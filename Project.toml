@@ -1,0 +1,10 @@
+name = "Conductor"
+uuid = "d194a933-43b5-4953-818b-974a45c81e67"
+authors = ["Wiktor Phillips <wsphillips@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
