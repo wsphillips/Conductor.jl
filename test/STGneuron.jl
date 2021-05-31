@@ -67,10 +67,13 @@ h_kinetics = [
 @named Kdr = IonChannel(Potassium, kdr_kinetics, 36mS/cm^2)
 @named leak = PassiveChannel(Leak, 0.3mS/cm^2)
 
+Ca_in = Conductor.Concentration(Calcium)
+
 # Equilibrium potentials are a implicit description of a ion concentration gradient
-gradients = Equilibria([Na   =>  50.0mV,
-                        K    => -77.0mV,
-                        Leak => -54.4mV])
+gradients = Equilibria(Pair[Na   =>  50.0mV,
+                            K    => -77.0mV,
+                            Leak => -54.4mV,
+                            Calcium => (500.0)*(8.6174e-5)*(283.15)*(log(max((3000.0/Ca_in), 0.001)))])
 
 # ECa = (500.0)*(8.6174e-5)*(283.15)*(log(max((3000.0/Ca), 0.001)))
 # f = 0.094; summed_calcium_flux -> sum of all calcium currents

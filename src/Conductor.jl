@@ -1,14 +1,16 @@
 module Conductor
 
-using ModelingToolkit, Unitful, Unitful.DefaultSymbols, InteractiveUtils, Symbolics, SymbolicUtils
-using IfElse
-import Symbolics: get_variables, Symbolic, value, tosymbol
-import Unitful: Time, Voltage, Current, mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms
-import Base: show, display
+using ModelingToolkit, Unitful, Unitful.DefaultSymbols, InteractiveUtils
+using IfElse, Symbolics, SymbolicUtils
 
+import Symbolics: get_variables, Symbolic, value, tosymbol, VariableDefaultValue
 import ModelingToolkit: toparam, isparameter, Equation
-import ModelingToolkit.SymbolicUtils: FnType
-import Symbolics.VariableDefaultValue
+import SymbolicUtils: FnType
+
+import Unitful: Time, Voltage, Current, Molarity
+import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM
+
+import Base: show, display
 
 export Gate, AlphaBetaRates, SteadyStateTau, IonChannel, PassiveChannel
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, MembraneCurrent
@@ -29,14 +31,17 @@ const MembranePotential() = symoft(:Vₘ)
 @derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
 
 # Ion species
+
+@enum Location Outside Inside
+
 abstract type Ion end
 abstract type Cation <: Ion end
 abstract type Anion <: Ion end
 
-struct Calcium <: Cation end
-struct Sodium <: Cation end
-struct Potassium <: Cation end
-struct Chloride <: Anion end
+struct Calcium  <: Ion end
+struct Sodium <: Ion end
+struct Potassium <: Ion end
+struct Chloride <: Ion end
 
 # Convenience aliases
 const Ca = Calcium
@@ -56,23 +61,24 @@ export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
 
 abstract type ConductorCurrentCtx end
 abstract type ConductorEquilibriumCtx end
+abstract type ConductorConcentrationCtx end
 
-struct MembraneCurrent{T <: Ion, V <: Union{Nothing,Num,Symbolic,Current}}
-    ion::Type{T}
+struct MembraneCurrent{I<:Ion,V<:Union{Nothing,Num,Symbolic,Current}}
+    ion::Type{I}
     val::V
 end
 
 function MembraneCurrent{I}(val = nothing; name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
-    var = Sym{Real}(Symbol("I", name))
+    var = Sym{Real}(Symbol("I", name)) # FIXME: set this to symoft?
     var = setmetadata(var, ConductorCurrentCtx, MembraneCurrent(I, val))
     return val isa Current ? toparam(Num(var)) : Num(var)
 end
 
+abstract type AbstractConcentration end
 abstract type AbstractIonGradient end
-struct IonConcentrations <: AbstractIonGradient end # stub placeholder
 
-struct EquilibriumPotential{T<:Ion, V <: Union{Num,Symbolic,Voltage}} <: AbstractIonGradient
-    ion::Type{T}
+struct EquilibriumPotential{I<:Ion,V<:Union{Num,Symbolic,Voltage}} <: AbstractIonGradient
+    ion::Type{I}
     val::V
 end
 
@@ -82,6 +88,18 @@ function EquilibriumPotential{I}(val; name::Symbol = PERIODIC_SYMBOL[I]) where {
     var = Sym{Real}(Symbol("E", name))
     var = setmetadata(var, ConductorEquilibriumCtx, EquilibriumPotential(I, val))
     return val isa Voltage ? toparam(Num(var)) : Num(var)
+end
+
+struct IonConcentration{I<:Ion, L<:Location, V<:Union{Num,Symbolic,Molarity}} <:AbstractConcentration
+    ion::Type{I}
+    val::V
+    loc::L
+end
+
+function Concentration(::Type{I}, val = 0mM, loc::Location = Inside, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
+    var = Sym{Real}(Symbol("⟦",name,"⟧",(loc == Inside ? "ᵢ" : "ₒ")))
+    var = setmetadata(var,  ConductorConcentrationCtx, IonConcentration(I, val, loc))
+    return val isa Molarity ? toparam(Num(var)) : Num(var)
 end
 
 # Alternative constructor
@@ -225,6 +243,7 @@ function IonChannel(conducts::Type{I},
 
     params = @parameters gbar
     defaultmap = Pair[gbar => gbar_val]
+
     # the "output" of a channel is it's conductance: g
     if passive
         eqs = [g ~ gbar]
@@ -286,7 +305,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
                   Vₘ => ustrip(Float64, mV, V0),
                   cₘ => ustrip(Float64, mF/cm^2, capacitance)]
 
-    eqs = Equation[] #Iapp ~ IfElse.ifelse(200. < t < 600., ustrip(Float64, mA, applied), 0.0)]
+    eqs = Equation[]
     required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
                          # but that we discover referenced in the RHS
                          
