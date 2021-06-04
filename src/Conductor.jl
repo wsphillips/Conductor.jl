@@ -19,7 +19,8 @@ export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
 
 # Helper utils
-symoft(name::Symbol) = Num(Variable{FnType{Tuple{Any}, Real}}(name))(t)
+symoft(name::Symbol) = Num(Sym{FnType{Tuple{Any}, Real}}(name))(value(t))
+symuncalled(name::Symbol) = Num(Sym{SymbolicUtils.FnType{NTuple{0, Any}, Real}}(name)())
 
 hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
 hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
@@ -76,8 +77,9 @@ struct IonConcentration{I<:Ion, L<:Location, V<:Union{Nothing, Num,Symbolic,Mola
     loc::L
 end
 
+# FIXME: handle default values
 function Concentration(::Type{I}, val = nothing, loc::Location = Inside, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
-    var = Sym{Real}(Symbol(name,(loc == Inside ? "ᵢ" : "ₒ")))
+    var = symoft(Symbol(name,(loc == Inside ? "ᵢ" : "ₒ")))
     var = setmetadata(var,  ConductorConcentrationCtx, IonConcentration(I, val, loc))
     return val isa Molarity ? toparam(Num(var)) : Num(var)
 end
@@ -98,6 +100,8 @@ end
 ismembranecurrent(x::Symbolic) = hasmetadata(x, ConductorCurrentCtx)
 ismembranecurrent(x::Num) = ismembranecurrent(ModelingToolkit.value(x))
 getmembranecurrent(x::Union{Num, Symbolic}) = ismembranecurrent(x) ? getmetadata(x, ConductorCurrentCtx) : nothing
+iontype(x::Union{Num, Symbolic}) = getmembranecurrent(x).ion
+isaggregator(x::Union{Num, Symbolic})  = getmetadata(x, ConductorAggregatorCtx)
 
 # Equilibrium potential implicitly defines an ionic gradient
 abstract type AbstractIonGradient end
@@ -110,7 +114,7 @@ end
 const Equilibrium{I} = EquilibriumPotential{I} 
 
 function EquilibriumPotential{I}(val, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
-    var = Sym{Real}(Symbol("E", name))
+    var = symuncalled(Symbol("E", name))
     var = setmetadata(var, ConductorEquilibriumCtx, EquilibriumPotential(I, val))
     return val isa Voltage ? toparam(Num(var)) : Num(var)
 end
@@ -305,7 +309,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     systems = []
     eqs = Equation[]
     required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
-    states = [Vₘ] # grow this as we discover/generate new states
+    states = Any[Vₘ] # grow this as we discover/generate new states
     currents = [] 
     params = @parameters cₘ aₘ Iapp()
 
@@ -332,13 +336,14 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
             # isolate states produced
             outvars = vcat((get_variables(x.lhs) for x in i.eqs)...)
             append!(states, outvars)
+            append!(eqs, i.eqs)
         end
     end
      
     # parse and build channel equations
     for chan in channels
 
-        iontype = chan.conducts
+        ion = chan.conducts
         sys = chan.sys
         push!(systems, sys) 
         
@@ -353,12 +358,12 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
         
         # write the current equation state
         # I = symoft(Symbol(:I,nameof(sys))) # alternatively "uncalled" term
-        I = MembraneCurrent{iontype}(name = nameof(sys), aggregate = false)
+        I = MembraneCurrent{ion}(name = nameof(sys), aggregate = false)
         push!(states, I) 
         push!(currents, I)
 
         # for now, take the first reversal potential with matching ion type
-        idx = findfirst(x -> x.ion == iontype, grad_meta)
+        idx = findfirst(x -> x.ion == ion, grad_meta)
         Erev = gradients[idx]
         eq = [I ~ aₘ * sys.g * (Vₘ - Erev)]
         rhs = grad_meta[idx].val 
@@ -378,8 +383,23 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
         end
     end
     # FIXME: handle aggregate current, handle all states 
-    required_states = value.(required_states)
-    unique!(required_states)
+    required_states = unique(value.(required_states))
+    states = unique(value.(states))
+     
+    filter!(x -> !any(isequal(y, x) for y in states), required_states)
+
+    if !isempty(required_states)
+        newstateeqs = Equation[]
+        for s in required_states
+            if ismembranecurrent(s) && isaggregator(s)
+                push!(newstateeqs, s ~ sum(filter(x -> iontype(x) == iontype(s), currents)))
+                push!(states, s)
+                
+            end
+        end
+        append!(eqs, newstateeqs)
+    end
+
     # propagate default parameter values to channel systems
     vm_eq = D(Vₘ) ~ (Iapp - sum(currents))/(aₘ*cₘ)
     push!(eqs, vm_eq)

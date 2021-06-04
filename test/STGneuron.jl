@@ -1,5 +1,5 @@
 
-using Conductor, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
+using Conductor, OrdinaryDiffEq, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
