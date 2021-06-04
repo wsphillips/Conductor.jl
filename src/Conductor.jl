@@ -14,36 +14,46 @@ import Base: show, display
 
 export Gate, AlphaBetaRates, SteadyStateTau, IonChannel, PassiveChannel
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, MembraneCurrent
-export Soma, Simulation
+export Soma, Simulation, Concentration, IonConcentration
 export @named
+export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
 
+# Helper utils
+symoft(name::Symbol) = Num(Variable{FnType{Tuple{Any}, Real}}(name))(t)
+
+hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
+hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
+hasdefault(x) = false    
+
+getdefault(x::Symbolic) = hasdefault(x) ? getmetadata(x, VariableDefaultValue) : nothing
+getdefault(x::Num) = getdefault(ModelingToolkit.value(x))
+
+# Basic symbols
 const t = toparam(Num(Sym{Real}(:t)))
 const D = Differential(t)
-
-function symoft(name::Symbol)
-    Num(Variable{FnType{Tuple{Any}, Real}}(name))(t)
-end
-
 const MembranePotential() = symoft(:Vₘ)
+@enum Location Outside Inside
 
+# Custom Unitful.jl quantities
 @derived_dimension SpecificConductance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^3 # conductance per unit area
 @derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4 # capacitance per unit area
 @derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
 
+# Metadata IDs
+abstract type ConductorCurrentCtx end
+abstract type ConductorEquilibriumCtx end
+abstract type ConductorConcentrationCtx end
+abstract type ConductorAggregatorCtx end
+
 # Ion species
-
-@enum Location Outside Inside
-
 abstract type Ion end
 abstract type Cation <: Ion end
 abstract type Anion <: Ion end
-
 struct Calcium  <: Ion end
 struct Sodium <: Ion end
 struct Potassium <: Ion end
 struct Chloride <: Ion end
 
-# Convenience aliases
 const Ca = Calcium
 const Na = Sodium
 const K = Potassium
@@ -57,24 +67,39 @@ const PERIODIC_SYMBOL = IdDict(Na => :Na,
                                Ca => :Ca,
                                Leak => :l)
 
-export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
+# Concentrations of ions
+abstract type AbstractConcentration end
 
-abstract type ConductorCurrentCtx end
-abstract type ConductorEquilibriumCtx end
-abstract type ConductorConcentrationCtx end
+struct IonConcentration{I<:Ion, L<:Location, V<:Union{Nothing, Num,Symbolic,Molarity}} <:AbstractConcentration
+    ion::Type{I}
+    val::V
+    loc::L
+end
 
+function Concentration(::Type{I}, val = nothing, loc::Location = Inside, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
+    var = Sym{Real}(Symbol(name,(loc == Inside ? "ᵢ" : "ₒ")))
+    var = setmetadata(var,  ConductorConcentrationCtx, IonConcentration(I, val, loc))
+    return val isa Molarity ? toparam(Num(var)) : Num(var)
+end
+
+# Currents
 struct MembraneCurrent{I<:Ion,V<:Union{Nothing,Num,Symbolic,Current}}
     ion::Type{I}
     val::V
 end
 
-function MembraneCurrent{I}(val = nothing; name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
-    var = Sym{Real}(Symbol("I", name)) # FIXME: set this to symoft?
+function MembraneCurrent{I}(val = nothing; name::Symbol = PERIODIC_SYMBOL[I], aggregate::Bool = false) where {I <: Ion}
+    var = symoft(Symbol("I", name))
     var = setmetadata(var, ConductorCurrentCtx, MembraneCurrent(I, val))
+    var = setmetadata(var, ConductorAggregatorCtx, aggregate)
     return val isa Current ? toparam(Num(var)) : Num(var)
 end
 
-abstract type AbstractConcentration end
+ismembranecurrent(x::Symbolic) = hasmetadata(x, ConductorCurrentCtx)
+ismembranecurrent(x::Num) = ismembranecurrent(ModelingToolkit.value(x))
+getmembranecurrent(x::Union{Num, Symbolic}) = ismembranecurrent(x) ? getmetadata(x, ConductorCurrentCtx) : nothing
+
+# Equilibrium potential implicitly defines an ionic gradient
 abstract type AbstractIonGradient end
 
 struct EquilibriumPotential{I<:Ion,V<:Union{Num,Symbolic,Voltage}} <: AbstractIonGradient
@@ -84,25 +109,13 @@ end
 
 const Equilibrium{I} = EquilibriumPotential{I} 
 
-function EquilibriumPotential{I}(val; name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
+function EquilibriumPotential{I}(val, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
     var = Sym{Real}(Symbol("E", name))
     var = setmetadata(var, ConductorEquilibriumCtx, EquilibriumPotential(I, val))
     return val isa Voltage ? toparam(Num(var)) : Num(var)
 end
 
-struct IonConcentration{I<:Ion, L<:Location, V<:Union{Num,Symbolic,Molarity}} <:AbstractConcentration
-    ion::Type{I}
-    val::V
-    loc::L
-end
-
-function Concentration(::Type{I}, val = 0mM, loc::Location = Inside, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
-    var = Sym{Real}(Symbol("⟦",name,"⟧",(loc == Inside ? "ᵢ" : "ₒ")))
-    var = setmetadata(var,  ConductorConcentrationCtx, IonConcentration(I, val, loc))
-    return val isa Molarity ? toparam(Num(var)) : Num(var)
-end
-
-# Alternative constructor
+# Alternate constructor
 function Equilibria(equil::Vector)
     out = Num[]
     for x in equil
@@ -118,10 +131,7 @@ function Equilibria(equil::Vector)
     return out
 end
 
-"""
-AbstractGatingVariable, in the most generic case, is any function that returns a
-dimensionless value (weight). 
-"""
+# Gating variables (as an interface)
 abstract type AbstractGatingVariable end
 
 hassteadystate(x::AbstractGatingVariable) = hasfield(typeof(x), :ss) ? !(isnothing(x.ss)) : false
@@ -155,9 +165,7 @@ end
 
 # TODO: find a nicer way to do this
 function Gate(::Type{SteadyStateTau}; p = one(Float64), kwargs...)
-
     syms = keys(kwargs)
-
     if length(syms) !== 2
         throw("Invalid number of input equations.")
     elseif issetequal([:m∞, :τₘ], syms)
@@ -170,9 +178,7 @@ function Gate(::Type{SteadyStateTau}; p = one(Float64), kwargs...)
 end
 
 function Gate(::Type{AlphaBetaRates}; p = one(Float64), kwargs...)
-
     syms = keys(kwargs)
-
     if length(syms) !== 2
         throw("Invalid number of input equations.")
     elseif issetequal([:αₘ, :βₘ], syms)
@@ -186,7 +192,12 @@ function Gate(::Type{AlphaBetaRates}; p = one(Float64), kwargs...)
     end
 end
 
-# Conductance types
+mutable struct AuxConversion
+    params::Vector{Num}
+    eqs::Vector{Equation}
+end
+
+# Conductance types (conductance as in "g")
 abstract type AbstractConductance end
 
 isbuilt(x::AbstractConductance) = x.sys !== nothing
@@ -207,7 +218,7 @@ Base.show(io::IO, ::MIME"text/plain", x::IonChannel) = Base.display(isbuilt(x) ?
 function IonChannel(conducts::Type{I},
                     gate_vars::Vector{<:AbstractGatingVariable},
                     max_g::SpecificConductance;
-                    name::Symbol, build = true) where {I <: Ion}
+                    name::Symbol) where {I <: Ion}
     
     # if no kinetics, the channel is just a scalar
     passive = length(gate_vars) == 0
@@ -215,25 +226,24 @@ function IonChannel(conducts::Type{I},
     # TODO: Generalize to other possible units (e.g. S/F)
     gbar_val = ustrip(Float64, mS/cm^2, max_g)
     gates = [getsymbol(x) for x in gate_vars]
+    params = @parameters gbar
+    defaultmap = Pair[gbar => gbar_val]
+    inputs = []
 
     # retrieve all variables present in the RHS of kinetics equations
-    inputs = []
-    
-    for i in gate_vars
-        syms = get_variables(getequation(i))
-        for j in syms
-            push!(inputs, j)
-        end
-    end
-    
-    # filter duplicates + self references from results
-    unique!(inputs)
-    filter!(x -> !any(isequal(y, x) for y in gates), inputs)
-    
     # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
     if passive
         @variables g() # uncalled
     else
+        for i in gate_vars
+            syms = value.(get_variables(getequation(i)))
+            for j in syms
+                isparameter(j) ? push!(params, j) : push!(inputs, j)
+            end
+        end
+        # filter duplicates + self references from results
+        unique!(inputs)
+        filter!(x -> !any(isequal(y, x) for y in gates), inputs)
         @variables g(t)
     end
 
@@ -241,13 +251,9 @@ function IonChannel(conducts::Type{I},
               gates
               inputs]
 
-    params = @parameters gbar
-    defaultmap = Pair[gbar => gbar_val]
-
-    # the "output" of a channel is it's conductance: g
     if passive
         eqs = [g ~ gbar]
-        push!(defaultmap, g => gbar_val)
+        push!(defaultmap, g => gbar_val) # this might be redundant
     else
         geq = [g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars)]
         eqs = [[getequation(x) for x in gate_vars]
@@ -256,7 +262,8 @@ function IonChannel(conducts::Type{I},
             push!(defaultmap, getsymbol(x) => hassteadystate(x) ? x.ss : 0.0) # fallback to zero
         end
     end
-    system = build ? ODESystem(eqs, t, states, params; defaults = defaultmap, name = name) : nothing
+
+    system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
     
     return IonChannel(max_g, conducts, inputs, params, gate_vars, system)
 end
@@ -265,9 +272,9 @@ end
 
 # Alias for ion channel with static conductance
 function PassiveChannel(conducts::Type{I}, max_g::SpecificConductance;
-                        name::Symbol = Base.gensym(:Leak), build = true) where {I <: Ion}
+                        name::Symbol = Base.gensym(:Leak)) where {I <: Ion}
     gate_vars = AbstractGatingVariable[] # ie. 'nothing'
-    return IonChannel(conducts, gate_vars, max_g; name = name, build = build)
+    return IonChannel(conducts, gate_vars, max_g; name = name)
 end
 
 abstract type Geometry end
@@ -288,44 +295,50 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
                              capacitance::SpecificCapacitance = 1µF/cm^2,
                              V0::Voltage = -65mV,
                              applied::Current = 225nA,
-                             #= auxstate = Equation[], =#
-                             build = true)
+                             aux::Union{Nothing, Vector{AuxConversion}} = nothing)
    
     Vₘ = MembranePotential()
+    grad_meta = getmetadata.(gradients, ConductorEquilibriumCtx) 
     r_val = ustrip(Float64, cm, radius)
     area = π*r_val^2
-    
-    params = @parameters cₘ aₘ Iapp()
-
+ 
+    systems = []
+    eqs = Equation[]
+    required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
     states = [Vₘ] # grow this as we discover/generate new states
     currents = [] 
+    params = @parameters cₘ aₘ Iapp()
 
     defaultmap = Pair[Iapp => ustrip(Float64, mA, applied),
                   aₘ => area,
                   Vₘ => ustrip(Float64, mV, V0),
                   cₘ => ustrip(Float64, mF/cm^2, capacitance)]
 
-    eqs = Equation[]
-    required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
-                         # but that we discover referenced in the RHS
-                         
-    grad_meta = getmetadata.(gradients, ConductorEquilibriumCtx) 
-    systems = []
+    # auxillary state transformations (e.g. net calcium current -> Ca concentration)
+    if aux !== nothing
+        for i in aux
 
-    #= use for auxillary state transformations (e.g. net calcium current -> Ca concentration)
-    for i in auxstate
-        push!(states, i.lhs)
-        append!(required_states, get_variables(i.rhs)...)
+            append!(params, i.params)
+            for x in i.params
+                hasdefault(x) && push!(defaultmap, x => getdefault(x))
+            end
+
+            # gather all unique variables)
+            inpvars = value.(vcat((get_variables(x.rhs) for x in i.eqs)...))
+            unique!(inpvars)
+            filter!(x -> !isparameter(x), inpvars) # exclude parameters
+            append!(required_states, inpvars)
+            
+            # isolate states produced
+            outvars = vcat((get_variables(x.lhs) for x in i.eqs)...)
+            append!(states, outvars)
+        end
     end
-    =# 
-
-    # parse and build equations
+     
+    # parse and build channel equations
     for chan in channels
 
         iontype = chan.conducts
-        
-        !isbuilt(chan) && build!(chan)
-
         sys = chan.sys
         push!(systems, sys) 
         
@@ -339,7 +352,8 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
         end
         
         # write the current equation state
-        I = symoft(Symbol(:I,nameof(sys))) # alternatively "uncalled" term
+        # I = symoft(Symbol(:I,nameof(sys))) # alternatively "uncalled" term
+        I = MembraneCurrent{iontype}(name = nameof(sys), aggregate = false)
         push!(states, I) 
         push!(currents, I)
 
@@ -352,23 +366,24 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
         if typeof(rhs) <: Voltage
             push!(defaultmap, Erev => ustrip(Float64, mV, rhs))
             push!(params, Erev)
-            push!(eqs, eq...) 
-        else # if symbolic/dynamic reversal potentials (warning: not tested yet)
+            append!(eqs, eq) 
+        else # symbolic/dynamic reversal potentials
             push!(eq, Erev ~ rhs)
+            push!(states, Erev)
             rhs_vars = get_variables(rhs)
             filter!(x -> !isequal(x, value(Erev)), rhs_vars)
-            append!(eqs, eq...)
+            rhs_ps = filter(x -> isparameter(x), rhs_vars)
+            append!(eqs, eq)
             append!(required_states, rhs_vars)
         end
     end
-    
+    # FIXME: handle aggregate current, handle all states 
     required_states = value.(required_states)
     unique!(required_states)
-
     # propagate default parameter values to channel systems
     vm_eq = D(Vₘ) ~ (Iapp - sum(currents))/(aₘ*cₘ)
     push!(eqs, vm_eq)
-    system = build ? ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name) : nothing
+    system = ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name)
     
     # Switch to outputting a compartment/neuron when we build-out networks/synapses
     return system#Compartment{Sphere}(capacitance, channels, states, params, system)
