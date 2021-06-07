@@ -14,6 +14,7 @@ import Base: show, display
 
 export Gate, AlphaBetaRates, SteadyStateTau, IonChannel, PassiveChannel
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, MembraneCurrent
+export AuxConversion, D
 export Soma, Simulation, Concentration, IonConcentration
 export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
@@ -77,12 +78,17 @@ struct IonConcentration{I<:Ion, L<:Location, V<:Union{Nothing, Num,Symbolic,Mola
     loc::L
 end
 
-# FIXME: handle default values
+# FIXME: handle default values better
 function Concentration(::Type{I}, val = nothing, loc::Location = Inside, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
     var = symoft(Symbol(name,(loc == Inside ? "ᵢ" : "ₒ")))
     var = setmetadata(var,  ConductorConcentrationCtx, IonConcentration(I, val, loc))
-    return val isa Molarity ? toparam(Num(var)) : Num(var)
+    return Num(var) #val isa Molarity ? toparam(Num(var)) : Num(var)
 end
+
+isconcentration(x::Symbolic) = hasmetadata(x, ConductorConcentrationCtx)
+isconcentration(x::Num) = isconcentration(value(x))
+getconcentration(x::Symbolic) = isconcentration(x) ? getmetadata(x, ConductorConcentrationCtx) : nothing
+getconcentration(x::Num) = getconcentration(value(x))
 
 # Currents
 struct MembraneCurrent{I<:Ion,V<:Union{Nothing,Num,Symbolic,Current}}
@@ -337,6 +343,10 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
             outvars = vcat((get_variables(x.lhs) for x in i.eqs)...)
             append!(states, outvars)
             append!(eqs, i.eqs)
+            for j in outvars
+                # FIXME: consider more consistent use of default variable ctx
+                isconcentration(j) && push!(defaultmap, j => ustrip(Float64, mM, getconcentration(j).val))
+            end
         end
     end
      
@@ -367,19 +377,24 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
         Erev = gradients[idx]
         eq = [I ~ aₘ * sys.g * (Vₘ - Erev)]
         rhs = grad_meta[idx].val 
-
-        if typeof(rhs) <: Voltage
-            push!(defaultmap, Erev => ustrip(Float64, mV, rhs))
-            push!(params, Erev)
-            append!(eqs, eq) 
-        else # symbolic/dynamic reversal potentials
-            push!(eq, Erev ~ rhs)
-            push!(states, Erev)
-            rhs_vars = get_variables(rhs)
-            filter!(x -> !isequal(x, value(Erev)), rhs_vars)
-            rhs_ps = filter(x -> isparameter(x), rhs_vars)
+        
+        # check to see if reversal potential already defined
+        if any(isequal(Erev, x) for x in states)
             append!(eqs, eq)
-            append!(required_states, rhs_vars)
+        else
+            if typeof(rhs) <: Voltage
+                push!(defaultmap, Erev => ustrip(Float64, mV, rhs))
+                push!(params, Erev)
+                append!(eqs, eq) 
+            else # symbolic/dynamic reversal potentials
+                push!(eq, Erev ~ rhs)
+                push!(states, Erev)
+                rhs_vars = get_variables(rhs)
+                filter!(x -> !isequal(x, value(Erev)), rhs_vars)
+                rhs_ps = filter(x -> isparameter(x), rhs_vars)
+                append!(eqs, eq)
+                append!(required_states, rhs_vars)
+            end
         end
     end
     # FIXME: handle aggregate current, handle all states 

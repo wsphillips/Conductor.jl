@@ -1,10 +1,10 @@
 
 using Conductor, OrdinaryDiffEq, Unitful, ModelingToolkit
-import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
+import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, mM
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
 Vₘ = MembranePotential()
-Caᵢ = Concentration(Calcium)
+Caᵢ = Concentration(Calcium, 0.03mM)
 ICa = MembraneCurrent{Calcium}(aggregate = true)
 
 nav_kinetics = [
@@ -66,6 +66,7 @@ h_kinetics = [
 @named KA  = IonChannel(Potassium, ka_kinetics, 0mS/cm^2)
 @named KCa = IonChannel(Potassium, kca_kinetics, 0mS/cm^2)
 @named Kdr = IonChannel(Potassium, kdr_kinetics, 36mS/cm^2)
+@named H = IonChannel(Cation, h_kinetics, 10mS/cm^2)
 @named leak = PassiveChannel(Leak, 0.3mS/cm^2)
 
 
@@ -75,15 +76,16 @@ gradients = Equilibria(Pair[Na      =>  50.0mV,
                             Leak    => -54.4mV,
                             Calcium => (500.0)*(8.6174e-5)*(283.15)*(log(max((3000.0/Caᵢ), 0.001)))])
 
-calcium_conversion = Conductor.AuxConversion(@parameters(τCa = 200.0, Ca∞ = 0.05, f = 0.094),
-                                   [Conductor.D(Caᵢ) ~ (1/τCa)*(-Caᵢ + Ca∞ + f*ICa)])
+calcium_conversion = AuxConversion(@parameters(τCa = 200.0, Ca∞ = 0.05, f = 0.094),
+                                   [D(Caᵢ) ~ (1/τCa)*(-Caᵢ + Ca∞ + f*ICa)])
 
-@named neuron = Soma([NaV, CaS, CaT, KA, KCa, Kdr, leak], gradients, aux = [calcium_conversion])
+# problem arises when we have two calcium currents
+@named neuron = Soma([NaV, CaS, CaT, KA, KCa, Kdr, H, leak], gradients, aux = [calcium_conversion])
 
 t = 250
 sim = Simulation(neuron, time = t*ms)
 
-solution = solve(sim, Rodas5())
+solution = solve(sim, ImplicitEuler())
 
 # Plot at 5kHz sampling
 plot(solution; plotdensity=Int(t*5))
