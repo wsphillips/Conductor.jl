@@ -29,12 +29,12 @@ gradients = Equilibria([Na   =>  50.0mV,
                         K    => -77.0mV,
                         Leak => -54.4mV])
 
-@named neuron = Soma([NaV,Kdr,leak], gradients, applied = 225nA, radius = 20µm)
+@named neuron = Soma([NaV,Kdr,leak], gradients, applied = 250pA, radius = 20µm)
 
 t = 250
 sim = Simulation(neuron, time = t*ms)
 
-solution = solve(sim, Rodas5())
+solution = solve(sim, Rosenbrock23())
 
 # Plot at 5kHz sampling
 plot(solution; plotdensity=Int(t*5))

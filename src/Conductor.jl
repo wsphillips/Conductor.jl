@@ -8,7 +8,7 @@ import ModelingToolkit: toparam, isparameter, Equation
 import SymbolicUtils: FnType
 
 import Unitful: Time, Voltage, Current, Molarity
-import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM
+import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 
 import Base: show, display
 
@@ -304,7 +304,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
                              gradients; name::Symbol, radius = 20µm,
                              capacitance::SpecificCapacitance = 1µF/cm^2,
                              V0::Voltage = -65mV,
-                             applied::Current = 225nA,
+                             applied::Current = 0nA,
                              aux::Union{Nothing, Vector{AuxConversion}} = nothing)
    
     Vₘ = MembranePotential()
@@ -319,7 +319,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     currents = [] 
     params = @parameters cₘ aₘ Iapp()
 
-    defaultmap = Pair[Iapp => ustrip(Float64, mA, applied),
+    defaultmap = Pair[Iapp => ustrip(Float64, µA, applied),
                   aₘ => area,
                   Vₘ => ustrip(Float64, mV, V0),
                   cₘ => ustrip(Float64, mF/cm^2, capacitance)]
@@ -345,7 +345,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
             append!(eqs, i.eqs)
             for j in outvars
                 # FIXME: consider more consistent use of default variable ctx
-                isconcentration(j) && push!(defaultmap, j => ustrip(Float64, mM, getconcentration(j).val))
+                isconcentration(j) && push!(defaultmap, j => ustrip(Float64, µM, getconcentration(j).val))
             end
         end
     end
