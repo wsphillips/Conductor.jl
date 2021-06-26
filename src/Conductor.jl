@@ -1,23 +1,25 @@
 module Conductor
 
 using ModelingToolkit, Unitful, Unitful.DefaultSymbols, InteractiveUtils
-using IfElse, Symbolics, SymbolicUtils
+using IfElse, Symbolics, SymbolicUtils, Setfield
 
 import Symbolics: get_variables, Symbolic, value, tosymbol, VariableDefaultValue
 import ModelingToolkit: toparam, isparameter, Equation
 import SymbolicUtils: FnType
 
-import Unitful: Time, Voltage, Current, Molarity
+import Unitful: Time, Voltage, Current, Molarity, ElectricalConductance
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 
 import Base: show, display
 
-export Gate, AlphaBetaRates, SteadyStateTau, IonChannel, PassiveChannel
+export Gate, AlphaBetaRates, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, MembraneCurrent
-export AuxConversion, D
+export AuxConversion, D, Network
 export Soma, Simulation, Concentration, IonConcentration
 export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
+
+const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 
 # Helper utils
 symoft(name::Symbol) = Num(Sym{FnType{Tuple{Any}, Real}}(name))(value(t))
@@ -63,11 +65,7 @@ const Cl = Chloride
 const Mixed = Ion # non-specific ion
 const Leak = Mixed
 
-const PERIODIC_SYMBOL = IdDict(Na => :Na,
-                               K  => :K,
-                               Cl => :Cl,
-                               Ca => :Ca,
-                               Leak => :l)
+const PERIODIC_SYMBOL = IdDict(Na => :Na, K  => :K, Cl => :Cl, Ca => :Ca, Leak => :l)
 
 # Concentrations of ions
 abstract type AbstractConcentration end
@@ -212,7 +210,7 @@ abstract type AbstractConductance end
 
 isbuilt(x::AbstractConductance) = x.sys !== nothing
 
-mutable struct IonChannel <: AbstractConductance
+struct IonChannel <: AbstractConductance
     gbar::SpecificConductance # scaling term - maximal conductance per unit area
     conducts::DataType # ion permeability
     inputs::Vector{Num} # cell states dependencies (input args to kinetics); we can infer this
@@ -227,7 +225,7 @@ Base.show(io::IO, ::MIME"text/plain", x::IonChannel) = Base.display(isbuilt(x) ?
 # General purpose constructor
 function IonChannel(conducts::Type{I},
                     gate_vars::Vector{<:AbstractGatingVariable},
-                    max_g::SpecificConductance;
+                    max_g::SpecificConductance = 0mS/cm^2;
                     name::Symbol) where {I <: Ion}
     
     # if no kinetics, the channel is just a scalar
@@ -257,9 +255,7 @@ function IonChannel(conducts::Type{I},
         @variables g(t)
     end
 
-    states = [g
-              gates
-              inputs]
+    states = vcat(g, gates, inputs)
 
     if passive
         eqs = [g ~ gbar]
@@ -278,13 +274,83 @@ function IonChannel(conducts::Type{I},
     return IonChannel(max_g, conducts, inputs, params, gate_vars, system)
 end
 
-(chan::IonChannel)(newgbar::SpecificConductance) = (chan.gbar = newgbar)
+function (chan::IonChannel)(newgbar::SpecificConductance)
+    newchan = @set chan.gbar = newgbar
+    @parameters gbar
+    gbar_val = ustrip(Float64, mS/cm^2, newgbar)
+    newchan.sys.defaults[value(gbar)] = gbar_val
+    return newchan
+end
 
 # Alias for ion channel with static conductance
-function PassiveChannel(conducts::Type{I}, max_g::SpecificConductance;
+function PassiveChannel(conducts::Type{I}, max_g::SpecificConductance = 0mS/cm^2;
                         name::Symbol = Base.gensym(:Leak)) where {I <: Ion}
     gate_vars = AbstractGatingVariable[] # ie. 'nothing'
     return IonChannel(conducts, gate_vars, max_g; name = name)
+end
+
+struct SynapticChannel <: AbstractConductance
+    gbar::ElectricalConductance # scaling term - maximal conductance per unit area
+    conducts::DataType # ion permeability
+    reversal::Num
+    inputs::Vector{Num} # cell states dependencies (input args to kinetics); we can infer this
+    params::Vector{Num}
+    kinetics::Vector{<:AbstractGatingVariable} # gating functions; none = passive channel
+    sys::Union{ODESystem, Nothing} # symbolic system
+end
+
+function SynapticChannel(conducts::Type{I},
+                    gate_vars::Vector{<:AbstractGatingVariable},
+                    reversal::Num,
+                    max_g::ElectricalConductance = 0mS;
+                    name::Symbol) where {I <: Ion}
+    
+    gbar_val = ustrip(Float64, mS, max_g)
+    gates = [getsymbol(x) for x in gate_vars]
+    params = @parameters gbar
+    defaultmap = Pair[gbar => gbar_val]
+    inputs = Any[]
+
+    # retrieve all variables present in the RHS of kinetics equations
+    # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
+        for i in gate_vars
+            syms = value.(get_variables(getequation(i)))
+            for j in syms
+                isparameter(j) ? push!(params, j) : push!(inputs, j)
+            end
+        end
+        # filter duplicates + self references from results
+        unique!(inputs)
+        filter!(x -> !any(isequal(y, x) for y in gates), inputs)
+        @variables g(t)
+
+    states = [g
+              gates
+              inputs]
+
+    #if passive
+    #    eqs = [g ~ gbar]
+    #    push!(defaultmap, g => gbar_val) # this might be redundant
+    #else
+    geq = [g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars)]
+        eqs = [[getequation(x) for x in gate_vars]
+               geq]
+        for x in gate_vars
+            push!(defaultmap, getsymbol(x) => #= hassteadystate(x) ? x.ss :=# 0.0) # fallback to zero
+        end
+    #end
+
+    system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
+    
+    return SynapticChannel(max_g, conducts, reversal, inputs, params, gate_vars, system)
+end
+
+function (chan::SynapticChannel)(newgbar::ElectricalConductance)
+    newchan = @set chan.gbar = newgbar
+    @parameters gbar
+    gbar_val = ustrip(Float64, mS, newgbar)
+    newchan.sys.defaults[value(gbar)] = gbar_val
+    return newchan
 end
 
 abstract type Geometry end
@@ -301,28 +367,33 @@ end
 
 # TODO: input validation - check channels/reversals for duplicates/conflicts
 function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
-                             gradients; name::Symbol, radius = 20µm,
+                             gradients; name::Symbol, area::Float64 = 0.628e-3, #radius = 20µm,
                              capacitance::SpecificCapacitance = 1µF/cm^2,
                              V0::Voltage = -65mV,
                              applied::Current = 0nA,
                              aux::Union{Nothing, Vector{AuxConversion}} = nothing)
    
     Vₘ = MembranePotential()
+    @variables Iapp(t) Isyn(t)
+    params = @parameters cₘ aₘ
     grad_meta = getmetadata.(gradients, ConductorEquilibriumCtx) 
-    r_val = ustrip(Float64, cm, radius)
-    area = π*r_val^2
+    #r_val = ustrip(Float64, cm, radius)
  
     systems = []
-    eqs = Equation[]
+    eqs = Equation[] # equations must be a vector
     required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
-    states = Any[Vₘ] # grow this as we discover/generate new states
+    states = Any[Vₘ, Iapp, Isyn] # grow this as we discover/generate new states
     currents = [] 
-    params = @parameters cₘ aₘ Iapp()
-
     defaultmap = Pair[Iapp => ustrip(Float64, µA, applied),
-                  aₘ => area,
-                  Vₘ => ustrip(Float64, mV, V0),
-                  cₘ => ustrip(Float64, mF/cm^2, capacitance)]
+                      aₘ => area,
+                      Vₘ => ustrip(Float64, mV, V0),
+                      Isyn => 0,
+                      cₘ => ustrip(Float64, mF/cm^2, capacitance)]
+    
+    # By default, we say applied current and synaptic current are constant
+    # They are both optionally revised to a new value during a "Stimulus" pass or during the
+    # Network constructor
+    append!(eqs, [D(Iapp) ~ 0])
 
     # auxillary state transformations (e.g. net calcium current -> Ca concentration)
     if aux !== nothing
@@ -399,7 +470,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     end
     # FIXME: handle aggregate current, handle all states 
     required_states = unique(value.(required_states))
-    states = unique(value.(states))
+    states = Any[unique(value.(states))...]
      
     filter!(x -> !any(isequal(y, x) for y in states), required_states)
 
@@ -414,14 +485,14 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
         end
         append!(eqs, newstateeqs)
     end
-
+    
     # propagate default parameter values to channel systems
-    vm_eq = D(Vₘ) ~ (Iapp - sum(currents))/(aₘ*cₘ)
+    vm_eq = D(Vₘ) ~ (Iapp - (+(currents..., Isyn)))/(aₘ*cₘ)
     push!(eqs, vm_eq)
     system = ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name)
     
     # Switch to outputting a compartment/neuron when we build-out networks/synapses
-    return system#Compartment{Sphere}(capacitance, channels, states, params, system)
+    return Compartment{Sphere}(capacitance, channels, states, params, system)
 end
 
 const Soma = Compartment{Sphere}
@@ -429,9 +500,89 @@ const Soma = Compartment{Sphere}
 function Compartment{Cylinder}() end
 # should also be able to parse "collections" of compartments" that have an adjacency list/matrix 
 
-function Simulation(system; time::Time)
+# takes a topology, which for now is just an adjacency list; also list of neurons, but we
+# should be able to just auto-detect all the neurons in the topology
+function Network(neurons, topology; name = :Network)
+    
+    all_neurons = Set(getproperty.(neurons, :sys))
+    eqs = Equation[]
+    params = Set()
+    states = Set() # placeholder for now
+    defaultmap = Pair[]
+    systems = []
+    
+    push!(systems, all_neurons...)
+    post_neurons = Set()
+
+    # what types of synapses do we have
+    all_synapses = [synapse.second[2] for synapse in topology]
+    all_synapse_types = [x.sys.name for x in all_synapses]
+    synapse_types = unique(all_synapse_types)
+
+    # how many of each synapse type are there 
+    synapse_counts = Dict{Symbol,Int64}()
+
+    for n in synapse_types
+        c = count(x -> isequal(x, n), all_synapse_types)
+        push!(synapse_counts, n => c)
+    end
+    
+    # Extract reversal potentials
+    reversals = unique([x.reversal for x in all_synapses])
+    push!(params, reversals...)
+    rev_meta = [getmetadata(x, ConductorEquilibriumCtx).val for x in reversals]
+    for (i,j) in zip(reversals, rev_meta)
+    push!(defaultmap, i => ustrip(Float64, mV, j))
+    end
+    
+    voltage_fwds = Set()
+
+    # create a unique synaptic current for each post-synaptic target
+    for synapse in topology
+        pre = synapse.first.sys # pre-synaptic neuron system
+        post = synapse.second[1].sys # post-synaptic neuron system
+        push!(post_neurons, post)
+        Erev = synapse.second[2].reversal
+        syntype = synapse.second[2].sys # synapse system
+        
+        syn = @set syntype.name = Symbol(syntype.name, synapse_counts[syntype.name]) # each synapse is uniquely named
+        synapse_counts[syntype.name] -= 1 
+
+        push!(systems, syn)
+        push!(voltage_fwds, syn.Vₘ ~ pre.Vₘ)
+        
+        if post.Isyn ∈ Set(vcat((get_variables(x.lhs) for x in eqs)...))
+            idx = findfirst(x -> isequal([post.Isyn], get_variables(x.lhs)), eqs) 
+            eq = popat!(eqs, idx)
+            eq = eq.lhs ~ eq.rhs + (syn.g * (post.Vₘ - Erev))
+            push!(eqs, eq)
+        else
+            push!(eqs, post.Isyn ~ syn.g * (post.Vₘ - Erev))
+        end
+    end
+
+    for nonpost in setdiff(all_neurons, post_neurons)
+        push!(eqs, D(nonpost.Isyn) ~ 0)
+    end
+    
+    append!(eqs, collect(voltage_fwds))
+
+    return ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name )
+end
+
+function Simulation(network; time::Time)
     t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(system)
+    simplified = structural_simplify(network)
+    return ODAEProblem(simplified, [], (0., t_val), [])
+end
+
+function Simulation(neuron::Soma; time::Time)
+    system = neuron.sys
+    # for a single neuron, we just need a thin layer to set synaptic current constant
+    @named simulation = ODESystem([D(system.Isyn) ~ 0]; systems = [system])
+
+    t_val = ustrip(Float64, ms, time)
+    simplified = structural_simplify(simulation)
     return ODAEProblem(simplified, [], (0., t_val), [])
 end
 

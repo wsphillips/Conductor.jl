@@ -1,6 +1,6 @@
 
 using Conductor, IfElse, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
-import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
+import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
 Vₘ = MembranePotential()
@@ -29,12 +29,27 @@ gradients = Equilibria([Na   =>  50.0mV,
                         K    => -77.0mV,
                         Leak => -54.4mV])
 
-area = 4*pi*(20µm)^2
+#area = 4*pi*(10µm)^2
+area = 0.629e-3cm^2
 
-@named neuron = Soma([NaV,Kdr,leak], gradients, applied = 400pA, area = ustrip(Float64, cm^2, area))
+@named neuron1 = Soma([NaV,Kdr,leak], gradients, applied = 5000pA, area = ustrip(Float64, cm^2, area))
+@named neuron2 = Soma([NaV,Kdr,leak], gradients, applied = 0pA, area = ustrip(Float64, cm^2, area))
+
+# Synaptic model
+syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
+τsyn = (1 - syn∞)/(1/40)
+syn_kinetics = Gate(SteadyStateTau, :s, syn∞, τsyn, 1)
+EGlut = Equilibrium{Conductor.Mixed}(0mV, :Glut) # NOTE: -70mV reversal => IPSP
+
+@named Glut = Conductor.SynapticChannel(Leak, [syn_kinetics], EGlut, 30nS)
+
+topology = [neuron1 => (neuron2, Glut),
+            neuron1 => (neuron2, Glut)]
+
+network = Conductor.Network([neuron1, neuron2], topology)
 
 t = 250
-sim = Simulation(neuron, time = t*ms)
+sim = Simulation(network, time = t*ms)
 
 solution = solve(sim, Rosenbrock23())
 
