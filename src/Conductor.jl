@@ -35,7 +35,7 @@ getdefault(x::Num) = getdefault(ModelingToolkit.value(x))
 # Basic symbols
 const t = toparam(Num(Sym{Real}(:t)))
 const D = Differential(t)
-const MembranePotential() = symoft(:Vₘ)
+MembranePotential() = symoft(:Vₘ)
 @enum Location Outside Inside
 
 # Custom Unitful.jl quantities
@@ -241,7 +241,7 @@ function IonChannel(conducts::Type{I},
     # retrieve all variables present in the RHS of kinetics equations
     # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
     if passive
-        @variables g() # uncalled
+        @variables g()
     else
         for i in gate_vars
             syms = value.(get_variables(getequation(i)))
@@ -259,7 +259,7 @@ function IonChannel(conducts::Type{I},
 
     if passive
         eqs = [g ~ gbar]
-        push!(defaultmap, g => gbar_val) # this might be redundant
+        push!(defaultmap, g => gbar_val) # perhaps redundant
     else
         geq = [g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars)]
         eqs = [[getequation(x) for x in gate_vars]
@@ -290,13 +290,13 @@ function PassiveChannel(conducts::Type{I}, max_g::SpecificConductance = 0mS/cm^2
 end
 
 struct SynapticChannel <: AbstractConductance
-    gbar::ElectricalConductance # scaling term - maximal conductance per unit area
-    conducts::DataType # ion permeability
+    gbar::ElectricalConductance
+    conducts::DataType
     reversal::Num
-    inputs::Vector{Num} # cell states dependencies (input args to kinetics); we can infer this
+    inputs::Vector{Num}
     params::Vector{Num}
-    kinetics::Vector{<:AbstractGatingVariable} # gating functions; none = passive channel
-    sys::Union{ODESystem, Nothing} # symbolic system
+    kinetics::Vector{<:AbstractGatingVariable}
+    sys::Union{ODESystem, Nothing}
 end
 
 function SynapticChannel(conducts::Type{I},
@@ -328,17 +328,12 @@ function SynapticChannel(conducts::Type{I},
               gates
               inputs]
 
-    #if passive
-    #    eqs = [g ~ gbar]
-    #    push!(defaultmap, g => gbar_val) # this might be redundant
-    #else
     geq = [g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars)]
-        eqs = [[getequation(x) for x in gate_vars]
-               geq]
-        for x in gate_vars
-            push!(defaultmap, getsymbol(x) => #= hassteadystate(x) ? x.ss :=# 0.0) # fallback to zero
-        end
-    #end
+    eqs = [[getequation(x) for x in gate_vars]
+           geq]
+    for x in gate_vars
+        push!(defaultmap, getsymbol(x) => 0.0)
+    end
 
     system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
     
@@ -365,35 +360,39 @@ struct Compartment{G}
     sys::ODESystem
 end
 
-# TODO: input validation - check channels/reversals for duplicates/conflicts
 function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
                              gradients; name::Symbol, area::Float64 = 0.628e-3, #radius = 20µm,
                              capacitance::SpecificCapacitance = 1µF/cm^2,
                              V0::Voltage = -65mV,
-                             applied::Current = 0nA,
+                             holding::Current = 0nA,
+                             stimulus::Union{Function,Nothing} = nothing,
                              aux::Union{Nothing, Vector{AuxConversion}} = nothing)
    
     Vₘ = MembranePotential()
     @variables Iapp(t) Isyn(t)
     params = @parameters cₘ aₘ
     grad_meta = getmetadata.(gradients, ConductorEquilibriumCtx) 
-    #r_val = ustrip(Float64, cm, radius)
+    #r_val = ustrip(Float64, cm, radius) # FIXME: make it so we calculate area from dims as needed
  
     systems = []
     eqs = Equation[] # equations must be a vector
     required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
     states = Any[Vₘ, Iapp, Isyn] # grow this as we discover/generate new states
     currents = [] 
-    defaultmap = Pair[Iapp => ustrip(Float64, µA, applied),
+    defaultmap = Pair[Iapp => ustrip(Float64, µA, holding),
                       aₘ => area,
                       Vₘ => ustrip(Float64, mV, V0),
                       Isyn => 0,
                       cₘ => ustrip(Float64, mF/cm^2, capacitance)]
     
-    # By default, we say applied current and synaptic current are constant
-    # They are both optionally revised to a new value during a "Stimulus" pass or during the
-    # Network constructor
-    append!(eqs, [D(Iapp) ~ 0])
+    # By default, applied current is constant (just a bias/offset/holding current)
+    # TODO: lift "stimulus" to a pass that happens at a higher level (i.e. after neuron 
+    # construction; with its own data type)
+    if stimulus == nothing
+        append!(eqs, [D(Iapp) ~ 0])
+    else
+        push!(eqs, Iapp ~ stimulus(t,Iapp))
+    end
 
     # auxillary state transformations (e.g. net calcium current -> Ca concentration)
     if aux !== nothing
@@ -438,7 +437,6 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
         end
         
         # write the current equation state
-        # I = symoft(Symbol(:I,nameof(sys))) # alternatively "uncalled" term
         I = MembraneCurrent{ion}(name = nameof(sys), aggregate = false)
         push!(states, I) 
         push!(currents, I)
@@ -468,7 +466,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
             end
         end
     end
-    # FIXME: handle aggregate current, handle all states 
+
     required_states = unique(value.(required_states))
     states = Any[unique(value.(states))...]
      
@@ -491,7 +489,6 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     push!(eqs, vm_eq)
     system = ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name)
     
-    # Switch to outputting a compartment/neuron when we build-out networks/synapses
     return Compartment{Sphere}(capacitance, channels, states, params, system)
 end
 
@@ -507,7 +504,7 @@ function Network(neurons, topology; name = :Network)
     all_neurons = Set(getproperty.(neurons, :sys))
     eqs = Equation[]
     params = Set()
-    states = Set() # placeholder for now
+    states = Set() # place holder
     defaultmap = Pair[]
     systems = []
     

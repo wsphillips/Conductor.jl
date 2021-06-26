@@ -182,7 +182,7 @@ channels = [NaV(300mS/cm^2),
 =#
 
 @named neuron = Soma(channels, gradients,
-                     area = area, V0 = -50mV, applied = 0nA, aux = [calcium_conversion]);
+                     area = area, V0 = -50mV, aux = [calcium_conversion]);
 
 t = 5000
 sim = Simulation(neuron, time = t*ms)

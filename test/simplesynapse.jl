@@ -32,8 +32,8 @@ gradients = Equilibria([Na   =>  50.0mV,
 #area = 4*pi*(10µm)^2
 area = 0.629e-3cm^2
 
-@named neuron1 = Soma([NaV,Kdr,leak], gradients, applied = 5000pA, area = ustrip(Float64, cm^2, area))
-@named neuron2 = Soma([NaV,Kdr,leak], gradients, applied = 0pA, area = ustrip(Float64, cm^2, area))
+@named neuron1 = Soma([NaV,Kdr,leak], gradients, holding = 5000pA, area = ustrip(Float64, cm^2, area))
+@named neuron2 = Soma([NaV,Kdr,leak], gradients, area = ustrip(Float64, cm^2, area))
 
 # Synaptic model
 syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
@@ -43,8 +43,7 @@ EGlut = Equilibrium{Conductor.Mixed}(0mV, :Glut) # NOTE: -70mV reversal => IPSP
 
 @named Glut = Conductor.SynapticChannel(Leak, [syn_kinetics], EGlut, 30nS)
 
-topology = [neuron1 => (neuron2, Glut),
-            neuron1 => (neuron2, Glut)]
+topology = [neuron1 => (neuron2, Glut)]
 
 network = Conductor.Network([neuron1, neuron2], topology)
 

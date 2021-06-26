@@ -13,7 +13,7 @@ using OrdinaryDiffEq, Plots
                     Kdr( 50mS/cm^2),
                     H(   .01mS/cm^2),
                     leak(  0mS/cm^2)],
-                    gradients, area = area, V0 = -50mV, applied = 0nA, aux = [calcium_conversion]);
+                    gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
 
 # LP 4
 @named LP = Soma([NaV( 100mS/cm^2),
@@ -24,7 +24,7 @@ using OrdinaryDiffEq, Plots
                   Kdr(  25mS/cm^2),
                   H(   .05mS/cm^2),
                   leak(.03mS/cm^2)],
-                  gradients, area = area, V0 = -50mV, applied = 0nA, aux = [calcium_conversion]);
+                  gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
 
 # PY 1
 @named PY = Soma([NaV( 100mS/cm^2),
@@ -35,7 +35,7 @@ using OrdinaryDiffEq, Plots
                   Kdr( 125mS/cm^2),
                   H(   .05mS/cm^2),
                   leak(.01mS/cm^2)],
-                  gradients, area = area, V0 = -50mV, applied = 0nA, aux = [calcium_conversion]);
+                  gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
 
 topology = [ABPD => (LP, Glut(30nS)),
             ABPD => (LP, Chol(30nS)),
