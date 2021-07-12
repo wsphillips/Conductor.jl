@@ -30,17 +30,10 @@ gradients = Equilibria([Na   =>  50.0mV,
                         Leak => -54.4mV])
 
 area = 4*pi*(20µm)^2
-
-function pulse(t, current)
-    if 100 < t < 200
-        return ustrip(Float64, µA, 400pA)
-    else
-        return 0.0
-    end
-end
+pulse(t, current) = 100. < t < 200. ? ustrip(Float64, µA, 400pA) : 0.0
 @register pulse(a,b)
 
-@named neuron = Soma([NaV,Kdr,leak], gradients, stimulus = pulse, area = ustrip(Float64, cm^2, area))
+@named neuron = Soma([NaV,Kdr,leak], gradients, stimulus = pulse, area = ustrip(Float64, cm^2, area));
 
 t = 300 
 sim = Simulation(neuron, time = t*ms)

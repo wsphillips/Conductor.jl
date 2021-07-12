@@ -1,3 +1,4 @@
+cd("Conductor.jl/test/")
 include(joinpath(@__DIR__, "prinz_kinetics.jl"))
 include(joinpath(@__DIR__, "prinz_synapses.jl"))
 

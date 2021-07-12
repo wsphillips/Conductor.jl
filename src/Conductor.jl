@@ -3,7 +3,7 @@ module Conductor
 using ModelingToolkit, Unitful, Unitful.DefaultSymbols, InteractiveUtils
 using IfElse, Symbolics, SymbolicUtils, Setfield
 
-import Symbolics: get_variables, Symbolic, value, tosymbol, VariableDefaultValue
+import Symbolics: get_variables, Symbolic, value, tosymbol, VariableDefaultValue, wrap
 import ModelingToolkit: toparam, isparameter, Equation
 import SymbolicUtils: FnType
 
@@ -20,10 +20,12 @@ export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
 
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
+const t = toparam(wrap(Sym{Real}(:t)))
+const D = Differential(t)
 
 # Helper utils
-symoft(name::Symbol) = Num(Sym{FnType{Tuple{Any}, Real}}(name))(value(t))
-symuncalled(name::Symbol) = Num(Sym{SymbolicUtils.FnType{NTuple{0, Any}, Real}}(name)())
+symoft(name::Symbol) = identity(wrap(Sym{FnType{Tuple{Any}, Real}}(name)(value(t))))
+symuncalled(name::Symbol) = identity(wrap(Sym{SymbolicUtils.FnType{NTuple{0, Any}, Real}}(name)()))
 
 hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
 hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
@@ -33,8 +35,6 @@ getdefault(x::Symbolic) = hasdefault(x) ? getmetadata(x, VariableDefaultValue) :
 getdefault(x::Num) = getdefault(ModelingToolkit.value(x))
 
 # Basic symbols
-const t = toparam(Num(Sym{Real}(:t)))
-const D = Differential(t)
 MembranePotential() = symoft(:Vₘ)
 @enum Location Outside Inside
 
@@ -80,7 +80,7 @@ end
 function Concentration(::Type{I}, val = nothing, loc::Location = Inside, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
     var = symoft(Symbol(name,(loc == Inside ? "ᵢ" : "ₒ")))
     var = setmetadata(var,  ConductorConcentrationCtx, IonConcentration(I, val, loc))
-    return Num(var) #val isa Molarity ? toparam(Num(var)) : Num(var)
+    return wrap(var) #val isa Molarity ? toparam(Num(var)) : Num(var)
 end
 
 isconcentration(x::Symbolic) = hasmetadata(x, ConductorConcentrationCtx)
@@ -98,7 +98,7 @@ function MembraneCurrent{I}(val = nothing; name::Symbol = PERIODIC_SYMBOL[I], ag
     var = symoft(Symbol("I", name))
     var = setmetadata(var, ConductorCurrentCtx, MembraneCurrent(I, val))
     var = setmetadata(var, ConductorAggregatorCtx, aggregate)
-    return val isa Current ? toparam(Num(var)) : Num(var)
+    return val isa Current ? toparam(wrap(var)) : wrap(var)
 end
 
 ismembranecurrent(x::Symbolic) = hasmetadata(x, ConductorCurrentCtx)
@@ -118,9 +118,13 @@ end
 const Equilibrium{I} = EquilibriumPotential{I} 
 
 function EquilibriumPotential{I}(val, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
-    var = symuncalled(Symbol("E", name))
+    if val isa Voltage
+        var = symuncalled(Symbol("E", name))
+    else
+        var = symoft(Symbol("E", name))
+    end
     var = setmetadata(var, ConductorEquilibriumCtx, EquilibriumPotential(I, val))
-    return val isa Voltage ? toparam(Num(var)) : Num(var)
+    return val isa Voltage ? toparam(wrap(var)) : wrap(var)
 end
 
 # Alternate constructor
@@ -234,15 +238,19 @@ function IonChannel(conducts::Type{I},
     # TODO: Generalize to other possible units (e.g. S/F)
     gbar_val = ustrip(Float64, mS/cm^2, max_g)
     gates = [getsymbol(x) for x in gate_vars]
-    params = @parameters gbar
-    defaultmap = Pair[gbar => gbar_val]
     inputs = []
 
     # retrieve all variables present in the RHS of kinetics equations
     # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
     if passive
-        @variables g()
+        params = @parameters g
+        defaultmap = Pair[g => gbar_val]
+        states = []
+        eqs = Equation[]
     else
+        @variables g(t)
+        params = @parameters gbar
+        defaultmap = Pair[gbar => gbar_val]
         for i in gate_vars
             syms = value.(get_variables(getequation(i)))
             for j in syms
@@ -252,15 +260,8 @@ function IonChannel(conducts::Type{I},
         # filter duplicates + self references from results
         unique!(inputs)
         filter!(x -> !any(isequal(y, x) for y in gates), inputs)
-        @variables g(t)
-    end
+        states = vcat(g, gates, inputs)
 
-    states = vcat(g, gates, inputs)
-
-    if passive
-        eqs = [g ~ gbar]
-        push!(defaultmap, g => gbar_val) # perhaps redundant
-    else
         geq = [g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars)]
         eqs = [[getequation(x) for x in gate_vars]
                geq]
@@ -272,6 +273,7 @@ function IonChannel(conducts::Type{I},
     system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
     
     return IonChannel(max_g, conducts, inputs, params, gate_vars, system)
+
 end
 
 function (chan::IonChannel)(newgbar::SpecificConductance)
@@ -397,7 +399,6 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     # auxillary state transformations (e.g. net calcium current -> Ca concentration)
     if aux !== nothing
         for i in aux
-
             append!(params, i.params)
             for x in i.params
                 hasdefault(x) && push!(defaultmap, x => getdefault(x))
@@ -489,6 +490,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     push!(eqs, vm_eq)
     system = ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name)
     
+    #return (eqs, states, params)
     return Compartment{Sphere}(capacitance, channels, states, params, system)
 end
 

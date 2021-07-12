@@ -184,7 +184,7 @@ channels = [NaV(300mS/cm^2),
 @named neuron = Soma(channels, gradients,
                      area = area, V0 = -50mV, aux = [calcium_conversion]);
 
-t = 5000
+t = 2500 
 sim = Simulation(neuron, time = t*ms)
 
 solution = solve(sim, Rosenbrock23())
