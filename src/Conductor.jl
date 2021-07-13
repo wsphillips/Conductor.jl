@@ -118,13 +118,14 @@ end
 const Equilibrium{I} = EquilibriumPotential{I} 
 
 function EquilibriumPotential{I}(val, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
+    sym = Symbol("E", name)
     if val isa Voltage
-        var = symuncalled(Symbol("E", name))
+        var = only(@parameters $sym) #symuncalled(Symbol("E", name))
     else
-        var = symoft(Symbol("E", name))
+        var = only(@variables $sym(t)) #symoft(Symbol("E", name))
     end
     var = setmetadata(var, ConductorEquilibriumCtx, EquilibriumPotential(I, val))
-    return val isa Voltage ? toparam(wrap(var)) : wrap(var)
+    return var #val isa Voltage ? toparam(wrap(var)) : wrap(var)
 end
 
 # Alternate constructor
@@ -169,7 +170,8 @@ function Gate(::Type{SteadyStateTau}, name::Symbol, ss::Num, tau::Num, p::Real)
 end
 
 function Gate(::Type{AlphaBetaRates}, name::Symbol, alpha::Num, beta::Num, p::Real)
-    sym = symoft(name)
+    #sym = symoft(name)
+    sym = only(@variables $name(t))
     df = D(sym) ~ alpha * (1 - sym) - beta*sym # αₘ(1 - m) - βₘ*m
     ss = alpha/(alpha + beta) # αₘ/(αₘ + βₘ)
     return Gate(sym, df, ss, p)
@@ -278,9 +280,14 @@ end
 
 function (chan::IonChannel)(newgbar::SpecificConductance)
     newchan = @set chan.gbar = newgbar
-    @parameters gbar
     gbar_val = ustrip(Float64, mS/cm^2, newgbar)
-    newchan.sys.defaults[value(gbar)] = gbar_val
+    if length(newchan.kinetics) > 0
+        @parameters gbar
+        newchan.sys.defaults[value(gbar)] = gbar_val
+    else # if no kinetics, by (our) definition it's a passive channel
+        @parameters g
+        newchan.sys.defaults[value(g)] = gbar_val
+    end
     return newchan
 end
 
