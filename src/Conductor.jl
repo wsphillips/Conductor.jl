@@ -20,13 +20,10 @@ export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
 
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
-const t = toparam(wrap(Sym{Real}(:t)))
+const t = let name = :t; only(@parameters $name) end
 const D = Differential(t)
 
 # Helper utils
-symoft(name::Symbol) = identity(wrap(Sym{FnType{Tuple{Any}, Real}}(name)(value(t))))
-symuncalled(name::Symbol) = identity(wrap(Sym{SymbolicUtils.FnType{NTuple{0, Any}, Real}}(name)()))
-
 hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
 hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
 hasdefault(x) = false    
@@ -35,7 +32,11 @@ getdefault(x::Symbolic) = hasdefault(x) ? getmetadata(x, VariableDefaultValue) :
 getdefault(x::Num) = getdefault(ModelingToolkit.value(x))
 
 # Basic symbols
-MembranePotential() = symoft(:Vₘ)
+function MembranePotential() 
+    name = :Vₘ
+    return only(@variables $name(t))
+end
+
 @enum Location Outside Inside
 
 # Custom Unitful.jl quantities
@@ -78,9 +79,11 @@ end
 
 # FIXME: handle default values better
 function Concentration(::Type{I}, val = nothing, loc::Location = Inside, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
-    var = symoft(Symbol(name,(loc == Inside ? "ᵢ" : "ₒ")))
-    var = setmetadata(var,  ConductorConcentrationCtx, IonConcentration(I, val, loc))
-    return wrap(var) #val isa Molarity ? toparam(Num(var)) : Num(var)
+    sym = Symbol(name,(loc == Inside ? "ᵢ" : "ₒ"))
+    # FIXME: Not necessarily a parameter when used as a primitive...but we should support
+    # this. Use a flag?
+    var = #=val isa Molarity ? only(@parameters $sym) :=# only(@variables $sym(t))
+    return setmetadata(var,  ConductorConcentrationCtx, IonConcentration(I, val, loc))
 end
 
 isconcentration(x::Symbolic) = hasmetadata(x, ConductorConcentrationCtx)
@@ -94,11 +97,12 @@ struct MembraneCurrent{I<:Ion,V<:Union{Nothing,Num,Symbolic,Current}}
     val::V
 end
 
+# TODO: add aggregator as field of Membrane current struct
 function MembraneCurrent{I}(val = nothing; name::Symbol = PERIODIC_SYMBOL[I], aggregate::Bool = false) where {I <: Ion}
-    var = symoft(Symbol("I", name))
+    sym = Symbol("I", name)
+    var = val isa Current ? only(@parameters $sym) : only(@variables $sym(t))
     var = setmetadata(var, ConductorCurrentCtx, MembraneCurrent(I, val))
-    var = setmetadata(var, ConductorAggregatorCtx, aggregate)
-    return val isa Current ? toparam(wrap(var)) : wrap(var)
+    return setmetadata(var, ConductorAggregatorCtx, aggregate)
 end
 
 ismembranecurrent(x::Symbolic) = hasmetadata(x, ConductorCurrentCtx)
@@ -119,13 +123,8 @@ const Equilibrium{I} = EquilibriumPotential{I}
 
 function EquilibriumPotential{I}(val, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
     sym = Symbol("E", name)
-    if val isa Voltage
-        var = only(@parameters $sym) #symuncalled(Symbol("E", name))
-    else
-        var = only(@variables $sym(t)) #symoft(Symbol("E", name))
-    end
-    var = setmetadata(var, ConductorEquilibriumCtx, EquilibriumPotential(I, val))
-    return var #val isa Voltage ? toparam(wrap(var)) : wrap(var)
+    var = val isa Voltage ? only(@parameters $sym) : only(@variables $sym(t))
+    return setmetadata(var, ConductorEquilibriumCtx, EquilibriumPotential(I, val))
 end
 
 # Alternate constructor
@@ -164,7 +163,7 @@ struct SteadyStateTau <: AbstractGateModel end
 struct AlphaBetaRates <: AbstractGateModel end
 
 function Gate(::Type{SteadyStateTau}, name::Symbol, ss::Num, tau::Num, p::Real)
-    sym = symoft(name)
+    sym = only(@variables $name(t))
     df = D(sym) ~ (ss-sym)/tau # (m∞ - m)/τₘ
     return Gate(sym, df, ss, p)
 end
@@ -308,6 +307,7 @@ struct SynapticChannel <: AbstractConductance
     sys::Union{ODESystem, Nothing}
 end
 
+# TODO: Collapse with Ion channel? "passive" == gap junction...?
 function SynapticChannel(conducts::Type{I},
                     gate_vars::Vector{<:AbstractGatingVariable},
                     reversal::Num,
@@ -322,16 +322,16 @@ function SynapticChannel(conducts::Type{I},
 
     # retrieve all variables present in the RHS of kinetics equations
     # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
-        for i in gate_vars
-            syms = value.(get_variables(getequation(i)))
-            for j in syms
-                isparameter(j) ? push!(params, j) : push!(inputs, j)
-            end
+    for i in gate_vars
+        syms = value.(get_variables(getequation(i)))
+        for j in syms
+            isparameter(j) ? push!(params, j) : push!(inputs, j)
         end
-        # filter duplicates + self references from results
-        unique!(inputs)
-        filter!(x -> !any(isequal(y, x) for y in gates), inputs)
-        @variables g(t)
+    end
+    # filter duplicates + self references from results
+    unique!(inputs)
+    filter!(x -> !any(isequal(y, x) for y in gates), inputs)
+    @variables g(t)
 
     states = [g
               gates
