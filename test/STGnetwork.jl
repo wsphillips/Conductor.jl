@@ -16,6 +16,18 @@ using OrdinaryDiffEq, Plots
                     leak(  0mS/cm^2)],
                     gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
 
+#= AB/PD 2
+@named ABPD = Soma([NaV(100mS/cm^2),
+                    CaT(2.5mS/cm^2),
+                    CaS(6mS/cm^2),
+                    KA(50mS/cm^2),
+                    KCa(5mS/cm^2),
+                    Kdr(100mS/cm^2),
+                    H(.01mS/cm^2),
+                    leak(0mS/cm^2)],
+                    gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
+=#
+
 # LP 4
 @named LP = Soma([NaV( 100mS/cm^2),
                   CaT(   0mS/cm^2),

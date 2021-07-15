@@ -169,7 +169,6 @@ function Gate(::Type{SteadyStateTau}, name::Symbol, ss::Num, tau::Num, p::Real)
 end
 
 function Gate(::Type{AlphaBetaRates}, name::Symbol, alpha::Num, beta::Num, p::Real)
-    #sym = symoft(name)
     sym = only(@variables $name(t))
     df = D(sym) ~ alpha * (1 - sym) - beta*sym # αₘ(1 - m) - βₘ*m
     ss = alpha/(alpha + beta) # αₘ/(αₘ + βₘ)
@@ -227,41 +226,37 @@ end
 # Return ODESystem pretty printing for our wrapper types
 Base.show(io::IO, ::MIME"text/plain", x::IonChannel) = Base.display(isbuilt(x) ? x.sys : x)
 
-function _conductance(gbar_val::T, gate_vars::Vector{<:AbstractGatingVariable}, name::Symbol; passive::Bool = false) where {T <: Real}
-
+function _conductance(gbar_val::T, gate_vars::Vector{<:AbstractGatingVariable}; 
+                      passive::Bool = false, null_init::Bool = false, name::Symbol) where {T <: Real}
     inputs = Set{Num}()
     states = Set{Num}()
     eqs = Equation[]
-
     # retrieve all variables present in the RHS of kinetics equations
     # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
     if passive
         params = @parameters g
-        defaultmap = Pair{Num, T}[g => gbar_val]
+        defaultmap = Pair[g => gbar_val]
     else
         gates = Set{Num}(getsymbol(x) for x in gate_vars)
         @variables g(t)
         push!(states, g)
         params = @parameters gbar
-        defaultmap = Pair{Num, T}[gbar => gbar_val]
+        defaultmap = Pair[gbar => gbar_val]
 
         for i in gate_vars
-            syms = get_variables(getequation(i))
+            syms = value.(get_variables(getequation(i)))
             for j in syms
-                j ∉ gates && isparameter(j) ? push!(params, j) : push!(inputs, j)
+                if j ∉ gates
+                    isparameter(j) ? push!(params, j) : push!(inputs, j)
+                end
             end
         end
-
         union!(states, gates, inputs)
-
         push!(eqs, g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars))
         append!(eqs, getequation(x) for x in gate_vars)
-        append!(defaultmap, getsymbol(x) => hassteadystate(x) ? x.ss : 0.0 for x in gate_vars) # fallback to zero
-
+        append!(defaultmap, getsymbol(x) => (hassteadystate(x) && !null_init) ? x.ss : 0.0 for x in gate_vars) # fallback to zero
     end
-
     system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
-
     return (collect(inputs), params, system)
 end
 
@@ -269,18 +264,11 @@ end
 function IonChannel(conducts::Type{I},
                     gate_vars::Vector{<:AbstractGatingVariable},
                     max_g::SpecificConductance = 0mS/cm^2;
-                    name::Symbol) where {I <: Ion}
-    
-    # if no kinetics, the channel is just a scalar
-    passive = length(gate_vars) == 0
-
+                    passive::Bool = false, name::Symbol) where {I <: Ion}
     # TODO: Generalize to other possible units (e.g. S/F)
     gbar_val = ustrip(Float64, mS/cm^2, max_g)
-
-    (inputs, params, system) = _conductance(gbar_val, gate_vars, name)
-    
+    (inputs, params, system) = _conductance(gbar_val, gate_vars, passive = passive, name = name)
     return IonChannel(max_g, conducts, inputs, params, gate_vars, system)
-
 end
 
 function (chan::IonChannel)(newgbar::SpecificConductance)
@@ -289,7 +277,7 @@ function (chan::IonChannel)(newgbar::SpecificConductance)
     if length(newchan.kinetics) > 0
         @parameters gbar
         newchan.sys.defaults[value(gbar)] = gbar_val
-    else # if no kinetics, by (our) definition it's a passive channel
+    else # if no kinetics, it's a passive channel
         @parameters g
         newchan.sys.defaults[value(g)] = gbar_val
     end
@@ -299,8 +287,8 @@ end
 # Alias for ion channel with static conductance
 function PassiveChannel(conducts::Type{I}, max_g::SpecificConductance = 0mS/cm^2;
                         name::Symbol = Base.gensym(:Leak)) where {I <: Ion}
-    gate_vars = AbstractGatingVariable[] # ie. 'nothing'
-    return IonChannel(conducts, gate_vars, max_g; name = name)
+    gate_vars = AbstractGatingVariable[]
+    return IonChannel(conducts, gate_vars, max_g; name = name, passive = true)
 end
 
 struct SynapticChannel <: AbstractConductance
@@ -313,53 +301,29 @@ struct SynapticChannel <: AbstractConductance
     sys::Union{ODESystem, Nothing}
 end
 
-# TODO: Collapse with Ion channel? "passive" == gap junction...?
-function SynapticChannel(conducts::Type{I},
-                    gate_vars::Vector{<:AbstractGatingVariable},
-                    reversal::Num,
-                    max_g::ElectricalConductance = 0mS;
-                    name::Symbol) where {I <: Ion}
-    
+function SynapticChannel(conducts::Type{I}, gate_vars::Vector{<:AbstractGatingVariable},
+                         reversal::Num, max_g::ElectricalConductance = 0mS;
+                         passive::Bool = false, name::Symbol) where {I <: Ion}
     gbar_val = ustrip(Float64, mS, max_g)
-    gates = [getsymbol(x) for x in gate_vars]
-    params = @parameters gbar
-    defaultmap = Pair[gbar => gbar_val]
-    inputs = Any[]
-
-    # retrieve all variables present in the RHS of kinetics equations
-    # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
-    for i in gate_vars
-        syms = value.(get_variables(getequation(i)))
-        for j in syms
-            isparameter(j) ? push!(params, j) : push!(inputs, j)
-        end
-    end
-    # filter duplicates + self references from results
-    unique!(inputs)
-    filter!(x -> !any(isequal(y, x) for y in gates), inputs)
-    @variables g(t)
-
-    states = [g
-              gates
-              inputs]
-
-    geq = [g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars)]
-    eqs = [[getequation(x) for x in gate_vars]
-           geq]
-    for x in gate_vars
-        push!(defaultmap, getsymbol(x) => 0.0)
-    end
-
-    system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
-    
+    (inputs, params, system) = _conductance(gbar_val, gate_vars, passive = passive, null_init = true, name = name)
     return SynapticChannel(max_g, conducts, reversal, inputs, params, gate_vars, system)
+end
+
+function GapJunction(conducts::Type{I}, reversal::Num, max_g::ElectricalConductance = 0mS;
+                     passive::Bool = false, name::Symbol) where {I <: Ion}
+    SynapticChannel(conducts, AbstractGatingVariable[], reversal, max_g, passive = true, name)
 end
 
 function (chan::SynapticChannel)(newgbar::ElectricalConductance)
     newchan = @set chan.gbar = newgbar
-    @parameters gbar
     gbar_val = ustrip(Float64, mS, newgbar)
-    newchan.sys.defaults[value(gbar)] = gbar_val
+    if length(newchan.kinetics) > 0
+        @parameters gbar
+        newchan.sys.defaults[value(gbar)] = gbar_val
+    else
+        @parameters g
+        newchan.sys.defaults[value(g)] = gbar_val
+    end
     return newchan
 end
 
@@ -436,7 +400,6 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
      
     # parse and build channel equations
     for chan in channels
-
         ion = chan.conducts
         sys = chan.sys
         push!(systems, sys) 
@@ -483,7 +446,6 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
 
     required_states = unique(value.(required_states))
     states = Any[unique(value.(states))...]
-     
     filter!(x -> !any(isequal(y, x) for y in states), required_states)
 
     if !isempty(required_states)
@@ -522,7 +484,6 @@ function Network(neurons, topology; name = :Network)
     states = Set() # place holder
     defaultmap = Pair[]
     systems = []
-    
     push!(systems, all_neurons...)
     post_neurons = Set()
 
@@ -556,10 +517,8 @@ function Network(neurons, topology; name = :Network)
         push!(post_neurons, post)
         Erev = synapse.second[2].reversal
         syntype = synapse.second[2].sys # synapse system
-        
         syn = @set syntype.name = Symbol(syntype.name, synapse_counts[syntype.name]) # each synapse is uniquely named
         synapse_counts[syntype.name] -= 1 
-
         push!(systems, syn)
         push!(voltage_fwds, syn.Vₘ ~ pre.Vₘ)
         
@@ -578,13 +537,13 @@ function Network(neurons, topology; name = :Network)
     end
     
     append!(eqs, collect(voltage_fwds))
-
     return ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name )
 end
 
 function Simulation(network; time::Time)
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(network)
+    display(simplified)
     return ODAEProblem(simplified, [], (0., t_val), [])
 end
 
@@ -592,9 +551,9 @@ function Simulation(neuron::Soma; time::Time)
     system = neuron.sys
     # for a single neuron, we just need a thin layer to set synaptic current constant
     @named simulation = ODESystem([D(system.Isyn) ~ 0]; systems = [system])
-
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(simulation)
+    display(simplified)
     return ODAEProblem(simplified, [], (0., t_val), [])
 end
 

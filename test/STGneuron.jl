@@ -1,6 +1,6 @@
 
 using Conductor, OrdinaryDiffEq, Plots
-
+cd("Conductor.jl/test")
 include(joinpath(@__DIR__, "prinz_kinetics.jl"))
 
 ############################################################################################
@@ -181,12 +181,10 @@ channels = [NaV(300mS/cm^2),
             leak(0mS/cm^2)]
 =#
 
-@named neuron = Soma(channels, gradients,
-                     area = area, V0 = -50mV, aux = [calcium_conversion]);
+@named neuron = Soma(channels, gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
 
 t = 2500 
 sim = Simulation(neuron, time = t*ms)
-
 solution = solve(sim, Rosenbrock23())
 
 # Plot at 5kHz sampling

@@ -37,7 +37,6 @@ pulse(t, current) = 100. < t < 200. ? ustrip(Float64, µA, 400pA) : 0.0
 
 t = 300 
 sim = Simulation(neuron, time = t*ms)
-
 solution = solve(sim, Rosenbrock23())
 
 # Plot at 5kHz sampling
