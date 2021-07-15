@@ -227,6 +227,44 @@ end
 # Return ODESystem pretty printing for our wrapper types
 Base.show(io::IO, ::MIME"text/plain", x::IonChannel) = Base.display(isbuilt(x) ? x.sys : x)
 
+function _conductance(gbar_val::T, gate_vars::Vector{<:AbstractGatingVariable}, name::Symbol; passive::Bool = false) where {T <: Real}
+
+    inputs = Set{Num}()
+    states = Set{Num}()
+    eqs = Equation[]
+
+    # retrieve all variables present in the RHS of kinetics equations
+    # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
+    if passive
+        params = @parameters g
+        defaultmap = Pair{Num, T}[g => gbar_val]
+    else
+        gates = Set{Num}(getsymbol(x) for x in gate_vars)
+        @variables g(t)
+        push!(states, g)
+        params = @parameters gbar
+        defaultmap = Pair{Num, T}[gbar => gbar_val]
+
+        for i in gate_vars
+            syms = get_variables(getequation(i))
+            for j in syms
+                j ∉ gates && isparameter(j) ? push!(params, j) : push!(inputs, j)
+            end
+        end
+
+        union!(states, gates, inputs)
+
+        push!(eqs, g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars))
+        append!(eqs, getequation(x) for x in gate_vars)
+        append!(defaultmap, getsymbol(x) => hassteadystate(x) ? x.ss : 0.0 for x in gate_vars) # fallback to zero
+
+    end
+
+    system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
+
+    return (collect(inputs), params, system)
+end
+
 # General purpose constructor
 function IonChannel(conducts::Type{I},
                     gate_vars::Vector{<:AbstractGatingVariable},
@@ -238,40 +276,8 @@ function IonChannel(conducts::Type{I},
 
     # TODO: Generalize to other possible units (e.g. S/F)
     gbar_val = ustrip(Float64, mS/cm^2, max_g)
-    gates = [getsymbol(x) for x in gate_vars]
-    inputs = []
 
-    # retrieve all variables present in the RHS of kinetics equations
-    # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
-    if passive
-        params = @parameters g
-        defaultmap = Pair[g => gbar_val]
-        states = []
-        eqs = Equation[]
-    else
-        @variables g(t)
-        params = @parameters gbar
-        defaultmap = Pair[gbar => gbar_val]
-        for i in gate_vars
-            syms = value.(get_variables(getequation(i)))
-            for j in syms
-                isparameter(j) ? push!(params, j) : push!(inputs, j)
-            end
-        end
-        # filter duplicates + self references from results
-        unique!(inputs)
-        filter!(x -> !any(isequal(y, x) for y in gates), inputs)
-        states = vcat(g, gates, inputs)
-
-        geq = [g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars)]
-        eqs = [[getequation(x) for x in gate_vars]
-               geq]
-        for x in gate_vars
-            push!(defaultmap, getsymbol(x) => hassteadystate(x) ? x.ss : 0.0) # fallback to zero
-        end
-    end
-
-    system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
+    (inputs, params, system) = _conductance(gbar_val, gate_vars, name)
     
     return IonChannel(max_g, conducts, inputs, params, gate_vars, system)
 
