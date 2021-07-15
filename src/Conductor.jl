@@ -281,7 +281,7 @@ function (chan::IonChannel)(newgbar::SpecificConductance)
         @parameters g
         newchan.sys.defaults[value(g)] = gbar_val
     end
-    return newchan
+    return deepcopy(newchan) # FIXME: setfield shouldn't be mutating...?
 end
 
 # Alias for ion channel with static conductance
@@ -324,7 +324,7 @@ function (chan::SynapticChannel)(newgbar::ElectricalConductance)
         @parameters g
         newchan.sys.defaults[value(g)] = gbar_val
     end
-    return newchan
+    return deepcopy(newchan)
 end
 
 abstract type Geometry end

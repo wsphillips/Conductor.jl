@@ -4,19 +4,8 @@ include(joinpath(@__DIR__, "prinz_synapses.jl"))
 
 using OrdinaryDiffEq, Plots
 
-# Figure 3e Prinz (rough attempt)
-# AB/PD 3 (Note: I think this is supposed to be ABPD 2, but that one results in silent network
-@named ABPD = Soma([NaV( 200mS/cm^2),
-                    CaT( 2.5mS/cm^2),
-                    CaS(   4mS/cm^2),
-                    KA(   50mS/cm^2),
-                    KCa(   5mS/cm^2),
-                    Kdr( 50mS/cm^2),
-                    H(   .01mS/cm^2),
-                    leak(  0mS/cm^2)],
-                    gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
-
-#= AB/PD 2
+# Figure 3e Prinz (rough attempt; might need tuning, but it's close)
+# AB/PD 2 
 @named ABPD = Soma([NaV(100mS/cm^2),
                     CaT(2.5mS/cm^2),
                     CaS(6mS/cm^2),
@@ -26,7 +15,6 @@ using OrdinaryDiffEq, Plots
                     H(.01mS/cm^2),
                     leak(0mS/cm^2)],
                     gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
-=#
 
 # LP 4
 @named LP = Soma([NaV( 100mS/cm^2),
@@ -60,7 +48,7 @@ topology = [ABPD => (LP, Glut(30nS)),
 
 network = Network([ABPD, LP, PY], topology)
 
-t = 7500
+t = 5000
 sim = Simulation(network, time = t*ms)
 solution = solve(sim, Rosenbrock23())
 
