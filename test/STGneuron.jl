@@ -1,6 +1,6 @@
 
 using Conductor, OrdinaryDiffEq, Plots
-cd("Conductor.jl/test")
+
 include(joinpath(@__DIR__, "prinz_kinetics.jl"))
 
 ############################################################################################
@@ -185,8 +185,12 @@ channels = [NaV(300mS/cm^2),
 
 t = 2500 
 sim = Simulation(neuron, time = t*ms)
-solution = solve(sim, Rosenbrock23())
+solution = solve(sim, Rosenbrock23());
 
 # Plot at 5kHz sampling
-plot(solution; plotdensity=Int(t*4))
+fig = plot(solution; plotdensity=Int(t*4), size=(1200,800), vars=[neuron.sys.Vₘ]);
+gui(fig)
+
+# Uncomment and eval `png(...)` to save as PNG
+# png(fig, "figure_simulated")
 
