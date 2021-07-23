@@ -48,10 +48,14 @@ topology = [ABPD => (LP, Glut(30nS)),
 
 network = Network([ABPD, LP, PY], topology)
 
-t = 5000
+t = 10000
 sim = Simulation(network, time = t*ms)
 solution = solve(sim, Rosenbrock23())
 
 # Plot at 5kHz sampling
-plot(solution; plotdensity=Int(t*5), vars = [ABPD.sys.Vₘ, LP.sys.Vₘ, PY.sys.Vₘ])
+fig = plot(solution; plotdensity=Int(t*5), size=(1200,800), vars = [ABPD.sys.Vₘ, LP.sys.Vₘ, PY.sys.Vₘ])
+fig
+
+# Uncomment and eval `png(...)` to save as PNG
+# png(fig, "figure3e_simulated")
 
