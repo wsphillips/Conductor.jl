@@ -91,4 +91,3 @@ calcium_conversion = AuxConversion(@parameters(τCa = 200, Ca∞ = 0.05, f = pri
 @named H   = IonChannel(Cation, h_kinetics)
 @named leak = PassiveChannel(Leak)
 
-

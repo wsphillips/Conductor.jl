@@ -1,7 +1,8 @@
+# Example of writing synaptic kinetics
 
 using Conductor, IfElse, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
-import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
-import Conductor: Na, K # shorter aliases for Sodium/Potassium
+import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
+import Conductor: Na, K
 
 Vₘ = MembranePotential()
 
@@ -29,14 +30,24 @@ gradients = Equilibria([Na   =>  50.0mV,
                         K    => -77.0mV,
                         Leak => -54.4mV])
 
-area = 4*pi*(20µm)^2
-pulse(t, current) = 100. < t < 200. ? ustrip(Float64, µA, 400pA) : 0.0
-@register pulse(a,b)
+#area = 4*pi*(10µm)^2
+area = 0.629e-3cm^2
 
-@named neuron = Soma([NaV,Kdr,leak], gradients, stimulus = pulse, area = ustrip(Float64, cm^2, area));
+@named neuron1 = Soma([NaV,Kdr,leak], gradients, holding = 5000pA, area = ustrip(Float64, cm^2, area));
+@named neuron2 = Soma([NaV,Kdr,leak], gradients, area = ustrip(Float64, cm^2, area));
 
-t = 300 
-sim = Simulation(neuron, time = t*ms)
+# Synaptic model
+syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
+τsyn = (1 - syn∞)/(1/40)
+syn_kinetics = Gate(SteadyStateTau, :s, syn∞, τsyn, 1)
+EGlut = Equilibrium{Conductor.Mixed}(0mV, :Glut)
+
+@named Glut = Conductor.SynapticChannel(Leak, [syn_kinetics], EGlut, 30nS);
+topology = [neuron1 => (neuron2, Glut)];
+network = Conductor.Network([neuron1, neuron2], topology)
+
+t = 250
+sim = Simulation(network, time = t*ms)
 solution = solve(sim, Rosenbrock23())
 
 # Plot at 5kHz sampling

@@ -1,10 +1,11 @@
-cd("Conductor.jl/test/")
-include(joinpath(@__DIR__, "prinz_kinetics.jl"))
-include(joinpath(@__DIR__, "prinz_synapses.jl"))
+# Synaptically connected STG model network built as in Prinz et al Nature Neurosci 2004
 
 using OrdinaryDiffEq, Plots
 
-# Figure 3e Prinz (rough attempt; might need tuning, but it's close)
+include(joinpath(@__DIR__, "prinz_kinetics.jl"));
+include(joinpath(@__DIR__, "prinz_synapses.jl"));
+
+# Figure 3e Prinz (qualitatively close to expected output)
 # AB/PD 2 
 @named ABPD = Soma([NaV(100mS/cm^2),
                     CaT(2.5mS/cm^2),
@@ -15,6 +16,8 @@ using OrdinaryDiffEq, Plots
                     H(.01mS/cm^2),
                     leak(0mS/cm^2)],
                     gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
+
+ABPD.sys # display
 
 # LP 4
 @named LP = Soma([NaV( 100mS/cm^2),
@@ -27,6 +30,8 @@ using OrdinaryDiffEq, Plots
                   leak(.03mS/cm^2)],
                   gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
 
+LP.sys # display
+
 # PY 1
 @named PY = Soma([NaV( 100mS/cm^2),
                   CaT( 2.5mS/cm^2),
@@ -37,6 +42,8 @@ using OrdinaryDiffEq, Plots
                   H(   .05mS/cm^2),
                   leak(.01mS/cm^2)],
                   gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
+
+PY.sys # display
 
 topology = [ABPD => (LP, Glut(30nS)),
             ABPD => (LP, Chol(30nS)),

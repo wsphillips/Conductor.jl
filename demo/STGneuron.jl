@@ -1,7 +1,11 @@
+# Multiple single neuron examples derived from the Prinz et al STG model.
+# To try some of the other neuron variants, redefine the `channels` vector, using any of the
+# additional commented out parameters listed below. Then re-run the neuron constructor,
+# simulation, solve and plot as before.
 
 using Conductor, OrdinaryDiffEq, Plots
 
-include(joinpath(@__DIR__, "prinz_kinetics.jl"))
+include(joinpath(@__DIR__, "prinz_kinetics.jl"));
 
 ############################################################################################
 # Prinz 2003 J. Neurophysiol
@@ -17,7 +21,23 @@ channels = [NaV(100mS/cm^2),
             H(.02mS/cm^2),
             leak(.03mS/cm^2)]
 
-#=
+@named neuron = Soma(channels, gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
+
+t = 2500 
+sim = Simulation(neuron, time = t*ms)
+solution = solve(sim, Rosenbrock23());
+
+# Plot at 5kHz sampling
+fig = plot(solution; plotdensity=Int(t*4), size=(1200,800), vars=[neuron.sys.Vₘ]);
+gui(fig)
+
+# Uncomment and eval `png(...)` to save as PNG
+# png(fig, "figure_simulated")
+
+# Evaluate the alternate channel vectors below to experiment with different styles of
+# neurons, derived directly from the original publications...
+
+#= 
 # Figure 3C Irregular bursting
 channels = [NaV(400mS/cm^2),
             CaT(0mS/cm^2),
@@ -181,16 +201,4 @@ channels = [NaV(300mS/cm^2),
             leak(0mS/cm^2)]
 =#
 
-@named neuron = Soma(channels, gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
-
-t = 2500 
-sim = Simulation(neuron, time = t*ms)
-solution = solve(sim, Rosenbrock23());
-
-# Plot at 5kHz sampling
-fig = plot(solution; plotdensity=Int(t*4), size=(1200,800), vars=[neuron.sys.Vₘ]);
-gui(fig)
-
-# Uncomment and eval `png(...)` to save as PNG
-# png(fig, "figure_simulated")
 
