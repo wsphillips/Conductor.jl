@@ -14,7 +14,7 @@ the directory via the package manager:
 
 ```julia
 # From Julia REPL
-using Pkg; Pkg.add("/path/to/Conductor.jl")
+using Pkg; Pkg.add(path="/path/to/Conductor.jl")
 ```
 
 While Conductor.jl is still in early development, you can get a feel for what's going on by looking in
