@@ -168,12 +168,15 @@ function Gate(::Type{SteadyStateTau}, name::Symbol, ss::Num, tau::Num, p::Real)
     return Gate(sym, df, ss, p)
 end
 
-function Gate(::Type{AlphaBetaRates}, name::Symbol, alpha::Num, beta::Num, p::Real)
+function Gate(::Type{AlphaBetaRates}, name::Symbol, alpha::Num, beta::Num, p::Float64)
     sym = only(@variables $name(t))
     df = D(sym) ~ alpha * (1 - sym) - beta*sym # αₘ(1 - m) - βₘ*m
     ss = alpha/(alpha + beta) # αₘ/(αₘ + βₘ)
     return Gate(sym, df, ss, p)
 end
+
+Gate(t::Type{AlphaBetaRates}, name::Symbol, alpha::Num, beta::Num, p::Real) =
+Gate(AlphaBetaRates, name, alpha, beta, Float64(p))
 
 # TODO: find a nicer way to do this
 function Gate(::Type{SteadyStateTau}; p = one(Float64), kwargs...)
