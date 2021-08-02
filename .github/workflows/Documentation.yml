@@ -1,23 +1,27 @@
-name: CI
+name: Documentation
+
 on:
   push:
     branches: [ main ]
     paths:
+      - 'docs/**'
+      - 'tutorials/**'
       - 'src/**'
-      - 'test/**'
       - 'Project.toml'
       - 'Manifest.toml'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'tutorials/**'
       - 'src/**'
-      - 'test/**'
       - 'Project.toml'
       - 'Manifest.toml'
 
   workflow_dispatch: # Allows running workflow manually from the Actions tab
 
 jobs:
-  test:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - name: Cancel Previous Runs
@@ -45,8 +49,23 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-
 
-      - name: Build package
-        uses: julia-actions/julia-buildpkg@latest
+      - name: Install Dependencies
+        run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
 
-      - name: Run tests
-        uses: julia-actions/julia-runtest@latest
+      # include this at a later time
+      #- run: |
+      #    julia --project=docs -e '
+      #      using Documenter: DocMeta, doctest
+      #      using Conductor
+      #      DocMeta.setdocmeta!(Conductor, :DocTestSetup, :(using Conductor); recursive=true)
+      #      doctest(Conductor)'
+
+      - name: Build and Deploy Docs
+        run: julia --project=docs docs/make.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
