@@ -31,6 +31,53 @@ jobs:
           show-versioninfo: 'true' # optional, default is false
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+
+# Documentation job 
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1'
+      - run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+      # This can be included later.
+      #- run: |
+      #    julia --project=docs -e '
+      #      using Documenter: DocMeta, doctest
+      #      using <<&PKG>>
+      #      DocMeta.setdocmeta!(<<&PKG>>, :DocTestSetup, :(using <<&PKG>>); recursive=true)
+      #      doctest(<<&PKG>>)'
+      - run: julia --project=docs docs/make.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       # Runs a single command using the runners shell
       #- name: Run a one-line script
       #  run: echo Hello, world!
