@@ -9,6 +9,7 @@ on:
       - 'Manifest.toml'
   pull_request:
     branches: [ main ]
+    paths:
       - 'src/**'
       - 'test/**'
       - 'Project.toml'
