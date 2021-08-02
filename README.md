@@ -2,6 +2,10 @@
 
 **Conductor.jl is a WIP. If the idea of a Julia-based neuronal network simulator engine sounds exciting to you, please feel free to reach out** 
 
+![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/wsphillips/Conductor.jl/CI/main?label=Tests&logo=github)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://wsphillips.github.io/Conductor.jl/stable)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://wsphillips.github.io/Conductor.jl/dev)
+
 Conductor.jl aims to be a platform for quickly and flexibly building high-performance,
 multi-scale neuronal network models in Julia. Under the hood it's being built on top of
 ModelingToolkit.jl--so all the tools available in the SciML and DiffEq ecosystem are (or
