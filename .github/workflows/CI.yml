@@ -1,0 +1,48 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allows running workflow manually from the Actions tab
+
+jobs:
+  # Testing job 
+  test:
+    name: 'Package testing'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1.6.0
+        with:
+          version: '1.6'
+          arch: 'x64'
+          show-versioninfo: 'true' # optional, default is false
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+
+  # Documentation job 
+  docs:
+    name: 'Build docs and deploy'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1'
+      - run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+      # include this at a later time
+      #- run: |
+      #    julia --project=docs -e '
+      #      using Documenter: DocMeta, doctest
+      #      using Conductor
+      #      DocMeta.setdocmeta!(Conductor, :DocTestSetup, :(using Conductor); recursive=true)
+      #      doctest(Conductor)'
+      - run: julia --project=docs docs/make.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
