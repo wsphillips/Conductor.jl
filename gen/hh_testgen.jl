@@ -1,9 +1,9 @@
 # Classic Hodgkin Huxley neuron with a "current pulse" stimulus
-using Conductor, IfElse, OrdinaryDiffEq, Unitful, ModelingToolkit
+using Conductor, IfElse, OrdinaryDiffEq, Unitful, ModelingToolkit, RuntimeGeneratedFunctions, JuliaFormatter
 using Symbolics, ExprTools, MacroTools
 using MacroTools: prettify, prewalk, rmlines, postwalk
 using ExprTools: splitdef
-using JuliaFormatter
+#using JuliaFormatter
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
@@ -38,15 +38,10 @@ pulse(t, current) = 100. < t < 200. ? ustrip(Float64, µA, 400pA) : 0.0
 @register pulse(a,b)
 
 @named neuron = Soma([NaV,Kdr,leak], gradients, stimulus = pulse, area = ustrip(Float64, cm^2, area));
-@named simulation = ODESystem([D(neuron.sys.Isyn) ~ 0]; systems = [neuron.sys])
-simp = structural_simplify(simulation)
 
-(oop, inp) = Symbolics.build_function([x.rhs for x in equations(simp)],
-                                   states(simp),
-                                   ModelingToolkit.parameters(simp),
-                                   independent_variable(simp))
-
-cleanup = prettify(postwalk(simplify,prewalk(rmlines, inp)))
+t = 300 
+sim = Simulation(neuron, time = t*ms)
+############################################################################################
 
 ivsuffix(x,sys) = endswith(string(x),"($(independent_variable(simp)))")
 
@@ -55,24 +50,25 @@ function chopiv(x,sys)
     return Symbol(chop(string(x), tail = suflen))
 end
 
-cleanup = postwalk(x -> (x isa Symbol && ivsuffix(x,simp)) ? chopiv(x,simp) : x, cleanup)
-
-def = ExprTools.splitdef(cleanup)
-def[:name] = :hodgkin_huxley!
-
-for (old, new) in zip(def[:args][1:3], [:du, :u, :p])
-    cleanup = postwalk(x -> x isa Symbol && x == old ? new : x, cleanup)
-
-#    def[:body] = postwalk(x -> x isa Symbol && x == old ? new : x, def[:body])
+function rgf_lambda_expr(x)
+    args = first(ExprTools.parameters(typeof(x)))
+    return Expr(:function, Expr(:tuple, args...), x.body)
 end
 
-def[:args] = Any[:du,:u,:p,:t]
+rgf = sim.f.f
+inpbody = prewalk(rmlines, rgf.body)
+args = first(ExprTools.parameters(typeof(rgf)))
 
-final = ExprTools.combinedef(def)
+for (old, new) in zip(args, [:du, :u, :p, :t])
+    inpbody = postwalk(x -> x isa Symbol && x == old ? new : x, inpbody)
+end
 
-clipboard(format_text(string(final)))
+inp = Expr(:function, :(hodgkin_huxley!(du, u, p, t)), inpbody)
+inp = postwalk(x -> x isa RuntimeGeneratedFunction ? rgf_lambda_expr(x) : x, inp )
+inp = prewalk(rmlines, inp)
 
-hhfun = eval(final)
-diff_vars = [true, false, true, true, true, true]
+cleanup = postwalk(x -> (x isa Symbol && ivsuffix(x,neuron.sys))?chopiv(x,neuron.sys):x,inp)
+
+clipboard(format_text(string(prettify(cleanup))))
 
 

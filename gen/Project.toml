@@ -1,0 +1,11 @@
+[deps]
+Conductor = "d194a933-43b5-4953-818b-974a45c81e67"
+ExprTools = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
+IfElse = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
+JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
+MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+RuntimeGeneratedFunctions = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"

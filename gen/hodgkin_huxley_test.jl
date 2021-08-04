@@ -11,12 +11,11 @@ hinf(V0) = 0.07*exp(-3.25 - 0.05V0) * inv(0.07*exp(-3.25 - 0.05V0) + inv(1.0 + e
 pulse(t, current) = 100. < t < 200. ? 0.0004 : 0.0
 
 # Initial conditions
-u0[1] = 0        # Isyn 
-u0[2] = V0       # Vₘ   
-u0[3] = minf(V0) # NaV₊m
-u0[4] = hinf(V0) # NaV₊h
-u0[5] = ninf(V0) # Kdr₊n
-u0[6] = 0.0      # Iapp 
+u0[1] = V0       # Vₘ    
+u0[2] = minf(V0) # NaV₊m 
+u0[3] = hinf(V0) # NaV₊h 
+u0[4] = ninf(V0) # Kdr₊n 
+u0[5] = 0.0      # Iapp  
 
 # Parameters 
 p[1]  = 0.001      # cₘ      
@@ -29,16 +28,15 @@ p[7]  = 36.0       # Kdr₊gbar
 p[8]  = 0.3        # leak₊g  
 
 # Layout
-diff_vars = [true, true, true, true, true, false]
+# diff_vars = [true, true, true, true, false]
 
 function hodgkin_huxley!(du, u, p, t)
 
-    @inbounds let Isyn        = u[1],
-                  Vₘ          = u[2],
-                  NaV₊m       = u[3],
-                  NaV₊h       = u[4],
-                  Kdr₊n       = u[5],
-                  Iapp        = u[6],
+    @inbounds let Vₘ         = u[1],
+                  NaV₊m      = u[2],
+                  NaV₊h      = u[3],
+                  Kdr₊n      = u[4],
+                  Iapp       = u[5],
           
                   cₘ          = p[1],
                   aₘ          = p[2],
@@ -49,24 +47,24 @@ function hodgkin_huxley!(du, u, p, t)
                   Kdr₊gbar    = p[7],
                   leak₊g      = p[8]
 
-    du[1] = 0
-    du[2] = (Iapp - aₘ*leak₊g*(Vₘ - El) - Kdr₊gbar*aₘ*Kdr₊n^4.0*(Vₘ - EK) - Isyn -
+    du[1] = (Iapp - aₘ*leak₊g*(Vₘ - El) - Kdr₊gbar*aₘ*Kdr₊n^4.0*(Vₘ - EK) -
              NaV₊gbar*aₘ*NaV₊h*NaV₊m^3.0*(Vₘ - ENa))*inv(aₘ)*inv(cₘ)
 
-    du[3] = (Vₘ == -40.0 ? 1.0 : (4.0 + 0.1Vₘ) * inv(1.0 - exp(-4.0 + -0.1Vₘ))) * 
+    du[2] = (Vₘ == -40.0 ? 1.0 : (4.0 + 0.1Vₘ) * inv(1.0 - exp(-4.0 + -0.1Vₘ))) * 
             (1 - NaV₊m) - 4.0*NaV₊m*exp(-3.6111111111111107 + -0.05555555555555555Vₘ)
 
-    du[4] = 0.07*exp(-3.25 + -0.05Vₘ)*(1 - NaV₊h) - NaV₊h*inv(1.0 + exp(-3.5 + -0.1Vₘ))
+    du[3] = 0.07*exp(-3.25 + -0.05Vₘ)*(1 - NaV₊h) - NaV₊h*inv(1.0 + exp(-3.5 + -0.1Vₘ))
 
-    du[5] = (Vₘ == -55.0 ? 0.1 : (0.55 + 0.01Vₘ) * inv(1.0 - exp(-5.5 + -0.1Vₘ)))*(1 - Kdr₊n) - 
+    du[4] = (Vₘ == -55.0 ? 0.1 : (0.55 + 0.01Vₘ) * inv(1.0 - exp(-5.5 + -0.1Vₘ)))*(1 - Kdr₊n) - 
             0.125 * Kdr₊n * exp(-0.8125 - 0.0125Vₘ)
 
-    du[6] = pulse(t, Iapp) - Iapp
+    du[5] = pulse(t, Iapp) - Iapp
     end
     return nothing
 end
 
-function raw_hodgkin_huxley!(du, u, p, t)
+# Result of building with only equations rhs passed to `build_function`
+function raw_bf_hodgkin_huxley!(du, u, p, t)
     let neuron₊Isyn = @inbounds(u[1]),
         neuron₊Vₘ = @inbounds(u[2]),
         neuron₊NaV₊m = @inbounds(u[3]),
@@ -122,42 +120,109 @@ function raw_hodgkin_huxley!(du, u, p, t)
         end
     end
 end
-#=
-function hodgkin_huxley!(du, u, p, t)
 
-    let Isyn        = @inbounds(u[1]),
-        Vₘ          = @inbounds(u[2]),
-        NaV₊m       = @inbounds(u[3]),
-        NaV₊h       = @inbounds(u[4]),
-        Kdr₊n       = @inbounds(u[5]),
-        Iapp        = @inbounds(u[6]),
+function rgf_hodgkin_huxley!(du, u, p, t)
+    @inbounds let Isyn      = u[1],
+                  Vₘ        = u[2],
+                  NaV₊m     = u[3],
+                  NaV₊h     = u[4],
+                  Kdr₊n     = u[5],
 
-        cₘ          = @inbounds(p[1]),
-        aₘ          = @inbounds(p[2]),
-        ENa         = @inbounds(p[3]),
-        EK          = @inbounds(p[4]),
-        El          = @inbounds(p[5]),
-        NaV₊gbar    = @inbounds(p[6]),
-        Kdr₊gbar    = @inbounds(p[7]),
-        leak₊g      = @inbounds(p[8])
+                  cₘ        = p[1],
+                  aₘ        = p[2],
+                  ENa       = p[3],
+                  EK        = p[4],
+                  El        = p[5],
+                  NaV₊gbar  = p[6],
+                  Kdr₊gbar  = p[7],
+                  leak₊g    = p[8]
 
-        @inbounds begin
+        @inbounds let hare = function (pony, dove)
+                                let Iapp = pony[1], t = dove[1]
+                                    pulse(t, Iapp) + -1Iapp
+                                end
+                             end,
+                      elephant = numerical_nlsolve(hare, 0.0, (t,)),
+                      Iapp = elephant[1]
+
             du[1] = 0
-            du[2] = pulse(t, Iapp) - Iapp
-
-            du[3] = (Iapp - aₘ*leak₊g*(Vₘ - El) - Kdr₊gbar*aₘ*Kdr₊n^4.0*(Vₘ - EK) - Isyn -
+            du[2] = (Iapp - aₘ*leak₊g*(Vₘ - El) - Kdr₊gbar*aₘ*Kdr₊n^4.0*(Vₘ - EK) - Isyn -
                      NaV₊gbar*aₘ*NaV₊h*NaV₊m^3.0*(Vₘ - ENa))*inv(aₘ)*inv(cₘ)
-
-            du[4] = (Vₘ == -40.0 ? 1.0 : (4.0 + 0.1Vₘ) * inv(1.0 - exp(-4.0 + -0.1Vₘ))) * 
+        
+            du[3] = (Vₘ == -40.0 ? 1.0 : (4.0 + 0.1Vₘ) * inv(1.0 - exp(-4.0 + -0.1Vₘ))) * 
                     (1 - NaV₊m) - 4.0*NaV₊m*exp(-3.6111111111111107 + -0.05555555555555555Vₘ)
-
-            du[5] = 0.07*exp(-3.25 + -0.05Vₘ)*(1 - NaV₊h) - NaV₊h*inv(1.0 + exp(-3.5 + -0.1Vₘ))
-
-            du[6] = (Vₘ == -55.0 ? 0.1 : (0.55 + 0.01Vₘ) * inv(1.0 - exp(-5.5 + -0.1Vₘ)))*(1 - Kdr₊n) - 
+        
+            du[4] = 0.07*exp(-3.25 + -0.05Vₘ)*(1 - NaV₊h) - NaV₊h*inv(1.0 + exp(-3.5 + -0.1Vₘ))
+        
+            du[5] = (Vₘ == -55.0 ? 0.1 : (0.55 + 0.01Vₘ) * inv(1.0 - exp(-5.5 + -0.1Vₘ)))*(1 - Kdr₊n) - 
                     0.125 * Kdr₊n * exp(-0.8125 - 0.0125Vₘ)
-            nothing
+           nothing
         end
     end
 end
 
-=#
+function raw_rgf_hodgkin_huxley!(du, u, p, t)
+    let neuron₊Isyn = @inbounds(u[1]),
+        neuron₊Vₘ = @inbounds(u[2]),
+        neuron₊NaV₊m = @inbounds(u[3]),
+        neuron₊NaV₊h = @inbounds(u[4]),
+        neuron₊Kdr₊n = @inbounds(u[5]),
+        neuron₊cₘ = @inbounds(p[1]),
+        neuron₊aₘ = @inbounds(p[2]),
+        neuron₊ENa = @inbounds(p[3]),
+        neuron₊EK = @inbounds(p[4]),
+        neuron₊El = @inbounds(p[5]),
+        neuron₊NaV₊gbar = @inbounds(p[6]),
+        neuron₊Kdr₊gbar = @inbounds(p[7]),
+        neuron₊leak₊g = @inbounds(p[8])
+
+        let hare = function (pony, dove)
+                let neuron₊Iapp = pony[1], t = dove[1]
+                    pulse(t, neuron₊Iapp) + -1neuron₊Iapp
+                end
+            end,
+            elephant = numerical_nlsolve(hare, 0.0, (t,)),
+            neuron₊Iapp = elephant[1]
+
+            du[1] = 0
+            du[2] =
+                (
+                    -1neuron₊Isyn +
+                    -1 * neuron₊aₘ * neuron₊leak₊g * (neuron₊Vₘ + -1neuron₊El) +
+                    -1 *
+                    neuron₊Kdr₊gbar *
+                    neuron₊aₘ *
+                    neuron₊Kdr₊n^4.0 *
+                    (neuron₊Vₘ + -1neuron₊EK) +
+                    -1 *
+                    neuron₊NaV₊gbar *
+                    neuron₊aₘ *
+                    neuron₊NaV₊h *
+                    neuron₊NaV₊m^3.0 *
+                    (neuron₊Vₘ + -1neuron₊ENa) +
+                    neuron₊Iapp
+                ) *
+                inv(neuron₊aₘ) *
+                inv(neuron₊cₘ)
+            du[3] =
+                (1 + -1neuron₊NaV₊m) * if neuron₊Vₘ == -40.0
+                    1.0
+                else
+                    (4.0 + 0.1neuron₊Vₘ) * inv(1.0 + -1 * exp(-4.0 + -0.1neuron₊Vₘ))
+                end +
+                -4.0 *
+                neuron₊NaV₊m *
+                exp(-3.6111111111111107 + -0.05555555555555555neuron₊Vₘ)
+            du[4] =
+                -1 * neuron₊NaV₊h * inv(1.0 + exp(-3.5 + -0.1neuron₊Vₘ)) +
+                0.07 * exp(-3.25 + -0.05neuron₊Vₘ) * (1 + -1neuron₊NaV₊h)
+            du[5] =
+                (1 + -1neuron₊Kdr₊n) * if neuron₊Vₘ == -55.0
+                    0.1
+                else
+                    (0.55 + 0.01neuron₊Vₘ) * inv(1.0 + -1 * exp(-5.5 + -0.1neuron₊Vₘ))
+                end + -0.125 * neuron₊Kdr₊n * exp(-0.8125 + -0.0125neuron₊Vₘ)
+            nothing
+        end
+    end
+end
