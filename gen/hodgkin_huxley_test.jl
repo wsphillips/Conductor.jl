@@ -1,7 +1,11 @@
+using RuntimeGeneratedFunctions
+
+RuntimeGeneratedFunctions.init(@__MODULE__)
 
 V0 = -65.0
-u0 = zeros(Float64, 6)
-u  = zeros(Float64, 6)
+u0 = zeros(Float64, 5)
+u20 = zeros(Float64, 5)
+u  = zeros(Float64, 5)
 p  = zeros(Float64, 8)
 du = similar(u)
 # Steady-state functions
@@ -16,6 +20,14 @@ u0[2] = minf(V0) # NaV₊m
 u0[3] = hinf(V0) # NaV₊h 
 u0[4] = ninf(V0) # Kdr₊n 
 u0[5] = 0.0      # Iapp  
+
+# RGF layout init
+u20[1] = 0.0      # Iapp  
+u20[2] = V0       # Vₘ    
+u20[3] = minf(V0) # NaV₊m 
+u20[4] = hinf(V0) # NaV₊h 
+u20[5] = ninf(V0) # Kdr₊n 
+
 
 # Parameters 
 p[1]  = 0.001      # cₘ      
@@ -62,6 +74,8 @@ function hodgkin_huxley!(du, u, p, t)
     end
     return nothing
 end
+
+prob = ODEProblem{true}(hodgkin_huxley!, u0, (0.,300.), p)
 
 # Result of building with only equations rhs passed to `build_function`
 function raw_bf_hodgkin_huxley!(du, u, p, t)
@@ -137,13 +151,13 @@ function rgf_hodgkin_huxley!(du, u, p, t)
                   Kdr₊gbar  = p[7],
                   leak₊g    = p[8]
 
-        @inbounds let hare = function (pony, dove)
+                  @inbounds let hare = @RuntimeGeneratedFunction(Expr(:function, :((pony, dove)), quote
                                 let Iapp = pony[1], t = dove[1]
                                     pulse(t, Iapp) + -1Iapp
                                 end
-                             end,
-                      elephant = numerical_nlsolve(hare, 0.0, (t,)),
-                      Iapp = elephant[1]
+                                end)),
+                  elephant = ModelingToolkit.StructuralTransformations.numerical_nlsolve(hare, 0.0, (t,)),
+                  Iapp = elephant[1]
 
             du[1] = 0
             du[2] = (Iapp - aₘ*leak₊g*(Vₘ - El) - Kdr₊gbar*aₘ*Kdr₊n^4.0*(Vₘ - EK) - Isyn -
@@ -181,7 +195,7 @@ function raw_rgf_hodgkin_huxley!(du, u, p, t)
                     pulse(t, neuron₊Iapp) + -1neuron₊Iapp
                 end
             end,
-            elephant = numerical_nlsolve(hare, 0.0, (t,)),
+            elephant = ModelingToolkit.StructuralTransformations.numerical_nlsolve(hare, 0.0, (t,)),
             neuron₊Iapp = elephant[1]
 
             du[1] = 0
