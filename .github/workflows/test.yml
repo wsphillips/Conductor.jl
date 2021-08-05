@@ -1,4 +1,4 @@
-ame: testself
+name: testself
 on:
   push:
     branches: [ main ]
