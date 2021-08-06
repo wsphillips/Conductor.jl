@@ -11,7 +11,7 @@ system = neuron.sys
 simplified = structural_simplify(simulation)
 
 sim_exp = ModelingToolkit.build_torn_function(simplified; expression=true)
-clean_expr(sim_exp, simplified)
+cleaned = clean_expr(sim_exp, simplified)
 
 clipboard(format_text(string(prettify(cleaned)))) # can paste readable output below
 
