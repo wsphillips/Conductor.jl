@@ -14,11 +14,11 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 IfElse = "0.1.0"
-ModelingToolkit = "5.22.0"
+ModelingToolkit = "5.22"
 Setfield = "0.7.0"
 SymbolicUtils = "0.13.1"
-Symbolics = "1.2.3"
-Unitful = "1.8.0"
+Symbolics = "1.4"
+Unitful = "1.8"
 julia = "1.5"
 
 [extras]

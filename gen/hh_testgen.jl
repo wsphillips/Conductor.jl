@@ -1,74 +1,88 @@
-# Classic Hodgkin Huxley neuron with a "current pulse" stimulus
-using Conductor, IfElse, OrdinaryDiffEq, Unitful, ModelingToolkit, RuntimeGeneratedFunctions, JuliaFormatter
-using Symbolics, ExprTools, MacroTools
-using MacroTools: prettify, prewalk, rmlines, postwalk
-using ExprTools: splitdef
-#using JuliaFormatter
-import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
-import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
-Vₘ = MembranePotential()
+cd(@__DIR__)
+using Pkg
+Pkg.activate(@__DIR__); Pkg.instantiate()
 
-nav_kinetics = [
-    Gate(AlphaBetaRates,
-         αₘ = IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
-         βₘ = 4.0*exp(-(Vₘ + 65.0)/18.0),
-         p = 3)
-    Gate(AlphaBetaRates,
-         αₕ = 0.07*exp(-(Vₘ+65.0)/20.0),
-         βₕ = 1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)))]
+include("hodgkin_huxley_test.jl")
+include("helpers.jl")
 
-kdr_kinetics = [
-    Gate(AlphaBetaRates,
-         αₙ = IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
-         βₙ = 0.125 * exp(-(Vₘ + 65.0)/80.0),
-         p = 4)]
+system = neuron.sys
+@named simulation = ODESystem([D(system.Isyn) ~ 0]; systems = [system])
+simplified = structural_simplify(simulation)
 
-@named NaV = IonChannel(Sodium, nav_kinetics, 120mS/cm^2) 
-@named Kdr = IonChannel(Potassium, kdr_kinetics, 36mS/cm^2)
-@named leak = PassiveChannel(Leak, 0.3mS/cm^2)
+sim_exp = ModelingToolkit.build_torn_function(simplified; expression=true)
+clean_expr(sim_exp, simplified)
 
-# Equilibrium potentials are a implicit description of a ion concentration gradient
-gradients = Equilibria([Na   =>  50.0mV,
-                        K    => -77.0mV,
-                        Leak => -54.4mV])
+clipboard(format_text(string(prettify(cleaned)))) # can paste readable output below
 
-area = 4*pi*(20µm)^2
-pulse(t, current) = 100. < t < 200. ? ustrip(Float64, µA, 400pA) : 0.0
-@register pulse(a,b)
-
-@named neuron = Soma([NaV,Kdr,leak], gradients, stimulus = pulse, area = ustrip(Float64, cm^2, area));
-
-t = 300 
-sim = Simulation(neuron, time = t*ms)
 ############################################################################################
+# Generated function expression from MTK lightly cleaned up for better readability
 
-ivsuffix(x,sys) = endswith(string(x),"($(independent_variable(simp)))")
+function hh_generated!(du, u, p, t)
+    let neuron₊Isyn = @inbounds(u[1]),
+        neuron₊Vₘ = @inbounds(u[2]),
+        neuron₊NaV₊m = @inbounds(u[3]),
+        neuron₊NaV₊h = @inbounds(u[4]),
+        neuron₊Kdr₊n = @inbounds(u[5]),
+        neuron₊cₘ = @inbounds(p[1]),
+        neuron₊aₘ = @inbounds(p[2]),
+        neuron₊ENa = @inbounds(p[3]),
+        neuron₊EK = @inbounds(p[4]),
+        neuron₊El = @inbounds(p[5]),
+        neuron₊NaV₊gbar = @inbounds(p[6]),
+        neuron₊Kdr₊gbar = @inbounds(p[7]),
+        neuron₊leak₊g = @inbounds(p[8])
 
-function chopiv(x,sys)
-    suflen = length(string(independent_variable(sys))) + 2
-    return Symbol(chop(string(x), tail = suflen))
+        let
+            du[1] = 0
+            du[2] =
+                (
+                    if t > 100.0
+                        if t < 200.0
+                            0.0004
+                        else
+                            0.0
+                        end
+                    else
+                        0.0
+                    end +
+                    -1neuron₊Isyn +
+                    -1 * neuron₊aₘ * neuron₊leak₊g * (neuron₊Vₘ + -1neuron₊El) +
+                    -1 *
+                    neuron₊Kdr₊gbar *
+                    neuron₊aₘ *
+                    neuron₊Kdr₊n^4.0 *
+                    (neuron₊Vₘ + -1neuron₊EK) +
+                    -1 *
+                    neuron₊NaV₊gbar *
+                    neuron₊aₘ *
+                    neuron₊NaV₊h *
+                    neuron₊NaV₊m^3.0 *
+                    (neuron₊Vₘ + -1neuron₊ENa)
+                ) *
+                inv(neuron₊aₘ) *
+                inv(neuron₊cₘ)
+            du[3] =
+                (1 + -1neuron₊NaV₊m) * if neuron₊Vₘ == -40.0
+                    1.0
+                else
+                    (4.0 + 0.1neuron₊Vₘ) * inv(1.0 + -1 * exp(-4.0 + -0.1neuron₊Vₘ))
+                end +
+                -4.0 *
+                neuron₊NaV₊m *
+                exp(-3.6111111111111107 + -0.05555555555555555neuron₊Vₘ)
+            du[4] =
+                -1 * neuron₊NaV₊h * inv(1.0 + exp(-3.5 + -0.1neuron₊Vₘ)) +
+                0.07 * exp(-3.25 + -0.05neuron₊Vₘ) * (1 + -1neuron₊NaV₊h)
+            du[5] =
+                if neuron₊Vₘ == -55.0
+                    0.1
+                else
+                    (0.55 + 0.01neuron₊Vₘ) * inv(1.0 + -1 * exp(-5.5 + -0.1neuron₊Vₘ))
+                end * (1 + -1neuron₊Kdr₊n) +
+                -0.125 * neuron₊Kdr₊n * exp(-0.8125 + -0.0125neuron₊Vₘ)
+            nothing
+        end
+    end
 end
-
-function rgf_lambda_expr(x)
-    args = first(ExprTools.parameters(typeof(x)))
-    return Expr(:function, Expr(:tuple, args...), x.body)
-end
-
-rgf = sim.f.f
-inpbody = prewalk(rmlines, rgf.body)
-args = first(ExprTools.parameters(typeof(rgf)))
-
-for (old, new) in zip(args, [:du, :u, :p, :t])
-    inpbody = postwalk(x -> x isa Symbol && x == old ? new : x, inpbody)
-end
-
-inp = Expr(:function, :(hodgkin_huxley!(du, u, p, t)), inpbody)
-inp = postwalk(x -> x isa RuntimeGeneratedFunction ? rgf_lambda_expr(x) : x, inp )
-inp = prewalk(rmlines, inp)
-
-cleanup = postwalk(x -> (x isa Symbol && ivsuffix(x,neuron.sys))?chopiv(x,neuron.sys):x,inp)
-
-clipboard(format_text(string(prettify(cleanup))))
-
 
