@@ -2,7 +2,7 @@ cd(@__DIR__)
 using Pkg
 Pkg.activate(@__DIR__); Pkg.instantiate()
 
-include("hodgkin_huxley_test.jl")
+include("hodgkin_huxley_setup.jl")
 
 byhand_prob = ODEProblem{true}(hodgkin_huxley!, u0, (0.,300.), p)
 byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);

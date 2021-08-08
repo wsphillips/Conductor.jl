@@ -3,7 +3,7 @@ cd(@__DIR__)
 using Pkg
 Pkg.activate(@__DIR__); Pkg.instantiate()
 
-include("hodgkin_huxley_test.jl")
+include("hodgkin_huxley_setup.jl")
 include("helpers.jl")
 
 system = neuron.sys
