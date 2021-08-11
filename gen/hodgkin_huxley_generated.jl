@@ -12,8 +12,8 @@ simplified = structural_simplify(simulation)
 
 sim_exp = ModelingToolkit.build_torn_function(simplified; expression=true)
 cleaned = clean_expr(sim_exp, simplified)
-
-clipboard(format_text(string(prettify(cleaned)))) # can paste readable output below
+#display_expr(cleaned)
+#clipboard(format_text(string(prettify(cleaned)))) # can paste readable output below
 
 ############################################################################################
 # Generated function expression from MTK lightly cleaned up for better readability

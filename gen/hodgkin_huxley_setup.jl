@@ -39,7 +39,7 @@ minf(V0) = inv((4.0 + 0.1V0)*inv(1.0 - exp(-4.0 - 0.1V0)) + 4.0*exp(-3.611111111
 ninf(V0) = (0.55 + 0.01V0) * inv(1.0 - exp(-5.5 - 0.1V0)) * inv(0.125exp(-0.8125 - 0.0125V0) +
                                                                 (0.55 + 0.01V0) * inv(1.0 - exp(-5.5 - 0.1V0)))
 hinf(V0) = 0.07*exp(-3.25 - 0.05V0) * inv(0.07*exp(-3.25 - 0.05V0) + inv(1.0 + exp(-3.5 - 0.1V0)) )
-hand_pulse(t) = 100. < t < 200. ? 0.0004 : 0.0
+hand_pulse(t) = ifelse(100. < t < 200. , 0.0004 , 0.0)
 
 # Initial conditions
 V0 = -65.0
@@ -78,15 +78,27 @@ function hodgkin_huxley!(du, u, p, t)
                   Kdr₊gbar    = p[7],
                   leak₊g      = p[8],
                   Iapp        = hand_pulse(t)
-
-    du[1] = (Iapp - aₘ*leak₊g*(Vₘ - El) - Kdr₊gbar*aₘ*Kdr₊n^4.0*(Vₘ - EK) -
-             NaV₊gbar*aₘ*NaV₊h*NaV₊m^3.0*(Vₘ - ENa))*inv(aₘ)*inv(cₘ)
-    du[2] = (Vₘ == -40.0 ? 1.0 : (4.0 + 0.1Vₘ) * inv(1.0 - exp(-4.0 + -0.1Vₘ))) * 
+    du[1] = (Iapp - aₘ*leak₊g*(Vₘ - El) - Kdr₊gbar*aₘ*Kdr₊n^4*(Vₘ - EK) -
+             NaV₊gbar*aₘ*NaV₊h*NaV₊m^3*(Vₘ - ENa))*inv(aₘ)*inv(cₘ)
+    du[2] = ifelse(Vₘ == -40.0 , 1.0 , (4.0 + 0.1Vₘ) * inv(1.0 - exp(-4.0 - 0.1Vₘ))) * 
             (1 - NaV₊m) - 4.0*NaV₊m*exp(-3.6111111111111107 + -0.05555555555555555Vₘ)
-    du[3] = 0.07*exp(-3.25 + -0.05Vₘ)*(1 - NaV₊h) - NaV₊h*inv(1.0 + exp(-3.5 + -0.1Vₘ))
-    du[4] = (Vₘ == -55.0 ? 0.1 : (0.55 + 0.01Vₘ) * inv(1.0 - exp(-5.5 + -0.1Vₘ)))*(1 - Kdr₊n) - 
+
+    du[3] = 0.07*exp(-3.25 - 0.05Vₘ)*(1 - NaV₊h) - NaV₊h*inv(1.0 + exp(-3.5 - 0.1Vₘ))
+    du[4] = ifelse(Vₘ == -55.0 , 0.1 , (0.55 + 0.01Vₘ) * inv(1.0 - exp(-5.5 - 0.1Vₘ)))*(1 - Kdr₊n) - 
             0.125 * Kdr₊n * exp(-0.8125 - 0.0125Vₘ)
     end
     return nothing
 end
+
+# Original time
+# ~99ns+/-5ns
+
+# Int exponents -- this is a sizeable optimization
+# ~87ns+/-5ns
+
+# ifelse
+# ~85.5+/-4
+
+# static params
+# 84.3 +/- 3
 
