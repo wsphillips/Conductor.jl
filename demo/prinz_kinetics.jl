@@ -1,6 +1,6 @@
 
 using Conductor, Unitful, ModelingToolkit
-import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, mM, nM, µM, nS
+import Unitful: mV, mS, cm, µm, ms, mM, µM
 
 Vₘ = MembranePotential()
 Caᵢ = Concentration(Calcium, 0.05µM)

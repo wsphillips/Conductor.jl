@@ -1,9 +1,3 @@
-using Test
 
-@testset "Conductor" begin
-
-    a = 2
-
-    @test a > 1
-
-end
+include("hodgkinhuxley.jl")
+include("prinzneuron.jl")
