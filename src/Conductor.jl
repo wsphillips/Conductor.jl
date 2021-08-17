@@ -358,7 +358,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     grad_meta = getmetadata.(gradients, ConductorEquilibriumCtx) 
     #r_val = ustrip(Float64, cm, radius) # FIXME: make it so we calculate area from dims as needed
  
-    systems = []
+    channel_systems = []
     eqs = Equation[] # equations must be a vector
     required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
     states = Any[Vₘ, Iapp, Isyn] # grow this as we discover/generate new states
@@ -407,7 +407,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     for chan in channels
         ion = chan.conducts
         sys = chan.sys
-        push!(systems, sys) 
+        push!(channel_systems, sys) 
         
         # auto forward cell states to channels
         for inp in chan.inputs
@@ -456,11 +456,12 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     if !isempty(required_states)
         newstateeqs = Equation[]
         for s in required_states
+            # Handled based on metadata of each state (for now just one)
             if ismembranecurrent(s) && isaggregator(s)
                 push!(newstateeqs, s ~ sum(filter(x -> iontype(x) == iontype(s), currents)))
                 push!(states, s)
-                
             end
+            # ... other required state handlers ...
         end
         append!(eqs, newstateeqs)
     end
@@ -468,10 +469,9 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     # propagate default parameter values to channel systems
     vm_eq = D(Vₘ) ~ (Iapp - (+(currents..., Isyn)))/(aₘ*cₘ)
     push!(eqs, vm_eq)
-    system = ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name)
-    
-    #return (eqs, states, params)
-    return Compartment{Sphere}(capacitance, channels, states, params, system)
+    compartment = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
+    comp_sys = compose(compartment, channel_systems)
+    return Compartment{Sphere}(capacitance, channels, states, params, comp_sys)
 end
 
 const Soma = Compartment{Sphere}
@@ -481,15 +481,15 @@ function Compartment{Cylinder}() end
 
 # takes a topology, which for now is just an adjacency list; also list of neurons, but we
 # should be able to just auto-detect all the neurons in the topology
-function Network(neurons, topology; name = :Network)
+function Network(neurons, topology; name = Base.gensym(:Network))
     
     all_neurons = Set(getproperty.(neurons, :sys))
     eqs = Equation[]
     params = Set()
     states = Set() # place holder
     defaultmap = Pair[]
-    systems = []
-    push!(systems, all_neurons...)
+    all_systems = []
+    push!(all_systems, all_neurons...)
     post_neurons = Set()
 
     # what types of synapses do we have
@@ -509,8 +509,9 @@ function Network(neurons, topology; name = :Network)
     reversals = unique([x.reversal for x in all_synapses])
     push!(params, reversals...)
     rev_meta = [getmetadata(x, ConductorEquilibriumCtx).val for x in reversals]
+
     for (i,j) in zip(reversals, rev_meta)
-    push!(defaultmap, i => ustrip(Float64, mV, j))
+        push!(defaultmap, i => ustrip(Float64, mV, j))
     end
     
     voltage_fwds = Set()
@@ -525,7 +526,7 @@ function Network(neurons, topology; name = :Network)
         synname = nameof(syntype)
         syn = @set syntype.name = Symbol(synname, synapse_counts[synname]) # each synapse is uniquely named
         synapse_counts[synname] -= 1 
-        push!(systems, syn)
+        push!(all_systems, syn)
         push!(voltage_fwds, syn.Vₘ ~ pre.Vₘ)
         
         if post.Isyn ∈ Set(vcat((get_variables(x.lhs) for x in eqs)...))
@@ -543,23 +544,23 @@ function Network(neurons, topology; name = :Network)
     end
     
     append!(eqs, collect(voltage_fwds))
-    return ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name )
+    network_system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name )
+    return compose(network_system, all_systems) 
 end
 
 function Simulation(network; time::Time)
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(network)
-    display(simplified)
+    @info repr("text/plain", simplified)
     return ODAEProblem(simplified, [], (0., t_val), [])
 end
 
 function Simulation(neuron::Soma; time::Time)
-    system = neuron.sys
     # for a single neuron, we just need a thin layer to set synaptic current constant
-    @named simulation = ODESystem([D(system.Isyn) ~ 0]; systems = [system])
+    neuron_sys = extend(ODESystem([D(system.Isyn) ~ 0]; name = nameof(neuron.sys)), neuron.sys)
     t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(simulation)
-    display(simplified)
+    simplified = structural_simplify(neuron_sys)
+    @info repr("text/plain", simplified)
     return ODAEProblem(simplified, [], (0., t_val), [])
 end
 
