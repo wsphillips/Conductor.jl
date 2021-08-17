@@ -1,5 +1,6 @@
 # Classic Hodgkin Huxley neuron with a "current pulse" stimulus
-using Conductor, IfElse, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
+using OrdinaryDiffEq, Plots
+using Conductor, IfElse, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 

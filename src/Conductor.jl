@@ -558,7 +558,13 @@ end
 function Simulation(neuron::Soma; time::Time)
     # for a single neuron, we just need a thin layer to set synaptic current constant
     old_sys = neuron.sys
-    new_neuron_sys = extend(ODESystem([D(old_sys.Isyn) ~ 0]; name = nameof(old_sys)), old_sys)
+    Isyn = getproperty(old_sys, :Isyn, namespace=false)
+    wrapper = ODESystem([D(Isyn) ~ 0])
+    # FIXME: This works but I think it's a bug in MTK's ODESystem constructor--the order of
+    # system unions in `extend` can cause duplication of equations for some weird reason
+    # The reason we don't want this is because we can't currently override defaults via the
+    # wrapper (it merges with preference to `old_sys`)
+    new_neuron_sys = extend(old_sys,wrapper)
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(new_neuron_sys)
     @info repr("text/plain", simplified)
