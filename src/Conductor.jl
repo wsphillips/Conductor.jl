@@ -283,8 +283,8 @@ function (chan::IonChannel)(newgbar::SpecificConductance)
            value(first(@parameters g))
 
     mapping = Dict([gsym => gbar_val])
-    new_defaults = merge(defaults(newchan), mapping)
-    @set! newchan.defaults = new_defaults
+    new_defaults = merge(defaults(newchan.sys), mapping)
+    @set! newchan.sys.defaults = new_defaults
     return newchan
 end
 
@@ -327,8 +327,8 @@ function (chan::SynapticChannel)(newgbar::ElectricalConductance)
            value(first(@parameters g))
 
     mapping = Dict([gsym => gbar_val])
-    new_defaults = merge(defaults(newchan), mapping)
-    @set! newchan.defaults = new_defaults
+    new_defaults = merge(defaults(newchan.sys), mapping)
+    @set! newchan.sys.defaults = new_defaults
     return newchan
 end
 
