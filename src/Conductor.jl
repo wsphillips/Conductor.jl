@@ -4,7 +4,7 @@ using ModelingToolkit, Unitful, Unitful.DefaultSymbols, InteractiveUtils
 using IfElse, Symbolics, SymbolicUtils, Setfield
 
 import Symbolics: get_variables, Symbolic, value, tosymbol, VariableDefaultValue, wrap
-import ModelingToolkit: toparam, isparameter, Equation, defaults
+import ModelingToolkit: toparam, isparameter, Equation, defaults, AbstractSystem
 import SymbolicUtils: FnType
 
 import Unitful: Time, Voltage, Current, Molarity, ElectricalConductance
