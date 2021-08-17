@@ -358,7 +358,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     grad_meta = getmetadata.(gradients, ConductorEquilibriumCtx) 
     #r_val = ustrip(Float64, cm, radius) # FIXME: make it so we calculate area from dims as needed
  
-    channel_systems = []
+    channel_systems = AbstractSystem[]
     eqs = Equation[] # equations must be a vector
     required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
     states = Any[Vₘ, Iapp, Isyn] # grow this as we discover/generate new states
@@ -488,7 +488,7 @@ function Network(neurons, topology; name = Base.gensym(:Network))
     params = Set()
     states = Set() # place holder
     defaultmap = Pair[]
-    all_systems = []
+    all_systems = AbstractSystem[]
     push!(all_systems, all_neurons...)
     post_neurons = Set()
 
