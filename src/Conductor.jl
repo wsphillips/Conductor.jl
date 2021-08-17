@@ -494,7 +494,7 @@ function Network(neurons, topology; name = :Network)
 
     # what types of synapses do we have
     all_synapses = [synapse.second[2] for synapse in topology]
-    all_synapse_types = [x.sys.name for x in all_synapses]
+    all_synapse_types = [nameof(x.sys) for x in all_synapses]
     synapse_types = unique(all_synapse_types)
 
     # how many of each synapse type are there 
@@ -522,8 +522,9 @@ function Network(neurons, topology; name = :Network)
         push!(post_neurons, post)
         Erev = synapse.second[2].reversal
         syntype = synapse.second[2].sys # synapse system
-        syn = @set syntype.name = Symbol(syntype.name, synapse_counts[syntype.name]) # each synapse is uniquely named
-        synapse_counts[syntype.name] -= 1 
+        synname = nameof(syntype)
+        syn = @set syntype.name = Symbol(synname, synapse_counts[synname]) # each synapse is uniquely named
+        synapse_counts[synname] -= 1 
         push!(systems, syn)
         push!(voltage_fwds, syn.Vₘ ~ pre.Vₘ)
         
