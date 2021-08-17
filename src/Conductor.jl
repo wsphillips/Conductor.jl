@@ -557,9 +557,10 @@ end
 
 function Simulation(neuron::Soma; time::Time)
     # for a single neuron, we just need a thin layer to set synaptic current constant
-    neuron_sys = extend(ODESystem([D(system.Isyn) ~ 0]; name = nameof(neuron.sys)), neuron.sys)
+    old_sys = neuron.sys
+    new_neuron_sys = extend(ODESystem([D(old_sys.Isyn) ~ 0]; name = nameof(old_sys)), old_sys)
     t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(neuron_sys)
+    simplified = structural_simplify(new_neuron_sys)
     @info repr("text/plain", simplified)
     return ODAEProblem(simplified, [], (0., t_val), [])
 end
