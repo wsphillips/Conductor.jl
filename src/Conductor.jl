@@ -23,7 +23,7 @@ const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 const t = let name = :t; only(@parameters $name) end
 const D = Differential(t)
 
-# Helper utils
+# Helper utils -- FIXME: MTK has these now
 hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
 hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
 hasdefault(x) = false    
@@ -275,16 +275,17 @@ function IonChannel(conducts::Type{I},
 end
 
 function (chan::IonChannel)(newgbar::SpecificConductance)
-    newchan = @set chan.gbar = newgbar
+    newchan = deepcopy(chan)
+    @set! newchan.gbar = newgbar
     gbar_val = ustrip(Float64, mS/cm^2, newgbar)
-    if length(newchan.kinetics) > 0
-        @parameters gbar
-        newchan.sys.defaults[value(gbar)] = gbar_val
-    else # if no kinetics, it's a passive channel
-        @parameters g
-        newchan.sys.defaults[value(g)] = gbar_val
-    end
-    return deepcopy(newchan) # FIXME: setfield shouldn't be mutating...?
+    gsym = length(newchan.kinetics) > 0 ?
+           value(first(@parameters gbar)) : 
+           value(first(@parameters g))
+
+    mapping = Dict([gsym => gbar_val])
+    new_defaults = merge(defaults(newchan), mapping)
+    @set! newchan.defaults = new_defaults
+    return newchan
 end
 
 # Alias for ion channel with static conductance
@@ -318,16 +319,17 @@ function GapJunction(conducts::Type{I}, reversal::Num, max_g::ElectricalConducta
 end
 
 function (chan::SynapticChannel)(newgbar::ElectricalConductance)
-    newchan = @set chan.gbar = newgbar
+    newchan = deepcopy(chan)
+    @set! newchan.gbar = newgbar
     gbar_val = ustrip(Float64, mS, newgbar)
-    if length(newchan.kinetics) > 0
-        @parameters gbar
-        newchan.sys.defaults[value(gbar)] = gbar_val
-    else
-        @parameters g
-        newchan.sys.defaults[value(g)] = gbar_val
-    end
-    return deepcopy(newchan)
+    gsym = length(newchan.kinetics) > 0 ?
+           value(first(@parameters gbar)) : 
+           value(first(@parameters g))
+
+    mapping = Dict([gsym => gbar_val])
+    new_defaults = merge(defaults(newchan), mapping)
+    @set! newchan.defaults = new_defaults
+    return newchan
 end
 
 abstract type Geometry end
