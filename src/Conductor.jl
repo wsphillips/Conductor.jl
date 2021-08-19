@@ -4,7 +4,7 @@ using ModelingToolkit, Unitful, Unitful.DefaultSymbols, InteractiveUtils
 using IfElse, Symbolics, SymbolicUtils, Setfield
 
 import Symbolics: get_variables, Symbolic, value, tosymbol, VariableDefaultValue, wrap
-import ModelingToolkit: toparam, isparameter, Equation
+import ModelingToolkit: toparam, isparameter, Equation, defaults, AbstractSystem
 import SymbolicUtils: FnType
 
 import Unitful: Time, Voltage, Current, Molarity, ElectricalConductance
@@ -23,7 +23,7 @@ const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 const t = let name = :t; only(@parameters $name) end
 const D = Differential(t)
 
-# Helper utils
+# Helper utils -- FIXME: MTK has these now
 hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
 hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
 hasdefault(x) = false    
@@ -275,16 +275,17 @@ function IonChannel(conducts::Type{I},
 end
 
 function (chan::IonChannel)(newgbar::SpecificConductance)
-    newchan = @set chan.gbar = newgbar
+    newchan = deepcopy(chan)
+    @set! newchan.gbar = newgbar
     gbar_val = ustrip(Float64, mS/cm^2, newgbar)
-    if length(newchan.kinetics) > 0
-        @parameters gbar
-        newchan.sys.defaults[value(gbar)] = gbar_val
-    else # if no kinetics, it's a passive channel
-        @parameters g
-        newchan.sys.defaults[value(g)] = gbar_val
-    end
-    return deepcopy(newchan) # FIXME: setfield shouldn't be mutating...?
+    gsym = length(newchan.kinetics) > 0 ?
+           value(first(@parameters gbar)) : 
+           value(first(@parameters g))
+
+    mapping = Dict([gsym => gbar_val])
+    new_defaults = merge(defaults(newchan.sys), mapping)
+    @set! newchan.sys.defaults = new_defaults
+    return newchan
 end
 
 # Alias for ion channel with static conductance
@@ -318,16 +319,17 @@ function GapJunction(conducts::Type{I}, reversal::Num, max_g::ElectricalConducta
 end
 
 function (chan::SynapticChannel)(newgbar::ElectricalConductance)
-    newchan = @set chan.gbar = newgbar
+    newchan = deepcopy(chan)
+    @set! newchan.gbar = newgbar
     gbar_val = ustrip(Float64, mS, newgbar)
-    if length(newchan.kinetics) > 0
-        @parameters gbar
-        newchan.sys.defaults[value(gbar)] = gbar_val
-    else
-        @parameters g
-        newchan.sys.defaults[value(g)] = gbar_val
-    end
-    return deepcopy(newchan)
+    gsym = length(newchan.kinetics) > 0 ?
+           value(first(@parameters gbar)) : 
+           value(first(@parameters g))
+
+    mapping = Dict([gsym => gbar_val])
+    new_defaults = merge(defaults(newchan.sys), mapping)
+    @set! newchan.sys.defaults = new_defaults
+    return newchan
 end
 
 abstract type Geometry end
@@ -356,7 +358,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     grad_meta = getmetadata.(gradients, ConductorEquilibriumCtx) 
     #r_val = ustrip(Float64, cm, radius) # FIXME: make it so we calculate area from dims as needed
  
-    systems = []
+    channel_systems = AbstractSystem[]
     eqs = Equation[] # equations must be a vector
     required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
     states = Any[Vₘ, Iapp, Isyn] # grow this as we discover/generate new states
@@ -405,7 +407,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     for chan in channels
         ion = chan.conducts
         sys = chan.sys
-        push!(systems, sys) 
+        push!(channel_systems, sys) 
         
         # auto forward cell states to channels
         for inp in chan.inputs
@@ -454,11 +456,12 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     if !isempty(required_states)
         newstateeqs = Equation[]
         for s in required_states
+            # Handled based on metadata of each state (for now just one)
             if ismembranecurrent(s) && isaggregator(s)
                 push!(newstateeqs, s ~ sum(filter(x -> iontype(x) == iontype(s), currents)))
                 push!(states, s)
-                
             end
+            # ... other required state handlers ...
         end
         append!(eqs, newstateeqs)
     end
@@ -466,10 +469,9 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     # propagate default parameter values to channel systems
     vm_eq = D(Vₘ) ~ (Iapp - (+(currents..., Isyn)))/(aₘ*cₘ)
     push!(eqs, vm_eq)
-    system = ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name)
-    
-    #return (eqs, states, params)
-    return Compartment{Sphere}(capacitance, channels, states, params, system)
+    compartment = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
+    comp_sys = compose(compartment, channel_systems)
+    return Compartment{Sphere}(capacitance, channels, states, params, comp_sys)
 end
 
 const Soma = Compartment{Sphere}
@@ -479,20 +481,20 @@ function Compartment{Cylinder}() end
 
 # takes a topology, which for now is just an adjacency list; also list of neurons, but we
 # should be able to just auto-detect all the neurons in the topology
-function Network(neurons, topology; name = :Network)
+function Network(neurons, topology; name = Base.gensym(:Network))
     
     all_neurons = Set(getproperty.(neurons, :sys))
     eqs = Equation[]
     params = Set()
     states = Set() # place holder
     defaultmap = Pair[]
-    systems = []
-    push!(systems, all_neurons...)
+    all_systems = AbstractSystem[]
+    push!(all_systems, all_neurons...)
     post_neurons = Set()
 
     # what types of synapses do we have
     all_synapses = [synapse.second[2] for synapse in topology]
-    all_synapse_types = [x.sys.name for x in all_synapses]
+    all_synapse_types = [nameof(x.sys) for x in all_synapses]
     synapse_types = unique(all_synapse_types)
 
     # how many of each synapse type are there 
@@ -507,8 +509,9 @@ function Network(neurons, topology; name = :Network)
     reversals = unique([x.reversal for x in all_synapses])
     push!(params, reversals...)
     rev_meta = [getmetadata(x, ConductorEquilibriumCtx).val for x in reversals]
+
     for (i,j) in zip(reversals, rev_meta)
-    push!(defaultmap, i => ustrip(Float64, mV, j))
+        push!(defaultmap, i => ustrip(Float64, mV, j))
     end
     
     voltage_fwds = Set()
@@ -520,9 +523,10 @@ function Network(neurons, topology; name = :Network)
         push!(post_neurons, post)
         Erev = synapse.second[2].reversal
         syntype = synapse.second[2].sys # synapse system
-        syn = @set syntype.name = Symbol(syntype.name, synapse_counts[syntype.name]) # each synapse is uniquely named
-        synapse_counts[syntype.name] -= 1 
-        push!(systems, syn)
+        synname = nameof(syntype)
+        syn = @set syntype.name = Symbol(synname, synapse_counts[synname]) # each synapse is uniquely named
+        synapse_counts[synname] -= 1 
+        push!(all_systems, syn)
         push!(voltage_fwds, syn.Vₘ ~ pre.Vₘ)
         
         if post.Isyn ∈ Set(vcat((get_variables(x.lhs) for x in eqs)...))
@@ -540,23 +544,30 @@ function Network(neurons, topology; name = :Network)
     end
     
     append!(eqs, collect(voltage_fwds))
-    return ODESystem(eqs, t, states, params; systems = systems, defaults = defaultmap, name = name )
+    network_system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name )
+    return compose(network_system, all_systems) 
 end
 
 function Simulation(network; time::Time)
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(network)
-    display(simplified)
+    @info repr("text/plain", simplified)
     return ODAEProblem(simplified, [], (0., t_val), [])
 end
 
 function Simulation(neuron::Soma; time::Time)
-    system = neuron.sys
     # for a single neuron, we just need a thin layer to set synaptic current constant
-    @named simulation = ODESystem([D(system.Isyn) ~ 0]; systems = [system])
+    old_sys = neuron.sys
+    Isyn = getproperty(old_sys, :Isyn, namespace=false)
+    wrapper = ODESystem([D(Isyn) ~ 0])
+    # FIXME: This works but I think it's a bug in MTK's ODESystem constructor--the order of
+    # system unions in `extend` can cause duplication of equations for some weird reason
+    # The reason we don't want this is because we can't currently override defaults via the
+    # wrapper (it merges with preference to `old_sys`)
+    new_neuron_sys = extend(old_sys,wrapper)
     t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(simulation)
-    display(simplified)
+    simplified = structural_simplify(new_neuron_sys)
+    @info repr("text/plain", simplified)
     return ODAEProblem(simplified, [], (0., t_val), [])
 end
 
