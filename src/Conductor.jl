@@ -1,15 +1,46 @@
 module Conductor
 
-using ModelingToolkit, Unitful, Unitful.DefaultSymbols, InteractiveUtils
-using IfElse, Symbolics, SymbolicUtils, Setfield
+using ModelingToolkit,       
+      Unitful,               
+      Unitful.DefaultSymbols,
+      InteractiveUtils,
+      IfElse,                
+      Symbolics,             
+      SymbolicUtils,         
+      Setfield
 
-import Symbolics: get_variables, Symbolic, value, tosymbol, VariableDefaultValue, wrap
-import ModelingToolkit: toparam, isparameter, Equation, defaults, AbstractSystem
+import Symbolics:
+    get_variables,
+    Symbolic,
+    value,
+    tosymbol,
+    VariableDefaultValue,
+    wrap
+
+import ModelingToolkit:
+    toparam,
+    isparameter,
+    Equation,
+    defaults,
+    AbstractSystem,
+    get_eqs,
+    get_states,
+    get_observed,
+    get_defaults,
+    get_ps,
+    get_systems
+
+import ModelingToolkit.SciMLBase: parameterless_type
+
+import Unitful:
+    Time,
+    Voltage,
+    Current,
+    Molarity,
+    ElectricalConductance
+
 import SymbolicUtils: FnType
-
-import Unitful: Time, Voltage, Current, Molarity, ElectricalConductance
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
-
 import Base: show, display
 
 export Gate, AlphaBetaRates, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel
@@ -23,13 +54,42 @@ const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 const t = let name = :t; only(@parameters $name) end
 const D = Differential(t)
 
-# Helper utils -- FIXME: MTK has these now
-hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
-hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
-hasdefault(x) = false    
+# Temporary fix until https://github.com/SciML/ModelingToolkit.jl/issues/1223
+# gets resolved. Non-flattening form of extend
+function _extend(sys::AbstractSystem, basesys::AbstractSystem; name::Symbol=nameof(sys))
+    T = parameterless_type(basesys)
+    ivs = independent_variables(basesys)
+    if !(typeof(sys) <: T)
+        if length(ivs) == 0
+            sys = convert_system(T, sys)
+        elseif length(ivs) == 1
+            sys = convert_system(T, sys, ivs[1])
+        else
+            throw("Extending multivariate systems is not supported")
+        end
+    end
 
-getdefault(x::Symbolic) = hasdefault(x) ? getmetadata(x, VariableDefaultValue) : nothing
-getdefault(x::Num) = getdefault(ModelingToolkit.value(x))
+    eqs = union(get_eqs(basesys), get_eqs(sys))
+    sts = union(get_states(basesys), get_states(sys))
+    ps = union(get_ps(basesys), get_ps(sys))
+    obs = union(get_observed(basesys), get_observed(sys))
+    defs = merge(get_defaults(basesys), get_defaults(sys)) # prefer `sys`
+    syss = union(get_systems(basesys), get_systems(sys))
+
+    if length(ivs) == 0
+        T(eqs, sts, ps, observed = obs, defaults = defs, name=name, systems = syss)
+    elseif length(ivs) == 1
+        T(eqs, ivs[1], sts, ps, observed = obs, defaults = defs, name = name, systems = syss)
+    end
+end
+
+# Helper utils -- FIXME: MTK has these now
+#hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
+#hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
+#hasdefault(x) = false    
+#
+#getdefault(x::Symbolic) = hasdefault(x) ? getmetadata(x, VariableDefaultValue) : nothing
+#getdefault(x::Num) = getdefault(ModelingToolkit.value(x))
 
 # Basic symbols
 function MembranePotential() 
@@ -382,9 +442,10 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     if aux !== nothing
         for i in aux
             append!(params, i.params)
-            for x in i.params
-                hasdefault(x) && push!(defaultmap, x => getdefault(x))
-            end
+            # TODO: Probably can eliminate this block; MTK should find it automatically
+            #for x in i.params
+            #    hasdefault(x) && push!(defaultmap, x => getdefault(x))
+            #end
 
             # gather all unique variables)
             inpvars = value.(vcat((get_variables(x.rhs) for x in i.eqs)...))
@@ -559,12 +620,9 @@ function Simulation(neuron::Soma; time::Time)
     # for a single neuron, we just need a thin layer to set synaptic current constant
     old_sys = neuron.sys
     Isyn = getproperty(old_sys, :Isyn, namespace=false)
-    wrapper = ODESystem([D(Isyn) ~ 0])
-    # FIXME: This works but I think it's a bug in MTK's ODESystem constructor--the order of
-    # system unions in `extend` can cause duplication of equations for some weird reason
-    # The reason we don't want this is because we can't currently override defaults via the
-    # wrapper (it merges with preference to `old_sys`)
-    new_neuron_sys = extend(old_sys,wrapper)
+    wrapper = ODESystem([D(Isyn) ~ 0]; name = Base.gensym(:wrapper))
+    # Use non-flattening extend
+    new_neuron_sys = _extend(wrapper, old_sys; name = nameof(old_sys))
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(new_neuron_sys)
     @info repr("text/plain", simplified)

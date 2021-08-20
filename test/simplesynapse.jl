@@ -41,7 +41,7 @@ EGlut = Equilibrium{Conductor.Mixed}(0mV, :Glut)
 
 @named Glut = Conductor.SynapticChannel(Leak, [syn_kinetics], EGlut, 30nS);
 topology = [neuron1 => (neuron2, Glut)];
-network = Conductor.Network([neuron1, neuron2], topology)
+@named network = Conductor.Network([neuron1, neuron2], topology)
 
 t = 250.
 simul = Simulation(network, time = t*ms)
@@ -191,19 +191,13 @@ function simple_synapse!(du, u, p, t)
 end
 
 # Solve and check for invariance
-
-# since the index of states is non-deterministic, we look it up at runtime
-indexof(sym,syms) = findfirst(isequal(sym), syms)
-simplified_system = structural_simplify(network)
-idx = indexof(neuron1.sys.Vₘ, states(simplified_system))
-
 byhand_prob = ODEProblem{true}(simple_synapse!, u0, (0.,t), p)
 byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 current_mtk_sol = solve(simul, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 
 tsteps = 0.0:0.025:t
-byhand_out = Array(byhand_sol(tsteps, idxs=3))
-current_mtk_out = Array(current_mtk_sol(tsteps, idxs=idx))
+byhand_out = Array(byhand_sol(tsteps, idxs=8))
+current_mtk_out = current_mtk_sol(tsteps)[neuron2.sys.Vₘ]
 
 @test isapprox(byhand_out, current_mtk_out, rtol=0.0001)
 

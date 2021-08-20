@@ -103,7 +103,7 @@ current_mtk_sol = solve(sim, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.
 
 tsteps = 0.0:0.025:300.0
 byhand_out = Array(byhand_sol(tsteps, idxs=1))
-current_mtk_out = Array(current_mtk_sol(tsteps, idxs=2))
+current_mtk_out = current_mtk_sol(tsteps)[Vₘ]
 
 @test isapprox(byhand_out, current_mtk_out, rtol=0.0001)
 
