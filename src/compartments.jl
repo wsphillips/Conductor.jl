@@ -136,7 +136,7 @@ function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
     vm_eq = D(Vₘ) ~ (Iapp - (+(currents..., Isyn)))/(aₘ*cₘ)
     push!(eqs, vm_eq)
     compartment = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
-    comp_sys = compose(compartment, channel_systems)
+    comp_sys = ModelingToolkit.compose(compartment, channel_systems)
     return Compartment{Sphere}(capacitance, channels, states, params, comp_sys)
 end
 
