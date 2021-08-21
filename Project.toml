@@ -4,6 +4,7 @@ authors = ["Wiktor Phillips <wsphillips@gmail.com>"]
 version = "0.0.1"
 
 [deps]
+Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
 IfElse = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"

@@ -1,6 +1,7 @@
 module Conductor
 
 using ModelingToolkit,       
+      Catalyst,
       Unitful,               
       Unitful.DefaultSymbols,
       InteractiveUtils,
@@ -28,7 +29,9 @@ import ModelingToolkit:
     get_observed,
     get_defaults,
     get_ps,
-    get_systems
+    get_systems,
+    _merge,
+    renamespace
 
 import ModelingToolkit.SciMLBase: parameterless_type
 
