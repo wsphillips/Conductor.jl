@@ -609,14 +609,18 @@ function Network(neurons, topology; name = Base.gensym(:Network))
     return compose(network_system, all_systems) 
 end
 
-function Simulation(network; time::Time)
+function Simulation(network; time::Time, system = false)
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(network)
-    @info repr("text/plain", simplified)
-    return ODAEProblem(simplified, [], (0., t_val), [])
+    if system
+        return simplified
+    else
+        @info repr("text/plain", simplified)
+        return ODAEProblem(simplified, [], (0., t_val), [])
+    end
 end
 
-function Simulation(neuron::Soma; time::Time)
+function Simulation(neuron::Soma; time::Time, system = false)
     # for a single neuron, we just need a thin layer to set synaptic current constant
     old_sys = neuron.sys
     Isyn = getproperty(old_sys, :Isyn, namespace=false)
@@ -625,8 +629,12 @@ function Simulation(neuron::Soma; time::Time)
     new_neuron_sys = _extend(wrapper, old_sys; name = nameof(old_sys))
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(new_neuron_sys)
-    @info repr("text/plain", simplified)
-    return ODAEProblem(simplified, [], (0., t_val), [])
+    if system
+        return simplified
+    else
+        @info repr("text/plain", simplified)
+        return ODAEProblem(simplified, [], (0., t_val), [])
+    end
 end
 
 end # module

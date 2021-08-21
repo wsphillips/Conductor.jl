@@ -39,12 +39,28 @@ syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
 syn_kinetics = Gate(SteadyStateTau, :s, syn∞, τsyn, 1)
 EGlut = Equilibrium{Conductor.Mixed}(0mV, :Glut)
 
-@named Glut = Conductor.SynapticChannel(Leak, [syn_kinetics], EGlut, 30nS);
+@named Glut = SynapticChannel(Leak, [syn_kinetics], EGlut, 30nS);
+
+@test length.([equations(Glut.sys),
+               states(Glut.sys),
+               parameters(Glut.sys)]) == [2,3,1]
+
 topology = [neuron1 => (neuron2, Glut)];
-@named network = Conductor.Network([neuron1, neuron2], topology)
+@named network = Network([neuron1, neuron2], topology)
+
+@test length.([equations(network),
+               states(network),
+               parameters(network)]) == [29,29,18]
 
 t = 250.
-simul = Simulation(network, time = t*ms)
+simul_sys = Simulation(network, time = t*ms, system = true)
+
+@test length.([equations(simul_sys),
+               states(simul_sys),
+               parameters(simul_sys)]) == [12,12,18]
+
+expect_syms = [:Glut1₊s, :neuron1₊Isyn] # just take two for now
+@test all(x -> hasproperty(simul_sys, x), expect_syms)
 
 # Hand written problem
 # Steady-state functions
@@ -192,8 +208,9 @@ end
 
 # Solve and check for invariance
 byhand_prob = ODEProblem{true}(simple_synapse!, u0, (0.,t), p)
+mtk_prob = ODAEProblem(simul_sys, [], (0., t), [])
 byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
-current_mtk_sol = solve(simul, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
+current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 
 tsteps = 0.0:0.025:t
 byhand_out = Array(byhand_sol(tsteps, idxs=8))
