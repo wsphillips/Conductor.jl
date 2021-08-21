@@ -3,6 +3,7 @@ module HodgkinHuxleySingle
 
 using Test
 using Conductor, ModelingToolkit, OrdinaryDiffEq, Unitful, IfElse
+import ModelingToolkit: isparameter
 import Conductor: Na, K
 using Unitful: mV, mS, cm, µm, µA, ms
 
@@ -25,19 +26,39 @@ kdr_kinetics = [
          αₙ = IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
          βₙ = 0.125 * exp(-(Vₘ + 65.0)/80.0), p = 4)]
 
+alphamss = ((4.0exp(-3.6111111111111107 - (0.05555555555555555Vₘ)) +
+            IfElse.ifelse(Vₘ == -40.0, 1.0, (4.0 + 0.1Vₘ)*((1.0 - exp(-4.0 - (0.1Vₘ)))^-1)))^-1) * 
+            IfElse.ifelse(Vₘ == -40.0, 1.0, (4.0 + 0.1Vₘ)*((1.0 - exp(-4.0 - (0.1Vₘ)))^-1))
+
+@test isequal(nav_kinetics[1].ss, alphamss)
+
 @named NaV = IonChannel(Sodium, nav_kinetics, 120mS/cm^2) 
 @named Kdr = IonChannel(Potassium, kdr_kinetics, 36mS/cm^2)
 @named leak = PassiveChannel(Leak, 0.3mS/cm^2)
 
-gradients = Equilibria([Na   =>  50.0mV, K    => -77.0mV, Leak => -54.4mV])
+@test isparameter(leak.sys.g) && !isparameter(NaV.sys.g)
+channels = [NaV, Kdr, leak]
+@test [length(equations(x.sys)) for x in channels] == [3,2,0]
+
+gradients = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 area = 4*pi*(20µm)^2
-t = 300.
 pulse(t, current) = IfElse.ifelse(t > 100.0, IfElse.ifelse(t < 200.0, 0.0004, 0.0), 0.0)
 
-@named neuron = Soma([NaV,Kdr,leak], gradients, stimulus = pulse, area = ustrip(Float64, cm^2, area));
-sim = Simulation(neuron, time = t*ms) # ODESystem -> structural_simplify -> ODAEProblem output
+@named neuron = Soma(channels, gradients, stimulus = pulse, area = ustrip(Float64, cm^2, area));
 
-# TODO: Add test to check that the model contains generated features that we expect
+@test length.([equations(neuron.sys),
+               states(neuron.sys),
+               parameters(neuron.sys)]) == [12,13,8]
+
+t = 300.
+sim_sys = Simulation(neuron, time = t*ms, system = true)
+
+@test length.([equations(sim_sys),
+               states(sim_sys),
+               parameters(sim_sys)]) == [5,5,8]
+
+expect_syms = [:Vₘ, :NaV₊m, :NaV₊h, :Kdr₊n, :Isyn]
+@test all(x -> hasproperty(sim_sys, x), expect_syms)
 
 ### Hand-written model setup ###
 # Steady-state functions
@@ -98,8 +119,10 @@ function hodgkin_huxley!(du, u, p, t)
 end
 
 byhand_prob = ODEProblem{true}(hodgkin_huxley!, u0, (0.,300.), p)
+mtk_prob = ODAEProblem(sim_sys, [], (0., t), [])
+
 byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
-current_mtk_sol = solve(sim, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
+current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 
 tsteps = 0.0:0.025:300.0
 byhand_out = Array(byhand_sol(tsteps, idxs=1))
