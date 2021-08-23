@@ -29,7 +29,7 @@ function Gate(::Type{SteadyStateTau}, name::Symbol, ss::Num, tau::Num, p::Float6
             # Extra parameters are made unique to the gate ie. x => m₊x
             par = renamespace(name,symbol)
             # substitute in unique parameter
-            alpha, beta = substitute.([alpha,beta], (symbol => par))
+            ss, tau = substitute.([ss,tau], (symbol => par))
             # set parameter default
             haskey(defaults,symbol) ? push!(pars_defaults, par => defaults[symbol]) : nothing
             push!(pars,par)
