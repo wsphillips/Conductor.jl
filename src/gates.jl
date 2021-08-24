@@ -1,114 +1,111 @@
 # Gating variables (as an interface)
-abstract type AbstractGatingVariable end
 
-# TODO: hassteadystate(x::AbstractGatingVariable) = hasfield(typeof(x), :ss) ? !(isnothing(x.ss)) : false
-hasexponent(x::AbstractGatingVariable) = hasfield(typeof(x), :p) ? x.p !== one(Float64) : false
-getsymbol(x::AbstractGatingVariable) = only(states(x.sys))
-getequation(x::AbstractGatingVariable) = only(equations(x.sys))
-getdefaults(x::AbstractGatingVariable) = defaults(x.sys)
-subtype(x::AbstractGatingVariable) = typeof(x.sys)
-subtype(x::Type{G}) where G<:AbstractGatingVariable = fieldtype(G,:sys)
+import ModelingToolkit:
+    independent_variables
 
-struct Gate{S<:AbstractSystem} <: AbstractGatingVariable
+abstract type AbstractGatingSystem end # <: AbstractTimeDependentSystem end
+
+struct GenericGate{S<:AbstractTimeDependentSystem} <: AbstractGatingSystem
     sys::S # symbolic system
-    p::Float64 # optional exponent (defaults to 1)
+    output::Num # the unitless output variable
+    transform::Rule # output transformation on use (e.g. out^p)
 end
 
+struct Gate <: AbstractGatingSystem
+    sys::ReactionSystem
+    output::Num
+    transform::Rule
+end
+
+Base.nameof(sys::AbstractGatingSystem) = nameof(getfield(sys, :sys))
+ModelingToolkit.independent_variables(sys::AbstractGatingSystem) =
+independent_variables(getfield(sys, :sys))
+get_output(x::AbstractGatingSystem) = getfield(x, :output)
+get_rule(x::AbstractGatingSystem) = getfield(x, :transform)
+Base.merge(gate1::AbstractGatingSystem, gate2::AbstractGatingSystem) =
+merge(getfield(gate1, :sys), getfield(gate2, :sys))
+
+# TODO: hassteadystate(x::AbstractGatingSystem) = hasfield(typeof(x), :ss) ? !(isnothing(x.ss)) : false
+# hasexponent(x::AbstractGatingSystem) = hasfield(typeof(x), :p) ? x.p !== one(Float64) : false
+
+Base.convert(::Type{<:ODESystem}, x::Gate) = convert(ODESystem, x.sys; include_zero_odes=false)
+# etc... for available conversions from Catalyst.jl
+
+# Model types via trait types
 abstract type AbstractGateModel end
 struct SteadyStateTau <: AbstractGateModel end
 struct AlphaBetaRates <: AbstractGateModel end
 
-function Gate(::Type{SteadyStateTau}, name::Symbol, ss::Num, tau::Num, p::Float64;
-    defaults::Dict=Dict(), sys_type::Type{S}=ODESystem) where S<:AbstractSystem
-    sym = only(@variables $name(t))
-
-    pars = Set{Num}()
-    pars_defaults = Dict()
-    for symbol in union(get_variables.([ss,tau])...)
-        if isparameter(symbol)
-            # Extra parameters are made unique to the gate ie. x => m₊x
-            par = renamespace(name,symbol)
-            # substitute in unique parameter
-            ss, tau = substitute.([ss,tau], (symbol => par))
-            # set parameter default
-            haskey(defaults,symbol) ? push!(pars_defaults, par => defaults[symbol]) : nothing
-            push!(pars,par)
-        end
-    end
-    rn = ReactionSystem(
-        [Reaction(ss/tau,nothing,[sym]),
-        Reaction(1/tau,[sym],nothing)],
-        t,[sym],pars;
-        defaults=_merge(Dict(sym=>ss),pars_defaults),
-        name=name
-    )
-    sys = convert(sys_type,rn)
-    Gate(sys,p)
-end
-
-function Gate(::Type{AlphaBetaRates}, name::Symbol, alpha::Num, beta::Num, p::Float64;
-    defaults::Dict=Dict(), sys_type::Type{S}=ODESystem) where S<:AbstractSystem
-    sym = only(@variables $name(t))
-
-    pars = Set{Num}()
-    pars_defaults = Dict()
-    for symbol in union(get_variables.([alpha,beta])...)
-        if isparameter(symbol)
-            # Extra parameters are made unique to the gate ie. x => m₊x
-            par = renamespace(name,symbol)
-            # substitute in unique parameter
-            alpha, beta = substitute.([alpha,beta], (symbol => par))
-            # set parameter default
-            haskey(defaults,symbol) ? push!(pars_defaults, par => defaults[symbol]) : nothing
-            push!(pars,par)
-        end
-    end
+function Gate(::Type{AlphaBetaRates}, alpha::Num, beta::Num, p::Real;
+        defaults::Dict=Dict(), symname::Symbol, name::Symbol = Base.gensym("Gate"))
+    
     ss = alpha/(alpha + beta) # αₘ/(αₘ + βₘ)
-    rn = ReactionSystem(
-        [Reaction(alpha,nothing,[sym]),
-        Reaction(alpha+beta,[sym],nothing)],
-        t,[sym],pars;
-        defaults=_merge(Dict(sym=>ss),pars_defaults),
-        name=name
-    )
-    sys = convert(sys_type,rn)
-    Gate(sys,p)
+    rule = @rule ~x => (~x)^p
+    pars = Set{Num}()
+    defaultmap = Dict()
+    out = only(@variables $symname(t))
+    states = Set{Num}([out])
+    push!(defaultmap, out => ss) 
+
+    rxns = [Reaction(alpha,nothing,[out]),
+            Reaction(alpha+beta,[out],nothing)]
+
+    for symbol in union(get_variables(alpha),get_variables(beta))
+        isparameter(symbol) ? push!(pars, symbol) : push!(states, symbol)
+        hasdefault(symbol) && push!(defaultmap, symbol => getdefault(symbol))
+    end
+
+    rxn_sys = ReactionSystem(rxns, t, states, pars; defaults = merge(defaultmap, defaults),
+                             name=name)
+
+    Gate(rxn_sys, out, rule)
 end
 
-Gate(t::Type{SteadyStateTau}, name::Symbol, alpha::Num, beta::Num, p::Real; kwargs...) =
-Gate(t, name, alpha, beta, Float64(p); kwargs...)
+function Gate(::Type{SteadyStateTau}, ss::Num, tau::Num, p::Real;
+        defaults::Dict=Dict(), symname::Symbol, name::Symbol = Base.gensym("Gate"))
+    
+    rule = @rule ~x => (~x)^p
+    pars = Set{Num}()
+    defaultmap = Dict()
+    out = only(@variables $symname(t))
+    states = Set{Num}([out])
+    push!(defaultmap, out => ss) 
+    rxns = [Reaction(ss/tau,nothing,[out]),
+            Reaction(1/tau,[out],nothing)]
 
-Gate(t::Type{AlphaBetaRates}, name::Symbol, alpha::Num, beta::Num, p::Real; kwargs...) =
-Gate(t, name, alpha, beta, Float64(p); kwargs...)
+    for symbol in union(get_variables(ss),get_variables(tau))
+        isparameter(symbol) ? push!(pars, symbol) : push!(states, symbol)
+        hasdefault(symbol) && push!(defaultmap, symbol => getdefault(symbol))
+    end
 
-# TODO: find a nicer way to do this
-function Gate(::Type{SteadyStateTau}; p = one(Float64),
-    defaults::Dict=Dict(), sys_type::Type{S}=ODESystem, kwargs...) where S<:AbstractSystem
+    rxn_sys = ReactionSystem(rxns, t, states, pars; defaults = merge(defaultmap, defaults),
+                             name=name)
+    Gate(rxn_sys, out, rule)
+end
 
+function Gate(::Type{SteadyStateTau}; p = one(Int64), defaults::Dict=Dict(), kwargs...)
     syms = keys(kwargs)
     if length(syms) !== 2
         throw("Invalid number of input equations.")
     elseif issetequal([:m∞, :τₘ], syms)
-        Gate(SteadyStateTau, :m, kwargs[:m∞], kwargs[:τₘ], p; defaults=defaults, sys_type=sys_type)
+        Gate(SteadyStateTau, kwargs[:m∞], kwargs[:τₘ], p; defaults=defaults, symname = :m)
     elseif issetequal([:h∞, :τₕ], syms)
-        Gate(SteadyStateTau, :h, kwargs[:h∞], kwargs[:τₕ], p; defaults=defaults, sys_type=sys_type)
+        Gate(SteadyStateTau, kwargs[:h∞], kwargs[:τₕ], p; defaults=defaults, symname = :h)
     else
         throw("invalid keywords")
     end
 end
 
-function Gate(::Type{AlphaBetaRates}; p = one(Float64),
-    defaults::Dict=Dict(), sys_type::Type{S}=ODESystem, kwargs...) where S<:AbstractSystem
-
+function Gate(::Type{AlphaBetaRates}; p = one(Int64), defaults::Dict=Dict(), kwargs...)
     syms = keys(kwargs)
     if length(syms) !== 2
         throw("Invalid number of input equations.")
     elseif issetequal([:αₘ, :βₘ], syms)
-        Gate(AlphaBetaRates, :m, kwargs[:αₘ], kwargs[:βₘ], p; defaults=defaults, sys_type=sys_type)
+        Gate(AlphaBetaRates, kwargs[:αₘ], kwargs[:βₘ], p; defaults=defaults, symname = :m)
     elseif issetequal([:αₕ, :βₕ], syms)
-        Gate(AlphaBetaRates, :h, kwargs[:αₕ], kwargs[:βₕ], p; defaults=defaults, sys_type=sys_type)
+        Gate(AlphaBetaRates, kwargs[:αₕ], kwargs[:βₕ], p; defaults=defaults, symname = :h)
     elseif issetequal([:αₙ, :βₙ], syms)
-        Gate(AlphaBetaRates, :n, kwargs[:αₙ], kwargs[:βₙ], p; defaults=defaults, sys_type=sys_type)
+        Gate(AlphaBetaRates, kwargs[:αₙ], kwargs[:βₙ], p; defaults=defaults, symname = :n)
     else
         throw("invalid keywords")
     end

@@ -31,7 +31,11 @@ import ModelingToolkit:
     get_ps,
     get_systems,
     _merge,
-    renamespace
+    renamespace,
+    hasdefault,
+    getdefault,
+    AbstractTimeDependentSystem,
+    AbstractSystem
 
 import ModelingToolkit.SciMLBase: parameterless_type
 
@@ -42,7 +46,7 @@ import Unitful:
     Molarity,
     ElectricalConductance
 
-import SymbolicUtils: FnType
+import SymbolicUtils: FnType, Rule
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 

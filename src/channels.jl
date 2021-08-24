@@ -13,11 +13,11 @@ struct IonChannel <: AbstractConductance
     conducts::DataType # ion permeability
     inputs::Vector{Num} # cell states dependencies (input args to kinetics); we can infer this
     params::Vector{Num}
-    kinetics::Vector{<:AbstractGatingVariable} # gating functions; none = passive channel
+    kinetics::Vector{<:AbstractGatingSystem} # gating functions; none = passive channel
     sys::Union{ODESystem, Nothing} # symbolic system
 end
 
-function _conductance(::Type{ODESystem},gbar_val::T, gate_vars::Vector{<:AbstractGatingVariable};
+function _conductance(::Type{ODESystem},gbar_val::T, gate_vars::Vector{<:AbstractGatingSystem};
                       passive::Bool = false, null_init::Bool = false,
                       name::Symbol) where {T <: Real}
 
@@ -59,7 +59,7 @@ end
 
 # General purpose constructor
 function IonChannel(conducts::Type{I},
-                    gate_vars::Vector{<:AbstractGatingVariable},
+                    gate_vars::Vector{<:AbstractGatingSystem},
                     max_g::SpecificConductance = 0mS/cm^2;
                     passive::Bool = false, name::Symbol) where {I <: Ion}
     # TODO: Generalize to other possible units (e.g. S/F)
@@ -89,7 +89,7 @@ end
 # Alias for ion channel with static conductance
 function PassiveChannel(conducts::Type{I}, max_g::SpecificConductance = 0mS/cm^2;
                         name::Symbol = Base.gensym(:Leak)) where {I <: Ion}
-    gate_vars = AbstractGatingVariable[]
+    gate_vars = AbstractGatingSystem[]
     return IonChannel(conducts, gate_vars, max_g; name = name, passive = true)
 end
 
@@ -99,11 +99,11 @@ struct SynapticChannel <: AbstractConductance
     reversal::Num
     inputs::Vector{Num}
     params::Vector{Num}
-    kinetics::Vector{<:AbstractGatingVariable}
+    kinetics::Vector{<:AbstractGatingSystem}
     sys::Union{ODESystem, Nothing}
 end
 
-function SynapticChannel(conducts::Type{I}, gate_vars::Vector{<:AbstractGatingVariable},
+function SynapticChannel(conducts::Type{I}, gate_vars::Vector{<:AbstractGatingSystem},
                          reversal::Num, max_g::ElectricalConductance = 0mS;
                          passive::Bool = false, name::Symbol) where {I <: Ion}
 
@@ -117,7 +117,7 @@ end
 
 function GapJunction(conducts::Type{I}, reversal::Num, max_g::ElectricalConductance = 0mS;
                      passive::Bool = false, name::Symbol) where {I <: Ion}
-    SynapticChannel(conducts, AbstractGatingVariable[], reversal, max_g, passive = true, name)
+    SynapticChannel(conducts, AbstractGatingSystem[], reversal, max_g, passive = true, name)
 end
 
 function (chan::SynapticChannel)(newgbar::ElectricalConductance)
