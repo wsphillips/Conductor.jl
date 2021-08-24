@@ -34,7 +34,7 @@ You should then be able to open and step through the various demo script example
 
 ## Acknowldegements
 
-Conductor.jl is based on the acausal componenet modeling paradigm in
+Conductor.jl is based on the acausal component modeling paradigm in
 [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl). The initial draft of
 Conductor.jl was derived from an implementation of a stomatogastric ganglion (STG) model,
 which was written in Julia by [Dhruva Raman](http://www-control.eng.cam.ac.uk/Main/DhruvaRaman), and based on published works by [Astrid Prinz](http://www.biology.emory.edu/research/Prinz/) et
