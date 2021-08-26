@@ -1,15 +1,76 @@
 # Gating variables (as an interface)
 
-import ModelingToolkit:
-    independent_variables
+#abstract type AbstractKineticSystem end # <: AbstractTimeDependentSystem end
+abstract type AbstractGatingVariable end
 
-abstract type AbstractGatingSystem end # <: AbstractTimeDependentSystem end
+getvar(x::AbstractGatingVariable) = x.output
+#has_transform(x::AbstractGatingSystem) = !(isnothing(getfield(x, :transform)))
+#get_transform(x::AbstractGatingSystem) = getfield(x, :transform)
+# TODO: hassteadystate(x::AbstractGatingSystem) = hasfield(typeof(x), :ss) ? !(isnothing(x.ss)) : false
+# hasexponent(x::AbstractGatingSystem) = hasfield(typeof(x), :p) ? x.p !== one(Float64) : false
 
+@enum GateVarType NullType Activation Inactivation
+@enum GateVarForm AlphaBeta SteadyStateTau
+
+abstract type AbstractGatingVariable
+
+struct GatingVariable <: AbstractGatingVariable
+    output::Num
+    alpha::Num
+    beta::Num
+    steadystate::Num
+    p::Real
+    type::GateVarType # for future use
+end
+
+function GatingVariable(T::GateVarForm, x::Num, y::Num, p::Real = 1; name = Base.gensym("GateVar"))
+    out = only(@variables $name(t))
+    if T == AlphaBeta
+        alpha, beta = x, y
+        ss = alpha/(alpha + beta) 
+    elseif T == SteadyStateTau
+        ss, tau = x, y
+        alpha = ss/tau         
+        beta = inv(tau) - alpha
+    end
+    Gate(out, alpha, beta, ss, p, NullType)
+end
+
+# Likely replace this with macro
+function Gate(T::GateVarForm; p = one(Int64), kwargs...)
+    syms = keys(kwargs)
+    length(syms) !== 2 && throw("Invalid number of input equations.")
+    if T == SteadyStateTau
+        if issetequal([:m∞, :τₘ], syms)
+            return Gate(SteadyStateTau, kwargs[:m∞], kwargs[:τₘ], p; name = :m)
+        elseif issetequal([:h∞, :τₕ], syms)
+            return Gate(SteadyStateTau, kwargs[:h∞], kwargs[:τₕ], p; name = :h)
+        elseif isesetequal([:n∞, :τₙ], syms)
+            return Gate(SteadyStateTau, kwargs[:n∞], kwargs[:τₙ], p; name = :n)
+        else
+            throw("invalid keywords")
+        end
+    elseif T == AlphaBeta
+        if issetequal([:αₘ, :βₘ], syms)
+            return Gate(AlphaBetaRates, kwargs[:αₘ], kwargs[:βₘ], p; name = :m)
+        elseif issetequal([:αₕ, :βₕ], syms)
+            return Gate(AlphaBetaRates, kwargs[:αₕ], kwargs[:βₕ], p; name = :h)
+        elseif issetequal([:αₙ, :βₙ], syms)
+            return Gate(AlphaBetaRates, kwargs[:αₙ], kwargs[:βₙ], p; name = :n)
+        else
+            throw("invalid keywords")
+        end
+    end
+end
+
+#=
 struct GenericGate{S<:AbstractTimeDependentSystem} <: AbstractGatingSystem
     sys::S # symbolic system
     output::Num # the unitless output variable
-    transform::Rule # output transformation on use (e.g. out^p)
+    transform::Union{Nothing,Rule} # output transformation on use (e.g. out^p)
 end
+const Gate = GenericGate{ODESystem}
+const ReactionGate = GenericGate{ReactionSystem}
 
 struct Gate <: AbstractGatingSystem
     sys::ReactionSystem
@@ -17,27 +78,17 @@ struct Gate <: AbstractGatingSystem
     transform::Rule
 end
 
-Base.nameof(sys::AbstractGatingSystem) = nameof(getfield(sys, :sys))
-ModelingToolkit.independent_variables(sys::AbstractGatingSystem) =
-independent_variables(getfield(sys, :sys))
-get_output(x::AbstractGatingSystem) = getfield(x, :output)
-get_rule(x::AbstractGatingSystem) = getfield(x, :transform)
-Base.merge(gate1::AbstractGatingSystem, gate2::AbstractGatingSystem) =
-merge(getfield(gate1, :sys), getfield(gate2, :sys))
-
-# TODO: hassteadystate(x::AbstractGatingSystem) = hasfield(typeof(x), :ss) ? !(isnothing(x.ss)) : false
-# hasexponent(x::AbstractGatingSystem) = hasfield(typeof(x), :p) ? x.p !== one(Float64) : false
-
-Base.convert(::Type{<:ODESystem}, x::Gate) = convert(ODESystem, x.sys; include_zero_odes=false)
+#Base.nameof(sys::AbstractGatingSystem) = nameof(getfield(sys, :sys))
+#independent_variables(sys::AbstractGatingSystem) = independent_variables(getfield(sys, :sys))
+#Base.merge(gate1::AbstractGatingSystem, gate2::AbstractGatingSystem) =
+#merge(getfield(gate1, :sys), getfield(gate2, :sys))
+#Base.convert(::Type{<:ODESystem}, x::Gate) = convert(ODESystem, x.sys; include_zero_odes=false)
 # etc... for available conversions from Catalyst.jl
 
-# Model types via trait types
-abstract type AbstractGateModel end
-struct SteadyStateTau <: AbstractGateModel end
-struct AlphaBetaRates <: AbstractGateModel end
+=#
 
-function Gate(::Type{AlphaBetaRates}, alpha::Num, beta::Num, p::Real;
-        defaults::Dict=Dict(), symname::Symbol, name::Symbol = Base.gensym("Gate"))
+#=
+function GatingVariable(::Type{AlphaBeta}, alpha::Num, beta::Num, p::Real; name::Symbol = Base.gensym("Gate"))
     
     ss = alpha/(alpha + beta) # αₘ/(αₘ + βₘ)
     rule = @rule ~x => (~x)^p
@@ -61,8 +112,7 @@ function Gate(::Type{AlphaBetaRates}, alpha::Num, beta::Num, p::Real;
     Gate(rxn_sys, out, rule)
 end
 
-function Gate(::Type{SteadyStateTau}, ss::Num, tau::Num, p::Real;
-        defaults::Dict=Dict(), symname::Symbol, name::Symbol = Base.gensym("Gate"))
+function GatingVariable(::Type{SteadyStateTau}, ss::Num, tau::Num, p::Real; name::Symbol = Base.gensym("Gate"))
     
     rule = @rule ~x => (~x)^p
     pars = Set{Num}()
@@ -96,7 +146,7 @@ function Gate(::Type{SteadyStateTau}; p = one(Int64), defaults::Dict=Dict(), kwa
     end
 end
 
-function Gate(::Type{AlphaBetaRates}; p = one(Int64), defaults::Dict=Dict(), kwargs...)
+function Gate(::Type{AlphaBeta}; p = one(Int64), defaults::Dict=Dict(), kwargs...)
     syms = keys(kwargs)
     if length(syms) !== 2
         throw("Invalid number of input equations.")
@@ -110,3 +160,4 @@ function Gate(::Type{AlphaBetaRates}; p = one(Int64), defaults::Dict=Dict(), kwa
         throw("invalid keywords")
     end
 end
+=#

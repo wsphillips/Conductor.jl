@@ -35,7 +35,8 @@ import ModelingToolkit:
     hasdefault,
     getdefault,
     AbstractTimeDependentSystem,
-    AbstractSystem
+    AbstractSystem,
+    independent_variables
 
 import ModelingToolkit.SciMLBase: parameterless_type
 
