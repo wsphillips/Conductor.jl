@@ -1,21 +1,63 @@
-mutable struct AuxConversion
-    params::Vector{Num}
-    eqs::Vector{Equation}
-end
-
 # Conductance types (conductance as in "g")
-abstract type AbstractConductance end
+abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 
-isbuilt(x::AbstractConductance) = x.sys !== nothing
+# Linear Ohmic/Nernst vs non-linear GHK
+@enum IVCurve Linear Rectifying
 
-struct IonChannel <: AbstractConductance
+struct IonChannel{S<:AbstractTimeDependentSystem} <: AbstractConductanceSystem
+    conductance::Num # 'g' by default
     gbar::SpecificConductance # scaling term - maximal conductance per unit area
-    conducts::DataType # ion permeability
-    inputs::Vector{Num} # cell states dependencies (input args to kinetics); we can infer this
-    params::Vector{Num}
-    kinetics::Vector{<:AbstractGatingSystem} # gating functions; none = passive channel
-    sys::Union{ODESystem, Nothing} # symbolic system
+    ionspecies::DataType # ion permeability
+    gate_vars::Vector{<:AbstractGatingVariable}
+    sys::S
+    trend::IVCurve
+    defaults::Dict
+    transmatrix::Matrix
 end
+
+function IonChannel(ionspecies::Type{I},
+                    gate_vars::Vector{GatingVariable} = GatingVariable[];
+                    max_g::SpecificConductance = 0mS/cm^2,
+                    name::Symbol) where {I <: Ion}
+    
+    eqs = Equation[]
+    inputs = Set{Num}() 
+    defaults = Dict() 
+    conductance = only(@variables g(t))
+    params = Set{Num}(@parameters gbar)
+    
+    gbar_val = ustrip(Float64, mS/cm^2, max_g)
+    push!(defaults, gbar => gbar_val)
+
+    for gvar in gatevars, rate in (gvar.alpha, gvar.beta)
+    # TODO: make equations and sets of product arguments (gbar,m^p,h, etc)
+            get_variables!(inputs, rate)
+    end
+
+    for sym in inputs
+        isparameter(sym) && push!(params, sym)
+        hasdefault(sym) && push!(defaults, sym => getdefault(sym))
+    end
+
+    setdiff!(inputs, params, x.output for x in gate_vars)
+    
+    sys = ODESystem(eqs, union(inputs, conductance, gvars), t, params; defaults = defaults) 
+
+    return IonChannel(conductance, max_g, ionspecies, gate_vars, sys, trend, transmatrix)
+end
+
+
+struct SynapticChannel <: AbstractConductance
+    conductance::Num # 's' by default
+    gbar::ElectricalConductance
+    conducts::DataType
+    reversal::Num
+    inputs::Vector{Num}
+    params::Vector{Num}
+    kinetics::Vector{<:AbstractGatingVariable}
+    sys::Union{ODESystem, Nothing}
+end
+
 
 function _conductance(::Type{ODESystem},gbar_val::T, gate_vars::Vector{<:AbstractGatingSystem};
                       passive::Bool = false, null_init::Bool = false,
@@ -57,21 +99,6 @@ function _conductance(::Type{ODESystem},gbar_val::T, gate_vars::Vector{<:Abstrac
     return (collect(inputs), params, system)
 end
 
-# General purpose constructor
-function IonChannel(conducts::Type{I},
-                    gate_vars::Vector{<:AbstractGatingSystem},
-                    max_g::SpecificConductance = 0mS/cm^2;
-                    passive::Bool = false, name::Symbol) where {I <: Ion}
-    # TODO: Generalize to other possible units (e.g. S/F)
-    sys_type = passive ? ODESystem : subtype(eltype(gate_vars))
-    @assert sys_type <: AbstractSystem "All gate variables must contain an AbstractSystem!"
-    @assert ~isequal(sys_type,AbstractSystem) "All gate variables must contain the same AbstracSystem subtype!"
-
-    gbar_val = ustrip(Float64, mS/cm^2, max_g)
-    (inputs, params, system) = _conductance(sys_type,gbar_val, gate_vars, passive = passive, name = name)
-    return IonChannel(max_g, conducts, inputs, params, gate_vars, system)
-end
-
 function (chan::IonChannel)(newgbar::SpecificConductance)
     newchan = deepcopy(chan)
     @set! newchan.gbar = newgbar
@@ -91,16 +118,6 @@ function PassiveChannel(conducts::Type{I}, max_g::SpecificConductance = 0mS/cm^2
                         name::Symbol = Base.gensym(:Leak)) where {I <: Ion}
     gate_vars = AbstractGatingSystem[]
     return IonChannel(conducts, gate_vars, max_g; name = name, passive = true)
-end
-
-struct SynapticChannel <: AbstractConductance
-    gbar::ElectricalConductance
-    conducts::DataType
-    reversal::Num
-    inputs::Vector{Num}
-    params::Vector{Num}
-    kinetics::Vector{<:AbstractGatingSystem}
-    sys::Union{ODESystem, Nothing}
 end
 
 function SynapticChannel(conducts::Type{I}, gate_vars::Vector{<:AbstractGatingSystem},

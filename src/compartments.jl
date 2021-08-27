@@ -2,6 +2,11 @@ abstract type Geometry end
 abstract type Sphere <: Geometry end
 abstract type Cylinder <: Geometry end
 
+mutable struct AuxConversion
+    params::Vector{Num}
+    eqs::Vector{Equation}
+end
+
 struct Compartment{G}
     cap::SpecificCapacitance
     chans::Vector{<:AbstractConductance}

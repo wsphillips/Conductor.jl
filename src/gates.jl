@@ -3,7 +3,7 @@
 #abstract type AbstractKineticSystem end # <: AbstractTimeDependentSystem end
 abstract type AbstractGatingVariable end
 
-getvar(x::AbstractGatingVariable) = x.output
+get_output(x::AbstractGatingVariable) = x.output
 #has_transform(x::AbstractGatingSystem) = !(isnothing(getfield(x, :transform)))
 #get_transform(x::AbstractGatingSystem) = getfield(x, :transform)
 # TODO: hassteadystate(x::AbstractGatingSystem) = hasfield(typeof(x), :ss) ? !(isnothing(x.ss)) : false
@@ -37,7 +37,7 @@ function GatingVariable(T::GateVarForm, x::Num, y::Num, p::Real = 1; name = Base
 end
 
 # Likely replace this with macro
-function Gate(T::GateVarForm; p = one(Int64), kwargs...)
+function GatingVariable(T::GateVarForm; p = one(Int64), kwargs...)
     syms = keys(kwargs)
     length(syms) !== 2 && throw("Invalid number of input equations.")
     if T == SteadyStateTau
