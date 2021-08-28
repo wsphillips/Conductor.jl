@@ -2,151 +2,89 @@
 abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 
 # Linear Ohmic/Nernst vs non-linear GHK
-@enum IVCurve Linear Rectifying
+@enum IVCurvature Linear Rectifying
 
-struct IonChannel{S<:AbstractTimeDependentSystem} <: AbstractConductanceSystem
-    conductance::Num # 'g' by default
-    gbar::SpecificConductance # scaling term - maximal conductance per unit area
-    ionspecies::DataType # ion permeability
+# TODO: Implement AbstractSystem methods for AbstractConductanceSystem
+
+# Abstract types without parametrics
+struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceSystem
+    output::Num # 'g' by default; (TODO: embed units via native MTK API)
+    ionspecies::Type{<:Ion} # ion permeability
     gate_vars::Vector{<:AbstractGatingVariable}
+    inputs::Vector # required inputs
     sys::S
-    trend::IVCurve
-    defaults::Dict
-    transmatrix::Matrix
+    linearity::IVCurvature
+    transmatrix::Union{Matrix, Nothing}
 end
 
-function IonChannel(ionspecies::Type{I},
-                    gate_vars::Vector{GatingVariable} = GatingVariable[];
-                    max_g::SpecificConductance = 0mS/cm^2,
-                    name::Symbol) where {I <: Ion}
+function ConductanceSystem(g::Num, ionspecies::Type{I}, gate_vars::Vector{GatingVariable};
+                           max_g::Real = 0.0, linearity::IVCurvature = Linear, 
+                           defaults = Dict(), name::Symbol = Base.gensym("Conductance")) where {I <: Ion}
     
     eqs = Equation[]
     inputs = Set{Num}() 
-    defaults = Dict() 
-    conductance = only(@variables g(t))
+    gate_var_outputs = Set{Num}()
+    embed_defaults = Dict()
     params = Set{Num}(@parameters gbar)
-    
-    gbar_val = ustrip(Float64, mS/cm^2, max_g)
-    push!(defaults, gbar => gbar_val)
+    push!(defaults, gbar => max_g)
 
-    for gvar in gatevars, rate in (gvar.alpha, gvar.beta)
-    # TODO: make equations and sets of product arguments (gbar,m^p,h, etc)
-            get_variables!(inputs, rate)
+    for var in gatevars
+        x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
+        push!(gate_var_outputs, x)
+        eq = D(x) ~ inv(τₓ)*(x∞ - x)
+        get_variables!(inputs, eq)
+        push!(eqs, eq)
     end
 
     for sym in inputs
         isparameter(sym) && push!(params, sym)
-        hasdefault(sym) && push!(defaults, sym => getdefault(sym))
+        hasdefault(sym) && push!(embed_defaults, sym => getdefault(sym))
     end
 
-    setdiff!(inputs, params, x.output for x in gate_vars)
+    setdiff!(inputs, params, gate_var_outputs)
     
-    sys = ODESystem(eqs, union(inputs, conductance, gvars), t, params; defaults = defaults) 
+    push!(eqs, g ~ gbar * prod(hasexponent(x) ? output(x)^exponent(x) : output(x) for x in gate_vars))
+    sys = ODESystem(eqs, t, union(inputs, g, gate_var_outputs), params;
+                    defaults = merge(embed_defaults, defaults), name = name) 
 
-    return IonChannel(conductance, max_g, ionspecies, gate_vars, sys, trend, transmatrix)
+    return ConductanceSystem(g, dimension(max_g), ionspecies, gate_vars, sys, linearity, transmatrix, nothing)
 end
 
+function IonChannel(ionspecies::Type{I<:Ion},
+                    gate_vars::Vector{GatingVariable} = GatingVariable[];
+                    max_g::SpecificConductance = 0mS/cm^2,
+                    name::Symbol = Base.gensym("IonChannel"),
+                    linearity::IVCurvature = Linear, defaults = Dict())
 
-struct SynapticChannel <: AbstractConductance
-    conductance::Num # 's' by default
-    gbar::ElectricalConductance
-    conducts::DataType
-    reversal::Num
-    inputs::Vector{Num}
-    params::Vector{Num}
-    kinetics::Vector{<:AbstractGatingVariable}
-    sys::Union{ODESystem, Nothing}
+    @variables g(t)
+    gbar_val = ustrip(Float64, mS/cm^2, max_g)
+    setmetadata(g, ConductorUnitsCtx, mS/cm^2) # TODO: rework with MTK native unit system
+    ConductanceSystem(g, ionspecies, gate_vars;
+                      max_g = gbar_val, name = name, defaults = defaults, linearity = linearity)
 end
 
+function SynapticChannel(ionspecies::Type{I<:Ion},
+                         gate_vars::Vector{GatingVariable} = GatingVariable[],
+                         max_s::ElectricalConductance = 0mS;
+                         name::Symbol = Base.gensym("SynapticChannel"),
+                         linearity::IVCurvature = Linear, defaults = Dict())
+    @variables s(t)
+    sbar_val = ustrip(Float64, mS, max_s)
+    setmetadata(s, ConductorUnitsCtx, mS) # TODO: rework iwth MTK native unit system
+    ConductanceSystem(s, ionspecies, gate_vars;
+                      max_g = sbar_val, name = name, defaults = defaults, linearity = linearity)
+end
 
-function _conductance(::Type{ODESystem},gbar_val::T, gate_vars::Vector{<:AbstractGatingSystem};
-                      passive::Bool = false, null_init::Bool = false,
-                      name::Symbol) where {T <: Real}
-
-    inputs = Set{Num}()
-    states = Set{Num}()
-    eqs = Equation[]
-    # retrieve all variables present in the RHS of kinetics equations
-    # g = total conductance (e.g. g(m,h) ~ ̄gm³h)
-    if passive
-        params = @parameters g
-        defaultmap = Pair[g => gbar_val]
-    else
-        gates = Set{Num}(getsymbol(x) for x in gate_vars)
-        @variables g(t)
-        push!(states, g)
-        params = @parameters gbar
-        defaultmap = Pair[gbar => gbar_val]
-
-        for i in gate_vars
-            syms = value.(get_variables(getequation(i)))
-            for j in syms
-                if j ∉ gates
-                    isparameter(j) ? push!(params, j) : push!(inputs, j)
-                end
-            end
-        end
-        union!(states, gates, inputs)
-        push!(eqs, g ~ gbar * prod(hasexponent(x) ? getsymbol(x)^x.p : getsymbol(x) for x in gate_vars))
-        append!(eqs, getequation(x) for x in gate_vars)
-        if null_init
-            foreach(gate_vars) do x; defaultmap = _merge(defaultmap, Dict(getsymbol(x)=>0.0)) end
-        else
-            foreach(gate_vars) do x; defaultmap = _merge(defaultmap, getdefaults(x)) end
-        end
+function (cond::AbstractConductanceSystem)(newgbar::Quantity)
+    newcond = deepcopy(cond)
+    g = output(newcond)
+    outunits = getmetadata(g, ConductorUnitsCtx)
+    if dimension(outunits) !== dimension(newgbar)
+        @error "Input Dimensions do not match output of ConductanceSystem"
     end
-    system = ODESystem(eqs, t, states, params; defaults = defaultmap, name = name)
-    return (collect(inputs), params, system)
+    gbar_val = ustrip(Float64, outunits, newgbar)
+    gbar_sym = getproperty(cond, gbar, namespace=false)
+    push!(defaults(newcond), gbar_sym => gbar_val)
+    return newcond
 end
 
-function (chan::IonChannel)(newgbar::SpecificConductance)
-    newchan = deepcopy(chan)
-    @set! newchan.gbar = newgbar
-    gbar_val = ustrip(Float64, mS/cm^2, newgbar)
-    gsym = length(newchan.kinetics) > 0 ?
-           value(first(@parameters gbar)) :
-           value(first(@parameters g))
-
-    mapping = Dict([gsym => gbar_val])
-    new_defaults = merge(defaults(newchan.sys), mapping)
-    @set! newchan.sys.defaults = new_defaults
-    return newchan
-end
-
-# Alias for ion channel with static conductance
-function PassiveChannel(conducts::Type{I}, max_g::SpecificConductance = 0mS/cm^2;
-                        name::Symbol = Base.gensym(:Leak)) where {I <: Ion}
-    gate_vars = AbstractGatingSystem[]
-    return IonChannel(conducts, gate_vars, max_g; name = name, passive = true)
-end
-
-function SynapticChannel(conducts::Type{I}, gate_vars::Vector{<:AbstractGatingSystem},
-                         reversal::Num, max_g::ElectricalConductance = 0mS;
-                         passive::Bool = false, name::Symbol) where {I <: Ion}
-
-    sys_type = passive ? ODESystem : subtype(eltype(gate_vars))
-    @assert sys_type <: AbstractSystem "All gate variables must contain an AbstractSystem!"
-    @assert ~isequal(sys_type,AbstractSystem) "All gate variables must contain the same AbstracSystem subtype!"
-    gbar_val = ustrip(Float64, mS, max_g)
-    (inputs, params, system) = _conductance(sys_type, gbar_val, gate_vars, passive = passive, null_init = true, name = name)
-    return SynapticChannel(max_g, conducts, reversal, inputs, params, gate_vars, system)
-end
-
-function GapJunction(conducts::Type{I}, reversal::Num, max_g::ElectricalConductance = 0mS;
-                     passive::Bool = false, name::Symbol) where {I <: Ion}
-    SynapticChannel(conducts, AbstractGatingSystem[], reversal, max_g, passive = true, name)
-end
-
-function (chan::SynapticChannel)(newgbar::ElectricalConductance)
-    newchan = deepcopy(chan)
-    @set! newchan.gbar = newgbar
-    gbar_val = ustrip(Float64, mS, newgbar)
-    gsym = length(newchan.kinetics) > 0 ?
-           value(first(@parameters gbar)) :
-           value(first(@parameters g))
-
-    mapping = Dict([gsym => gbar_val])
-    new_defaults = merge(defaults(newchan.sys), mapping)
-    @set! newchan.sys.defaults = new_defaults
-    return newchan
-end

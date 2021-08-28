@@ -1,9 +1,3 @@
-# Metadata IDs
-abstract type ConductorCurrentCtx end
-abstract type ConductorEquilibriumCtx end
-abstract type ConductorConcentrationCtx end
-abstract type ConductorAggregatorCtx end
-
 # Ion species
 abstract type Ion end
 abstract type Cation <: Ion end

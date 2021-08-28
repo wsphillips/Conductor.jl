@@ -62,6 +62,13 @@ const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 const t = let name = :t; only(@parameters $name) end
 const D = Differential(t)
 
+# Metadata IDs
+abstract type ConductorCurrentCtx end
+abstract type ConductorEquilibriumCtx end
+abstract type ConductorConcentrationCtx end
+abstract type ConductorAggregatorCtx end
+abstract type ConductorUnitsCtx end # temporary shim until we implement MTK's unit checking
+
 # Temporary fix until https://github.com/SciML/ModelingToolkit.jl/issues/1223
 # gets resolved. Non-flattening form of extend
 function _extend(sys::AbstractSystem, basesys::AbstractSystem; name::Symbol=nameof(sys))
