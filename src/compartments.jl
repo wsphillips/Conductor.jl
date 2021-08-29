@@ -9,13 +9,13 @@ end
 
 struct Compartment{G}
     cap::SpecificCapacitance
-    chans::Vector{<:AbstractConductance}
+    chans::Vector{<:AbstractConductanceSystem}
     states::Vector
     params::Vector
     sys::ODESystem
 end
 
-function Compartment{Sphere}(channels::Vector{<:AbstractConductance},
+function Compartment{Sphere}(channels::Vector{<:AbstractConductanceSystem},
                              gradients; name::Symbol, area::Float64 = 0.628e-3, #radius = 20µm,
                              capacitance::SpecificCapacitance = 1µF/cm^2,
                              V0::Voltage = -65mV,

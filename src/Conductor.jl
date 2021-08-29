@@ -1,14 +1,15 @@
 module Conductor
 
-using ModelingToolkit,       
+using ModelingToolkit,
       Catalyst,
-      Unitful,               
+      Unitful,
       Unitful.DefaultSymbols,
       InteractiveUtils,
-      IfElse,                
-      Symbolics,             
-      SymbolicUtils,         
-      Setfield
+      IfElse,
+      Symbolics,
+      SymbolicUtils,
+      Setfield,
+      MacroTools
 
 import Symbolics:
     get_variables,
@@ -61,6 +62,7 @@ export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 const t = let name = :t; only(@parameters $name) end
 const D = Differential(t)
+const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
 
 # Metadata IDs
 abstract type ConductorCurrentCtx end
@@ -68,6 +70,15 @@ abstract type ConductorEquilibriumCtx end
 abstract type ConductorConcentrationCtx end
 abstract type ConductorAggregatorCtx end
 abstract type ConductorUnitsCtx end # temporary shim until we implement MTK's unit checking
+
+isfunction(ex::ExprValues) = try return eval(ex) isa Function catch; return false end
+
+function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
+    if ~isfunction(ex) && isa(ex, Symbol)
+        union!(out, [ex])
+    end
+    return ex
+end
 
 # Temporary fix until https://github.com/SciML/ModelingToolkit.jl/issues/1223
 # gets resolved. Non-flattening form of extend
@@ -101,7 +112,7 @@ end
 # Helper utils -- FIXME: MTK has these now
 #hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
 #hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
-#hasdefault(x) = false    
+#hasdefault(x) = false
 #
 #getdefault(x::Symbolic) = hasdefault(x) ? getmetadata(x, VariableDefaultValue) : nothing
 #getdefault(x::Num) = getdefault(ModelingToolkit.value(x))

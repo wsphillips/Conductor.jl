@@ -18,17 +18,17 @@ struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceS
 end
 
 function ConductanceSystem(g::Num, ionspecies::Type{I}, gate_vars::Vector{GatingVariable};
-                           max_g::Real = 0.0, linearity::IVCurvature = Linear, 
+                           max_g::Real = 0.0, linearity::IVCurvature = Linear,
                            defaults = Dict(), name::Symbol = Base.gensym("Conductance")) where {I <: Ion}
-    
+
     eqs = Equation[]
-    inputs = Set{Num}() 
+    inputs = Set{Num}()
     gate_var_outputs = Set{Num}()
     embed_defaults = Dict()
     params = Set{Num}(@parameters gbar)
     push!(defaults, gbar => max_g)
 
-    for var in gatevars
+    for var in gate_vars
         x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
         push!(gate_var_outputs, x)
         eq = D(x) ~ inv(τₓ)*(x∞ - x)
@@ -42,19 +42,19 @@ function ConductanceSystem(g::Num, ionspecies::Type{I}, gate_vars::Vector{Gating
     end
 
     setdiff!(inputs, params, gate_var_outputs)
-    
+
     push!(eqs, g ~ gbar * prod(hasexponent(x) ? output(x)^exponent(x) : output(x) for x in gate_vars))
     sys = ODESystem(eqs, t, union(inputs, g, gate_var_outputs), params;
-                    defaults = merge(embed_defaults, defaults), name = name) 
+                    defaults = merge(embed_defaults, defaults), name = name)
 
     return ConductanceSystem(g, dimension(max_g), ionspecies, gate_vars, sys, linearity, transmatrix, nothing)
 end
 
-function IonChannel(ionspecies::Type{I<:Ion},
+function IonChannel(ionspecies::Type{I},
                     gate_vars::Vector{GatingVariable} = GatingVariable[];
                     max_g::SpecificConductance = 0mS/cm^2,
                     name::Symbol = Base.gensym("IonChannel"),
-                    linearity::IVCurvature = Linear, defaults = Dict())
+                    linearity::IVCurvature = Linear, defaults = Dict()) where {I <: Ion}
 
     @variables g(t)
     gbar_val = ustrip(Float64, mS/cm^2, max_g)
@@ -63,11 +63,11 @@ function IonChannel(ionspecies::Type{I<:Ion},
                       max_g = gbar_val, name = name, defaults = defaults, linearity = linearity)
 end
 
-function SynapticChannel(ionspecies::Type{I<:Ion},
+function SynapticChannel(ionspecies::Type{I},
                          gate_vars::Vector{GatingVariable} = GatingVariable[],
                          max_s::ElectricalConductance = 0mS;
                          name::Symbol = Base.gensym("SynapticChannel"),
-                         linearity::IVCurvature = Linear, defaults = Dict())
+                         linearity::IVCurvature = Linear, defaults = Dict()) where {I <: Ion}
     @variables s(t)
     sbar_val = ustrip(Float64, mS, max_s)
     setmetadata(s, ConductorUnitsCtx, mS) # TODO: rework iwth MTK native unit system
@@ -88,3 +88,23 @@ function (cond::AbstractConductanceSystem)(newgbar::Quantity)
     return newcond
 end
 
+macro ionchannel(chan::Expr, ex::Expr, gbar)
+    gbar.args[1] != :gbar && throw("Please use `gbar` to define a channel conductance.")
+    name, ion, gates = _make_ionchannel(chan, ex)
+    IonChannel(eval(ion), gates; max_g = eval(gbar.args[2]), name = name)
+end
+
+macro ionchannel(chan::Expr, ex::Expr)
+    name, ion, gates = _make_ionchannel(chan, ex)
+    IonChannel(eval(ion), gates; name = name)
+end
+
+function _make_ionchannel(chan::Expr, ex::Expr)
+    ex = MacroTools.striplines(ex)
+    !@capture(chan, name_Symbol{ion_}) && throw("An ion type must be given `name{I<:Ion}`")
+    gates = GatingVariable[]
+    for gate in ex.args
+      push!(gates, eval(gate))
+    end
+    name, ion, gates
+end
