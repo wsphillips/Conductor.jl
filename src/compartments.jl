@@ -2,33 +2,34 @@ abstract type Geometry end
 abstract type Sphere <: Geometry end
 abstract type Cylinder <: Geometry end
 
-mutable struct AuxConversion
+# Extension building block
+struct AuxConversion
     params::Vector{Num}
     eqs::Vector{Equation}
 end
 
-struct Compartment{G}
-    cap::SpecificCapacitance
+struct CompartmentSystem
+    currents
+    voltage
     chans::Vector{<:AbstractConductanceSystem}
+    synapses::Vector{<:AbstractConductanceSystem}
     states::Vector
     params::Vector
-    sys::ODESystem
+    eqs
+    defaults
+    geometry
+    systems
+    observed
 end
 
-function Compartment{Sphere}(channels::Vector{<:AbstractConductanceSystem},
-                             gradients; name::Symbol, area::Float64 = 0.628e-3, #radius = 20µm,
-                             capacitance::SpecificCapacitance = 1µF/cm^2,
-                             V0::Voltage = -65mV,
-                             holding::Current = 0nA,
-                             stimulus::Union{Function,Nothing} = nothing,
-                             aux::Union{Nothing, Vector{AuxConversion}} = nothing)
+function CompartmentSystem(Vₘ, channels, aux, states, gradients, params; name, defaults) end
 
-    Vₘ = MembranePotential()
-    @variables Iapp(t) Isyn(t)
-    params = @parameters cₘ aₘ
+function CompartmentSystem(eqs, channels, states, params; gradients, name, aux)
+
+    #Vₘ = MembranePotential()
+    #params = @parameters cₘ aₘ
+    
     grad_meta = getmetadata.(gradients, ConductorEquilibriumCtx)
-    #r_val = ustrip(Float64, cm, radius) # FIXME: make it so we calculate area from dims as needed
-
     channel_systems = AbstractSystem[]
     eqs = Equation[] # equations must be a vector
     required_states = [] # states not produced or intrinsic (e.g. not currents or Vm)
