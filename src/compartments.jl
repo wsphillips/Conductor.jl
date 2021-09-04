@@ -9,24 +9,23 @@ struct AuxConversion
 end
 
 struct CompartmentSystem
-    currents
-    voltage
-    chans::Vector{<:AbstractConductanceSystem}
-    synapses::Vector{<:AbstractConductanceSystem}
-    states::Vector
-    params::Vector
-    eqs
-    defaults
-    geometry
-    systems
-    observed
+    currents # set of all currents
+    voltage # membrane voltage
+    chans::Vector{<:AbstractConductanceSystem} # conductance systems giving rise to currents
+    synapses::Vector{<:AbstractConductanceSystem} # synaptic conductance systems giving rise to synaptic currents
+    states::Vector # all states
+    params::Vector # all params
+    eqs # equations _other than_ the voltage equation
+    defaults::Dict
+    geometry # compartment geometry metadata (shape, dimensions, etc)
+    systems # subsystems (e.g. ConductanceSystem)
+    observed # placeholder; not implemented for now
 end
 
-function CompartmentSystem(Vₘ, channels, aux, states, gradients, params; name, defaults) end
+function CompartmentSystem(Vₘ, channels, aux, states, gradients, params = (@parameters cₘ = 1µF/cm^2 aₘ = 1.0); name, defaults = Dict()) end
 
-function CompartmentSystem(eqs, channels, states, params; gradients, name, aux)
+function CompartmentSystem(Vₘ, eqs, channels, states, params; gradients, name, aux)
 
-    #Vₘ = MembranePotential()
     #params = @parameters cₘ aₘ
     
     grad_meta = getmetadata.(gradients, ConductorEquilibriumCtx)
