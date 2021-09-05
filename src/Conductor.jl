@@ -65,11 +65,7 @@ const D = Differential(t)
 const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
 
 # Metadata IDs
-abstract type ConductorCurrentCtx end
-abstract type ConductorEquilibriumCtx end
-abstract type ConductorConcentrationCtx end
-abstract type ConductorAggregatorCtx end
-abstract type ConductorUnitsCtx end # temporary shim until we implement MTK's unit checking
+struct ConductorUnits end # temporary shim until we implement MTK's unit checking
 
 isfunction(ex::ExprValues) = try return eval(ex) isa Function catch; return false end
 
@@ -79,43 +75,6 @@ function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
     end
     return ex
 end
-
-# Temporary fix until https://github.com/SciML/ModelingToolkit.jl/issues/1223
-# gets resolved. Non-flattening form of extend
-function _extend(sys::AbstractSystem, basesys::AbstractSystem; name::Symbol=nameof(sys))
-    T = parameterless_type(basesys)
-    ivs = independent_variables(basesys)
-    if !(typeof(sys) <: T)
-        if length(ivs) == 0
-            sys = convert_system(T, sys)
-        elseif length(ivs) == 1
-            sys = convert_system(T, sys, ivs[1])
-        else
-            throw("Extending multivariate systems is not supported")
-        end
-    end
-
-    eqs = union(get_eqs(basesys), get_eqs(sys))
-    sts = union(get_states(basesys), get_states(sys))
-    ps = union(get_ps(basesys), get_ps(sys))
-    obs = union(get_observed(basesys), get_observed(sys))
-    defs = merge(get_defaults(basesys), get_defaults(sys)) # prefer `sys`
-    syss = union(get_systems(basesys), get_systems(sys))
-
-    if length(ivs) == 0
-        T(eqs, sts, ps, observed = obs, defaults = defs, name=name, systems = syss)
-    elseif length(ivs) == 1
-        T(eqs, ivs[1], sts, ps, observed = obs, defaults = defs, name = name, systems = syss)
-    end
-end
-
-# Helper utils -- FIXME: MTK has these now
-#hasdefault(x::Symbolic) = hasmetadata(x, VariableDefaultValue) ? true : false
-#hasdefault(x::Num) = hasdefault(ModelingToolkit.value(x))
-#hasdefault(x) = false
-#
-#getdefault(x::Symbolic) = hasdefault(x) ? getmetadata(x, VariableDefaultValue) : nothing
-#getdefault(x::Num) = getdefault(ModelingToolkit.value(x))
 
 # Basic symbols
 function MembranePotential()
