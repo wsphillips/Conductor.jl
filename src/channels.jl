@@ -5,10 +5,11 @@ abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 @enum IVCurvature Linear Rectifying
 
 # TODO: Implement AbstractSystem methods for AbstractConductanceSystem
-
+getion(x::AbstractConductanceSystem) = getfield(x, :ion)
+getinputs(x::AbstractConductanceSystem) = getfield(x, :inputs)
 # Abstract types without parametrics
 struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceSystem
-    output::Num # 'g' by default; (TODO: embed units via native MTK API)
+    output::Num # 'g' by default 
     ion::IonSpecies # ion permeability
     gate_vars::Vector{<:AbstractGatingVariable}
     inputs::Vector # required inputs

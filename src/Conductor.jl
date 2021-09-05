@@ -11,6 +11,8 @@ using ModelingToolkit,
       Setfield,
       MacroTools
 
+const MTK = ModelingToolkit
+
 import Symbolics:
     get_variables,
     Symbolic,

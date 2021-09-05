@@ -78,9 +78,8 @@ r = 25µm; h = 400µm; area = round(ustrip(Float64, cm^2, 2π*r*h), sigdigits=3)
 # Internal current units are µA (mS * mV) -> x1000 to match Prinz/Liu factor (uses nA)
 
 # conversion as published
-prinz_factor = 14.96
-calcium_conversion = AuxConversion(@parameters(τCa = 200, Ca∞ = 0.05, f = prinz_factor),
-                                   [D(Caᵢ) ~ ((-f*ICa*1000) - Caᵢ + Ca∞)/τCa]);
+@parameters τCa = 200 Ca∞ = 0.05 fₚ = 14.96 
+@named calcium_conversion = ODESystem([D(Caᵢ) ~ ((-fₚ*ICa*1000) - Caᵢ + Ca∞)/τCa]);
 
 @named NaV = IonChannel(Sodium, nav_kinetics) 
 @named CaT = IonChannel(Calcium, cat_kinetics)

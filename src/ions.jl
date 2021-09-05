@@ -59,7 +59,7 @@ function IonCurrent(
     ion::IonSpecies,
     val = nothing;
     aggregate::Bool = false,
-    dynamic::Bool = false,
+    dynamic::Bool = true,
     name::Symbol = PERIODIC_SYMBOL[ion]
 )
     sym = Symbol("I", name)
