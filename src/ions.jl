@@ -1,91 +1,128 @@
 # Ion species
-abstract type Ion end
-abstract type Cation <: Ion end
-abstract type Anion <: Ion end
-struct Calcium  <: Ion end
-struct Sodium <: Ion end
-struct Potassium <: Ion end
-struct Chloride <: Ion end
+@enum IonSpecies::UInt128 begin
+    NonIonic    = 1 << 0
+    Sodium      = 1 << 1
+    Potassium   = 1 << 2
+    Chloride    = 1 << 3
+    Calcium     = 1 << 4
+end
 
 const Ca = Calcium
 const Na = Sodium
 const K = Potassium
 const Cl = Chloride
-const Mixed = Ion # non-specific ion
-const Leak = Mixed
+const Mixed = const Leak = NonIonic
 
 const PERIODIC_SYMBOL = IdDict(Na => :Na, K  => :K, Cl => :Cl, Ca => :Ca, Leak => :l)
 
-# Concentrations of ions
-abstract type AbstractConcentration end
-
-struct IonConcentration{I<:Ion, L<:Location, V<:Union{Nothing, Num,Symbolic,Molarity}} <:AbstractConcentration
-    ion::Type{I}
-    val::V
-    loc::L
+struct IonConcentration
+    ion::IonSpecies
+    loc::Location
 end
 
-# FIXME: handle default values better
-function Concentration(::Type{I}, val = nothing, loc::Location = Inside, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
+const Concentration = IonConcentration
+
+function IonConcentration(
+    ion::IonSpecies,
+    val = nothing;
+    location::Location = Inside,
+    dynamic::Bool = false,
+    name::Symbol = PERIODIC_SYMBOL[ion]
+)
+
     sym = Symbol(name,(loc == Inside ? "ᵢ" : "ₒ"))
-    # FIXME: Not necessarily a parameter when used as a primitive...but we should support
-    # this. Use a flag?
-    var = #=val isa Molarity ? only(@parameters $sym) :=# only(@variables $sym(t))
-    return setmetadata(var,  ConductorConcentrationCtx, IonConcentration(I, val, loc))
+    var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
+    var = setmetadata(var,  IonConcentration, IonConcentration(ion, loc))
+    if !isnothing(val)
+        if val isa Molarity
+            var = setmetadata(var, ConductorUnits, unit(val))
+            raw_val = ustrip(Float64, val)
+            var = setdefault(var, raw_val)
+            return var
+        else
+            var = setdefault(var, val)
+            return var
+        end
+    end
+    return var
 end
 
-isconcentration(x::Symbolic) = hasmetadata(x, ConductorConcentrationCtx)
-isconcentration(x::Num) = isconcentration(value(x))
-getconcentration(x::Symbolic) = isconcentration(x) ? getmetadata(x, ConductorConcentrationCtx) : nothing
-getconcentration(x::Num) = getconcentration(value(x))
+isconc(x) = hasmetadata(value(x), IonConcentration)
+getconc(x) = isconc(x) ? getmetadata(value(x), IonConcentration) : nothing
 
-# Currents
-struct MembraneCurrent{I<:Ion,V<:Union{Nothing,Num,Symbolic,Current}}
-    ion::Type{I}
-    val::V
+struct IonCurrent
+    ion::IonSpecies
+    agg::Bool
 end
 
-# TODO: add aggregator as field of Membrane current struct
-function MembraneCurrent{I}(val = nothing; name::Symbol = PERIODIC_SYMBOL[I], aggregate::Bool = false) where {I <: Ion}
+function IonCurrent(
+    ion::IonSpecies,
+    val = nothing;
+    aggregate::Bool = false,
+    dynamic::Bool = false,
+    name::Symbol = PERIODIC_SYMBOL[ion]
+)
     sym = Symbol("I", name)
-    var = val isa Current ? only(@parameters $sym) : only(@variables $sym(t))
-    var = setmetadata(var, ConductorCurrentCtx, MembraneCurrent(I, val))
-    return setmetadata(var, ConductorAggregatorCtx, aggregate)
+    var = dynamic ? only(@parameters $sym) : only(@variables $sym(t))
+    setmetadata(var, IonCurrent, IonCurrent(ion, aggregate))
+    if !isnothing(val)
+        if val isa Current
+            var = setmetadata(var, ConductorUnits, unit(val))
+            raw_val = ustrip(Float64, val)
+            var = setdefault(var, raw_val)
+            return var
+        else
+            var = setdefault(var, val)
+            return var
+        end
+    end
+    return var
 end
 
-ismembranecurrent(x::Symbolic) = hasmetadata(x, ConductorCurrentCtx)
-ismembranecurrent(x::Num) = ismembranecurrent(ModelingToolkit.value(x))
-getmembranecurrent(x::Union{Num, Symbolic}) = ismembranecurrent(x) ? getmetadata(x, ConductorCurrentCtx) : nothing
-iontype(x::Union{Num, Symbolic}) = getmembranecurrent(x).ion
-isaggregator(x::Union{Num, Symbolic})  = getmetadata(x, ConductorAggregatorCtx)
+iscurrent(x) = hasmetadata(value(x), IonCurrent)
+getcurrent(x) = iscurrent(x) ? getmetadata(value(x), IonCurrent) : nothing
+getion(x::IonCurrent) = getfield(getcurrent(x), :ion)
+isaggregate(x::IonCurrent) = getfield(getcurrent(x), :agg)
 
-# Equilibrium potential implicitly defines an ionic gradient
-abstract type AbstractIonGradient end
-
-struct EquilibriumPotential{I<:Ion,V<:Union{Num,Symbolic,Voltage}} <: AbstractIonGradient
-    ion::Type{I}
-    val::V
+struct EquilibriumPotential
+    ion::IonSpecies
 end
 
-const Equilibrium{I} = EquilibriumPotential{I}
+const Equilibrium = EqulibirumPotential
 
-function EquilibriumPotential{I}(val, name::Symbol = PERIODIC_SYMBOL[I]) where {I <: Ion}
+function EquilibriumPotential(ion::IonSpecies, val; dynamic = false, name::Symbol = PERIODIC_SYMBOL[I])
     sym = Symbol("E", name)
-    var = val isa Voltage ? only(@parameters $sym) : only(@variables $sym(t))
-    return setmetadata(var, ConductorEquilibriumCtx, EquilibriumPotential(I, val))
+    var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
+    setmetadata(var, EquilibriumPotential, EquilibriumPotential(ion))
+    if !isnothing(val)
+        if val isa Voltage
+            var = setmetadata(var, ConductorUnits, unit(val))
+            raw_val = ustrip(Float64, val)
+            var = setdefault(var, raw_val)
+            return var
+        else
+            var = setdefault(var, val)
+            return var
+        end
+    end
+    return var
 end
+
+isreversal(x) = hasmetadata(value(x), EquilibriumPotential)
+getreversal(x) = isreversal(x) ? getmetadata(value(x), EquilibriumPotential) : nothing
+getion(x::EquilibriumPotential) = getfield(getreversal(x), :ion)
 
 # Alternate constructor
 function Equilibria(equil::Vector)
     out = Num[]
     for x in equil
-        !(x.first <: Ion) && throw("Equilibrium potential must be associated with an ion type.")
+        !(x.first <: IonSpecies) && throw("Equilibrium potential must be associated with an ion type.")
         if typeof(x.second) <: Tuple
             tup = x.second
             typeof(tup[2]) !== Symbol && throw("Second tuple argument for $(x.first) must be a symbol.")
-            push!(out, Equilibrium{x.first}(tup...))
+            push!(out, Equilibrium(x.first, tup...))
         else
-            push!(out, Equilibrium{x.first}(x.second))
+            push!(out, Equilibrium(x.first, x.second))
         end
     end
     return out
