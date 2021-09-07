@@ -18,8 +18,7 @@ struct Cylinder <: Geometry
 end
 
 function Cylinder(; radius, length, open_ends = true)
-    area = 2*π*radius*(h + open_ends ? 0 : radius)
-    return Cylinder(radius, length, area, open_ends)
+    return Cylinder(radius, length, open_ends)
 end
 
 length(x::Geometry) = hasfield(x, :length) ? getfield(x, :length) : nothing
@@ -31,15 +30,15 @@ area(x::Cylinder) = 2*π*radius(x)*(h + x.open_ends ? 0 : radius(x))
 area(::Point) = 1.0
 
 struct CompartmentSystem
-    voltage # membrane voltage
-    applied_current
+    ## Intrinsic properties
+    voltage::Num # symbol that represents membrane voltage
+    capacitance::Num # specific membrane capacitance
+    geometry::Geometry # compartment geometry metadata (shape, dimensions, etc)
+    ## Dynamics
+    applied_current # could be parameter or dynamic var
     chans::Vector{<:AbstractConductanceSystem} # conductance systems giving rise to currents
     synapses::Vector{<:AbstractConductanceSystem} # synaptic conductance systems giving rise to synaptic currents
-    states::Vector # all states
-    params::Vector # all params
-    eqs # equations _other than_ the voltage equation
     defaults::Dict
-    geometry::Geometry # compartment geometry metadata (shape, dimensions, etc)
     aux_systems::Vector{ODESystem}
 end
 
@@ -53,9 +52,7 @@ function CompartmentSystem(
     defaults = Dict(),
     name::Symbol = Base.gensym("Compartment")
 ) 
-    # TODO: use built-in MTK units
     @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance) aₘ = ustrip(Float64, cm^2, area(geometry))
-
     return CompartmentSystem(Vₘ, channels, states, params, systems)
 end
 
