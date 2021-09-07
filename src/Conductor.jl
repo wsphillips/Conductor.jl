@@ -79,9 +79,8 @@ function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
 end
 
 # Basic symbols
-function MembranePotential()
-    name = :Vₘ
-    return only(@variables $name(t))
+function MembranePotential(V0 = -60mV; dynamic = true, name::Symbol = :Vₘ)
+    return dynamic ? only(@variables $name(t) = V0) : only(@parameters $name = V0)
 end
 
 @enum Location Outside Inside

@@ -1,55 +1,87 @@
 
+abstract type Geometry end
+
+struct Sphere <: Geometry
+    radius
+end
+
+function Sphere(; radius)
+    Sphere(radius)
+end
+
+struct Point <: Geometry end
+
+struct Cylinder <: Geometry
+    radius
+    length
+    open_ends::Bool
+end
+
+function Cylinder(; radius, length, open_ends = true)
+    area = 2*π*radius*(h + open_ends ? 0 : radius)
+    return Cylinder(radius, length, area, open_ends)
+end
+
+length(x::Geometry) = hasfield(x, :length) ? getfield(x, :length) : nothing
+radius(x::Geometry) = getfield(x, :radius)
+radius(::Point) = 0.0
+
+area(x::Sphere) = 4*π*radius(x)^2
+area(x::Cylinder) = 2*π*radius(x)*(h + x.open_ends ? 0 : radius(x))
+area(::Point) = 1.0
+
 struct CompartmentSystem
     voltage # membrane voltage
-    currents # set of all currents
-    chans       ::Vector{<:AbstractConductanceSystem} # conductance systems giving rise to currents
-    synapses    ::Vector{<:AbstractConductanceSystem} # synaptic conductance systems giving rise to synaptic currents
-    states      ::Vector # all states
-    params      ::Vector # all params
+    applied_current
+    chans::Vector{<:AbstractConductanceSystem} # conductance systems giving rise to currents
+    synapses::Vector{<:AbstractConductanceSystem} # synaptic conductance systems giving rise to synaptic currents
+    states::Vector # all states
+    params::Vector # all params
     eqs # equations _other than_ the voltage equation
-    defaults    ::Dict
-    geometry # compartment geometry metadata (shape, dimensions, etc)
-    systems # subsystems (e.g. ConductanceSystem)
-    observed # placeholder; not implemented for now
+    defaults::Dict
+    geometry::Geometry # compartment geometry metadata (shape, dimensions, etc)
+    aux_systems::Vector{ODESystem}
 end
 
 function CompartmentSystem(
     Vₘ,
     channels,
-    gradients,
-    capacitance = 1µF/cm^2;
-    geometry,
+    reversals;
+    capacitance = 1µF/cm^2,
+    geometry::Geometry = Point(),
     aux::Vector{ODESystem} = ODESystem[],
     defaults = Dict(),
     name::Symbol = Base.gensym("Compartment")
 ) 
+    # TODO: use built-in MTK units
+    @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance) aₘ = ustrip(Float64, cm^2, area(geometry))
 
-    @parameters cₘ aₘ
+    return CompartmentSystem(Vₘ, channels, states, params, systems)
+end
+
+function Base.convert(ODESystem, compartment::CompartmentSystem)
+
     grad_meta = getreversal.(gradients)
     
     eqs = Equation[]
-    required_states = Set{Num}()
     dvs = Set{Num}([Vₘ])
-    currents = Set{Num}()
-
-    push!(defaults, aₘ => area)
-    push!(defaults, cₘ => ustrip(Float64, mF/cm^2, capacitance))
+    channel_currents = Set()
+    required_states = Set{Num}()
 
     # auxillary state transformations (e.g. net calcium current -> Ca concentration)
-    # ODESystems that extend the CompartmentSystem, which are flattened first.
     for auxsys in aux
         union!(eqs, equations(auxsys))
         union!(params, parameters(auxsys))
         union!(dvs, states(auxsys))
         defaults = merge(MTK.defaults(auxsys), defaults)
-        aux_outputs = Set{Num}()
-
-        for eq in equations(auxsys)
-            modified_states!(aux_outputs, eq)
-        end
-        
-        aux_inputs = setdiff(states(auxsys), aux_outputs)
-        union!(required_states, aux_inputs)
+       
+        # Push this to the end...
+        #aux_outputs = Set{Num}()
+        #for eq in equations(auxsys)
+        #    modified_states!(aux_outputs, eq)
+        #end
+        #aux_inputs = setdiff(states(auxsys), aux_outputs)
+        #union!(required_states, aux_inputs)
     end
 
     # parse and build channel equations
@@ -99,6 +131,6 @@ function CompartmentSystem(
     
     push!(eqs, D(Vₘ) ~ (Iapp - (+(currents..., Isyn)))/(aₘ*cₘ))
 
-    return CompartmentSystem(channels, states, params, systems)
+    return ODESystem(eqs, t, states, params; defaults = defaults, name = nameof(compartment))
 end
 
