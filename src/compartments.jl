@@ -30,31 +30,54 @@ area(x::Cylinder) = 2*π*radius(x)*(h + x.open_ends ? 0 : radius(x))
 area(::Point) = 1.0
 
 struct CompartmentSystem
+    iv::Num
     ## Intrinsic properties
     voltage::Num # symbol that represents membrane voltage
     capacitance::Num # specific membrane capacitance
     geometry::Geometry # compartment geometry metadata (shape, dimensions, etc)
     ## Dynamics
-    applied_current # could be parameter or dynamic var
-    chans::Vector{<:AbstractConductanceSystem} # conductance systems giving rise to currents
-    synapses::Vector{<:AbstractConductanceSystem} # synaptic conductance systems giving rise to synaptic currents
+    currents::Set{Num} # container for static/dynamic currents
+    chans::Set{AbstractConductanceSystem} # conductance systems giving rise to currents
+    channel_reversals::Set{Num}
+    synapses::Set{AbstractConductanceSystem} # synaptic conductance systems giving rise to synaptic currents
+    synaptics_reversals::Set{Num}
     defaults::Dict
     aux_systems::Vector{ODESystem}
 end
 
 function CompartmentSystem(
     Vₘ,
-    channels,
+    channels::Set{AbstractConductanceSystem},
     reversals;
     capacitance = 1µF/cm^2,
     geometry::Geometry = Point(),
     aux::Vector{ODESystem} = ODESystem[],
-    defaults = Dict(),
     name::Symbol = Base.gensym("Compartment")
 ) 
-    @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance) aₘ = ustrip(Float64, cm^2, area(geometry))
-    return CompartmentSystem(Vₘ, channels, states, params, systems)
+    @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
+    foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"), reversals)
+    return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(), channels, Set(reversals), Set(), Set(), Set(), Dict(), aux)
 end
+
+# AbstractSystem interface extensions
+
+function get_eqs(x::AbstractConductanceSystem)
+    # collect _top level_ eqs including from aux + currents + reversals + Vₘ
+end
+
+function get_states(x::AbstractConductanceSystem)
+    # collect _top level_ states from currents + reversals + aux
+end
+
+function get_ps(x::AbstractConductanceSystem)
+    # collect _top level_ parameters from aux + currents + capacitance + area + reversals
+end
+
+function get_systems(x::AbstractConductanceSystem)
+    # collect channels + synapses conductance systems
+end
+
+# System conversions
 
 function Base.convert(ODESystem, compartment::CompartmentSystem)
 
