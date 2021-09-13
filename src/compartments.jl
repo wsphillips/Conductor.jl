@@ -29,6 +29,9 @@ area(x::Sphere) = 4*π*radius(x)^2
 area(x::Cylinder) = 2*π*radius(x)*(h + x.open_ends ? 0 : radius(x))
 area(::Point) = 1.0
 
+# stub -- TODO: implement datastructure for describing electrode stimuli
+struct Stimulus end
+
 struct CompartmentSystem
     ivs::Num # usually just t
     ## Intrinsic properties
@@ -36,13 +39,13 @@ struct CompartmentSystem
     capacitance::Num # specific membrane capacitance
     geometry::Geometry # compartment geometry metadata (shape, dimensions, etc)
     ## Dynamics
-    currents::Set{Num} # container for static/dynamic currents
     chans::Set{AbstractConductanceSystem} # conductance systems
     channel_reversals::Set{Num}
     synapses::Set{AbstractConductanceSystem} # synaptic conductance systems
     synaptic_reversals::Set{Num}
+    stimuli::Vector{Stimulus}
+    extension_systems::Vector{ODESystem}
     defaults::Dict
-    aux_systems::Vector{ODESystem}
 end
 
 function CompartmentSystem(
@@ -51,34 +54,44 @@ function CompartmentSystem(
     reversals;
     capacitance = 1µF/cm^2,
     geometry::Geometry = Point(),
-    aux::Vector{ODESystem} = ODESystem[],
+    extension::Vector{ODESystem} = ODESystem[],
     name::Symbol = Base.gensym("Compartment")
 ) 
     @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
     foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"), reversals)
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(), channels, Set(reversals), Set(),
-                             Set(), Set(), Dict(), aux)
+                             Set(), Set(), Dict(), extension)
 end
 
 # AbstractSystem interface extensions
-geometry(x::AbstractCompartmentSystem) = getfield(x, :geometry)
-area(x::AbstractCompartmentSystem) = only(@parameters aₘ = area(geometry(x)))
+get_geometry(x::AbstractCompartmentSystem) = getfield(x, :geometry)
+area(x::AbstractCompartmentSystem) = only(@parameters aₘ = area(get_geometry(x)))
 capacitance(x::AbstractCompartmentSystem) = getfield(x, :capacitance)
 output(x::AbstractCompartmentSystem) = getfield(x, :voltage)
-get_auxsystems(x::AbstractCompartmentSystem) = getfield(x, :aux_systems)
+
+get_extensionsystems(x::AbstractCompartmentSystem) = getfield(x, :extension_sysget_tems)
+get_channels(x::AbstractCompartmentSystem) = getfield(x, :chans)
+get_synapses(x::AbstractCompartmentSystem) = getfield(x, :synapses)
 
 function get_reversals(x::AbstractCompartmentSystem)
     return getfield(x, :channel_reversals), getfield(x, :synaptic_reversals) 
 end
 
-function build_toplevel(comp_sys::CompartmentSystem)
+function build_toplevel(comp_sys)
     dvs = Set{Num}()
     ps = Set{Num}()
     eqs = Equation[]
-    
+    defs = Dict()
+    build_toplevel!(dvs, ps, eqs, defs, comp_sys)
+    return eqs, dvs, ps, defs
+end
+
+function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     aₘ = area(comp_sys)
     cₘ = capactiance(comp_sys)
     Vₘ = output(comp_sys)
+
+    currents = Set{Num}()
 
     push!(ps, aₘ)
     push!(ps, cₘ)
@@ -99,7 +112,7 @@ function build_toplevel(comp_sys::CompartmentSystem)
     foreach(x -> isparameter(x) && push!(ps, x), rev_eq_vars)
 
     # Gather channel current equations
-    for chan in channels
+    for chan in get_channels(x)
         ion = permeability(chan)
         Erev = chan_revs[findfirst(x -> isequal(getion(x), ion), chan_revs)]
         I = IonCurrent(ion, name = nameof(chan))
@@ -107,114 +120,84 @@ function build_toplevel(comp_sys::CompartmentSystem)
         # TODO: checks for whether we need area scaling
         push!(eqs, I ~ g*aₘ*(Vₘ - Erev))
         push!(dvs, I)
+        push!(currents, I)
+        merge!(defs, defaults(chan))
     end
 
     # Gather synaptic current equations
-    for synapse in synapses
+    for synapse in get_synapses(x)
         ion = permeability(synapse)
         Esyn = syn_revs[findfirst(x -> isequal(getion(x), ion), syn_revs)]
         I = IonCurrent(ion, name = nameof(chan))
         g = output(synapse)
         push!(eqs, I ~ g*(Vₘ - Esyn))
         push!(dvs, I)
+        push!(currents, I)
+        merge!(defs, defaults(chan))
     end
 
-    # Gather aux equations
-    for aux in aux_systems
-        union!(eqs, equations(aux))
-        union!(ps, parameters(aux))
-        union!(dvs, states(aux))
+    # Gather extension equations
+    for extension in get_extensionsystems(x)
+        union!(eqs, equations(extension))
+        union!(ps, parameters(extension))
+        union!(dvs, states(extension))
+        merge!(defs, defaults(extension))
     end
     
-    # stimuli pushed as currents?
+    # FIXME: separate field for applied current(s)?
 
     # voltage equation
-    # push!(eqs, D(output(comp_sys)) ~ sum(currents)/cₘ*aₘ)
-
-    return eqs, dvs, ps
+    push!(eqs, D(output(comp_sys)) ~ -sum(currents)/cₘ*aₘ)
 end
 
-# collect _top level_ eqs including from aux + currents + reversals + Vₘ
-function get_eqs(comp_sys::AbstractCompartmentSystem)
-    build_top_level(comp_sys)[1]
+# collect _top level_ eqs including from extension + currents + reversals + Vₘ
+function get_eqs(x::AbstractCompartmentSystem)
+    build_top_level(x)[1]
 end
 
 function get_states(x::AbstractCompartmentSystem)
-    build_top_level(comp_sys)[2]
+    build_top_level(x)[2]
 end
 
 function get_ps(x::AbstractCompartmentSystem)
-    # collect _top level_ parameters from aux + currents + capacitance + area + reversals
+    # collect _top level_ parameters from extension + currents + capacitance + area + reversals
+    build_top_level(x)[3]
+end
 
+function defaults(x::AbstractCompartmentSystem)
+    build_top_level(x)[4]
 end
 
 function get_systems(x::AbstractCompartmentSystem)
-    # collect channels + synapses conductance systems
+    # collect channels + synapses + input systems
+    union(x.chans, x.synapses)
 end
 
-# System conversions
-
+# TODO/WIP: System conversions
 function Base.convert(ODESystem, compartment::CompartmentSystem)
 
-    grad_meta = getreversal.(gradients)
-    
-    eqs = Equation[]
-    dvs = Set{Num}([Vₘ])
-    channel_currents = Set()
     required_states = Set{Num}()
+    mstates = Set{Num}()
+    eqs, dvs, ps, defs = build_toplevel(compartment)
 
-    # auxillary state transformations (e.g. net calcium current -> Ca concentration)
-    for auxsys in aux
-        union!(eqs, equations(auxsys))
-        union!(params, parameters(auxsys))
-        union!(dvs, states(auxsys))
-        defaults = merge(MTK.defaults(auxsys), defaults)
-       
-        # Push this to the end...
-        #aux_outputs = Set{Num}()
-        #for eq in equations(auxsys)
-        #    modified_states!(aux_outputs, eq)
-        #end
-        #aux_inputs = setdiff(states(auxsys), aux_outputs)
-        #union!(required_states, aux_inputs)
-    end
-
-    # parse and build channel equations
+    # "connect" / auto forward cell states to channels
     for chan in channels
-        # "connect" / auto forward cell states to channels
         for inp in getinputs(chan)
             push!(required_states, inp)
             subinp = getproperty(sys, tosymbol(inp, escape=false))
             push!(eqs, inp ~ subinp)
         end
-
-        # symbol for current produced by channel
-        ion = getion(chan)
-        I = IonCurrent(ion, name = nameof(chan))
-        push!(dvs, I)
-        push!(currents, I)
-        
-        # Match to an available equilibirum potential
-        # KLUDGE: take the first with matching ion type
-        idx = findfirst(x -> getion(x) == ion, grad_meta)
-        Erev = gradients[idx]
-        
-        # Current equation
-        push!(eqs, I ~ aₘ * output(chan) * (Vₘ - Erev))
-
-        if isparameter(Erev)
-            push!(ps, Erev)
-        else # dynamic eq potentials
-            push!(dvs, Erev)
-            rhs = getdefault(Erev)
-            get_variables!(required_states, rhs)
-            hasdefault(Erev) && push!(eqs, Erev ~ getdefault(Erev))
-        end
+    end
+    
+    # extract available vs required state
+    for eq in eqs
+        modified_states!(mstates, eq)
+        get_variables!(required_states, eq.rhs)
     end
 
-    # Resolve unavailable states
-    setdiff!(required_states, dvs, ps, currents, reversals)
+    setdiff!(required_states, mstates)
 
+    # Resolve unavailable states
     for s in required_states
         # Handled based on metadata of each state (for now just one case)
         if iscurrent(s) && isaggregate(s)
@@ -223,9 +206,7 @@ function Base.convert(ODESystem, compartment::CompartmentSystem)
         end
         # ... other switch cases for required state handlers ...
     end
-    
-    push!(eqs, D(Vₘ) ~ (Iapp - (+(currents..., Isyn)))/(aₘ*cₘ))
 
-    return ODESystem(eqs, t, states, params; defaults = defaults, name = nameof(compartment))
+    return ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(compartment))
 end
 
