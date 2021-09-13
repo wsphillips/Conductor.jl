@@ -5,7 +5,7 @@ abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 @enum IVCurvature Linear Rectifying
 
 # TODO: Implement AbstractSystem methods for AbstractConductanceSystem
-getion(x::AbstractConductanceSystem) = getfield(x, :ion)
+permeability(x::AbstractConductanceSystem) = getfield(x, :ion)
 getinputs(x::AbstractConductanceSystem) = getfield(x, :inputs)
 # Abstract types without parametrics
 struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceSystem
