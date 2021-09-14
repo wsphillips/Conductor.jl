@@ -44,7 +44,7 @@ struct CompartmentSystem
     synapses::Set{AbstractConductanceSystem} # synaptic conductance systems
     synaptic_reversals::Set{Num}
     stimuli::Vector{Stimulus}
-    extension_systems::Vector{ODESystem}
+    extensions::Vector{ODESystem}
     defaults::Dict
 end
 
@@ -54,13 +54,13 @@ function CompartmentSystem(
     reversals;
     capacitance = 1µF/cm^2,
     geometry::Geometry = Point(),
-    extension::Vector{ODESystem} = ODESystem[],
+    extensions::Vector{ODESystem} = ODESystem[],
     name::Symbol = Base.gensym("Compartment")
 ) 
     @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
     foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"), reversals)
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(), channels, Set(reversals), Set(),
-                             Set(), Set(), Dict(), extension)
+                             Set(), Set(), Dict(), extensions)
 end
 
 # AbstractSystem interface extensions
@@ -69,9 +69,12 @@ area(x::AbstractCompartmentSystem) = only(@parameters aₘ = area(get_geometry(x
 capacitance(x::AbstractCompartmentSystem) = getfield(x, :capacitance)
 output(x::AbstractCompartmentSystem) = getfield(x, :voltage)
 
-get_extensionsystems(x::AbstractCompartmentSystem) = getfield(x, :extension_sysget_tems)
+get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 get_channels(x::AbstractCompartmentSystem) = getfield(x, :chans)
 get_synapses(x::AbstractCompartmentSystem) = getfield(x, :synapses)
+
+function get_inputs(x::AbstractCompartmentSystem) end 
+function inputs(x::AbstractCompartmentSystem) end
 
 function get_reversals(x::AbstractCompartmentSystem)
     return getfield(x, :channel_reversals), getfield(x, :synaptic_reversals) 
@@ -137,7 +140,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     end
 
     # Gather extension equations
-    for extension in get_extensionsystems(x)
+    for extension in get_extensions(x)
         union!(eqs, equations(extension))
         union!(ps, parameters(extension))
         union!(dvs, states(extension))
@@ -173,35 +176,29 @@ function get_systems(x::AbstractCompartmentSystem)
     union(x.chans, x.synapses)
 end
 
-# TODO/WIP: System conversions
 function Base.convert(ODESystem, compartment::CompartmentSystem)
 
     required_states = Set{Num}()
-    mstates = Set{Num}()
     eqs, dvs, ps, defs = build_toplevel(compartment)
 
-    # "connect" / auto forward cell states to channels
-    for chan in channels
-        for inp in getinputs(chan)
+    # Resolve in/out: "connect" / auto forward cell states to channels
+    for x in union(get_channels(compartment), get_synapses(compartment))
+        for inp in get_inputs(x)
+            # gathering inputs
             push!(required_states, inp)
+            # all inputs are outright connected to the compartment top-level
             subinp = getproperty(sys, tosymbol(inp, escape=false))
             push!(eqs, inp ~ subinp)
         end
     end
     
-    # extract available vs required state
-    for eq in eqs
-        modified_states!(mstates, eq)
-        get_variables!(required_states, eq.rhs)
-    end
-
-    setdiff!(required_states, mstates)
+    setdiff!(required_states, dvs)
 
     # Resolve unavailable states
     for s in required_states
         # Handled based on metadata of each state (for now just one case)
         if iscurrent(s) && isaggregate(s)
-            push!(eqs, s ~ sum(filter(x -> getion(x) == getion(s), currents)))
+            push!(eqs, s ~ sum(filter(x -> get_ion(x) == get_ion(s), currents)))
             push!(dvs, s)
         end
         # ... other switch cases for required state handlers ...

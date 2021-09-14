@@ -6,7 +6,7 @@ abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 
 # TODO: Implement AbstractSystem methods for AbstractConductanceSystem
 permeability(x::AbstractConductanceSystem) = getfield(x, :ion)
-getinputs(x::AbstractConductanceSystem) = getfield(x, :inputs)
+get_inputs(x::AbstractConductanceSystem) = getfield(x, :inputs)
 # Abstract types without parametrics
 struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceSystem
     output::Num # 'g' by default 
@@ -41,7 +41,8 @@ function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVari
         isparameter(sym) && push!(params, sym)
         hasdefault(sym) && push!(embed_defaults, sym => getdefault(sym))
     end
-
+    
+    # Remove parameters + generated states
     setdiff!(inputs, params, gate_var_outputs)
 
     push!(eqs, g ~ gbar * prod(hasexponent(x) ? output(x)^exponent(x) : output(x) for x in gate_vars))
