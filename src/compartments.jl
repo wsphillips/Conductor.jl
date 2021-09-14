@@ -73,6 +73,7 @@ get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 get_channels(x::AbstractCompartmentSystem) = getfield(x, :chans)
 get_synapses(x::AbstractCompartmentSystem) = getfield(x, :synapses)
 
+# TODO: define top-level and recursive getters for inputs
 function get_inputs(x::AbstractCompartmentSystem) end 
 function inputs(x::AbstractCompartmentSystem) end
 
@@ -185,6 +186,9 @@ function Base.convert(ODESystem, compartment::CompartmentSystem)
     for x in union(get_channels(compartment), get_synapses(compartment))
         for inp in get_inputs(x)
             # gathering inputs
+            # FIXME: add metadata indicating the level we expect to resolve at
+            # e.g. Vₘ used by a synapse is resolved at the network level (an external source)
+            # therefore it should remain unresolved when building the _host compartment_
             push!(required_states, inp)
             # all inputs are outright connected to the compartment top-level
             subinp = getproperty(sys, tosymbol(inp, escape=false))
@@ -196,6 +200,7 @@ function Base.convert(ODESystem, compartment::CompartmentSystem)
 
     # Resolve unavailable states
     for s in required_states
+        # resolvedby(s) !== compartment && continue
         # Handled based on metadata of each state (for now just one case)
         if iscurrent(s) && isaggregate(s)
             push!(eqs, s ~ sum(filter(x -> get_ion(x) == get_ion(s), currents)))
