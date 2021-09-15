@@ -37,9 +37,11 @@ import ModelingToolkit:
     renamespace,
     hasdefault,
     getdefault,
+    setdefault,
     AbstractTimeDependentSystem,
     AbstractSystem,
-    independent_variables
+    independent_variables,
+    get_variables!
 
 import ModelingToolkit.SciMLBase: parameterless_type
 
@@ -54,12 +56,14 @@ import SymbolicUtils: FnType, Rule
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
-export Gate, AlphaBetaRates, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel
+export Gate, AlphaBeta, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, MembraneCurrent
 export AuxConversion, D, Network
-export Soma, Simulation, Concentration, IonConcentration
+export Simulation, Concentration, IonConcentration
 export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
+
+export output, timeconstant, steadystate, forward_rate, reverse_rate, hasexponent, exponent
 
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 const t = let name = :t; only(@parameters $name) end
@@ -97,6 +101,7 @@ include("compartments.jl")
 include("networks.jl")
 include("io.jl")
 
+#=
 function Simulation(network; time::Time, system = false)
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(network)
@@ -108,7 +113,7 @@ function Simulation(network; time::Time, system = false)
     end
 end
 
-function Simulation(neuron::Soma; time::Time, system = false)
+function Simulation(neuron; time::Time, system = false)
     # for a single neuron, we just need a thin layer to set synaptic current constant
     old_sys = neuron.sys
     Isyn = getproperty(old_sys, :Isyn, namespace=false)
@@ -124,5 +129,5 @@ function Simulation(neuron::Soma; time::Time, system = false)
         return ODAEProblem(simplified, [], (0., t_val), [])
     end
 end
-
+=#
 end # module

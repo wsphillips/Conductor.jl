@@ -13,15 +13,15 @@ struct Point <: Geometry end
 
 struct Cylinder <: Geometry
     radius
-    length
+    height
     open_ends::Bool
 end
 
-function Cylinder(; radius, length, open_ends = true)
-    return Cylinder(radius, length, open_ends)
+function Cylinder(; radius, height, open_ends = true)
+    return Cylinder(radius, height, open_ends)
 end
 
-length(x::Geometry) = hasfield(x, :length) ? getfield(x, :length) : nothing
+height(x::Geometry) = hasfield(x, :height) ? getfield(x, :height) : nothing
 radius(x::Geometry) = getfield(x, :radius)
 radius(::Point) = 0.0
 
@@ -32,7 +32,9 @@ area(::Point) = 1.0
 # stub -- TODO: implement datastructure for describing electrode stimuli
 struct Stimulus end
 
-struct CompartmentSystem
+abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
+
+struct CompartmentSystem <: AbstractCompartmentSystem
     ivs::Num # usually just t
     ## Intrinsic properties
     voltage::Num # symbol that represents membrane voltage
@@ -49,8 +51,8 @@ struct CompartmentSystem
 end
 
 function CompartmentSystem(
-    Vₘ,
-    channels::Set{AbstractConductanceSystem},
+    Vₘ::Num,
+    channels,
     reversals;
     capacitance = 1µF/cm^2,
     geometry::Geometry = Point(),
@@ -59,8 +61,8 @@ function CompartmentSystem(
 ) 
     @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
     foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"), reversals)
-    return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(), channels, Set(reversals), Set(),
-                             Set(), Set(), Dict(), extensions)
+    return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(channels), Set(reversals), Set(),
+                             Set(), Stimulus[], extensions, Dict())
 end
 
 # AbstractSystem interface extensions
@@ -177,7 +179,7 @@ function get_systems(x::AbstractCompartmentSystem)
     union(x.chans, x.synapses)
 end
 
-function Base.convert(ODESystem, compartment::CompartmentSystem)
+function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
 
     required_states = Set{Num}()
     eqs, dvs, ps, defs = build_toplevel(compartment)

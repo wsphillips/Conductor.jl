@@ -5,7 +5,7 @@ output(x::AbstractGatingVariable) = getfield(x, :output)
 timeconstant(x::AbstractGatingVariable) = getfield(x, :tau)
 steadystate(x::AbstractGatingVariable) = getfield(x, :steadystate)
 forward_rate(x::AbstractGatingVariable) = getfield(x, :alpha)
-backward_rate(x::AbstractGatingVariable) = getfield(x: :beta)
+reverse_rate(x::AbstractGatingVariable) = getfield(x, :beta)
 hasexponent(x::AbstractGatingVariable) = hasfield(typeof(x), :p) ? getfield(x, :p) !== one(typeof(x.p)) : false
 exponent(x::AbstractGatingVariable) = hasexponent(x) ? getfield(x, :p) : nothing
 

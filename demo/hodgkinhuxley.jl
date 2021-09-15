@@ -1,40 +1,40 @@
 # Classic Hodgkin Huxley neuron with a "current pulse" stimulus
-using OrdinaryDiffEq, Plots
+#using OrdinaryDiffEq, Plots
 using Conductor, IfElse, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
-Vₘ = MembranePotential()
+Vₘ = MembranePotential(-65mV) # set default V₀ = -65mV
 
 nav_kinetics = [
-    Gate(AlphaBetaRates,
-         αₘ = IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
-         βₘ = 4.0*exp(-(Vₘ + 65.0)/18.0),
-         p = 3)
-    Gate(AlphaBetaRates,
-         αₕ = 0.07*exp(-(Vₘ+65.0)/20.0),
-         βₕ = 1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)))]
+    Gate(AlphaBeta,
+         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         4.0*exp(-(Vₘ + 65.0)/18.0), 3, name = :m)
+    Gate(AlphaBeta,
+         0.07*exp(-(Vₘ+65.0)/20.0),
+         1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)), name = :h)]
 
 kdr_kinetics = [
-    Gate(AlphaBetaRates,
-         αₙ = IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
-         βₙ = 0.125 * exp(-(Vₘ + 65.0)/80.0),
-         p = 4)]
+    Gate(AlphaBeta,
+         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
+         0.125 * exp(-(Vₘ + 65.0)/80.0),
+         4, name = :n)]
 
-@named NaV = IonChannel(Sodium, nav_kinetics, 120mS/cm^2) 
-@named Kdr = IonChannel(Potassium, kdr_kinetics, 36mS/cm^2)
-@named leak = PassiveChannel(Leak, 0.3mS/cm^2)
+@named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2) 
+@named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
+@named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
 
+channels = [NaV, Kdr, leak]
 # Equilibrium potentials are a implicit description of a ion concentration gradient
-gradients = Equilibria([Na   =>  50.0mV,
+reversals = Equilibria([Na   =>  50.0mV,
                         K    => -77.0mV,
                         Leak => -54.4mV])
 
-area = 4*pi*(20µm)^2
-pulse(t, current) = 100. < t < 200. ? ustrip(Float64, µA, 400pA) : 0.0
-@register pulse(a,b)
+#pulse(t, current) = 100. < t < 200. ? ustrip(Float64, µA, 400pA) : 0.0
+#@register pulse(a,b)
 
-@named neuron = Soma([NaV,Kdr,leak], gradients, stimulus = pulse, area = ustrip(Float64, cm^2, area));
+@named neuron = CompartmentSystem(Vₘ, channels, reversals;
+                                  geometry = Sphere(radius = 20µm));
 
 t = 300 
 sim = Simulation(neuron, time = t*ms)

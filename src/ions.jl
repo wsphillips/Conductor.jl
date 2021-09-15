@@ -64,7 +64,7 @@ function IonCurrent(
 )
     sym = Symbol("I", name)
     var = dynamic ? only(@parameters $sym) : only(@variables $sym(t))
-    setmetadata(var, IonCurrent, IonCurrent(ion, aggregate))
+    var = setmetadata(var, IonCurrent, IonCurrent(ion, aggregate))
     if !isnothing(val)
         if val isa Current
             var = setmetadata(var, ConductorUnits, unit(val))
@@ -88,16 +88,17 @@ struct EquilibriumPotential
     ion::IonSpecies
 end
 
-const Equilibrium = EqulibirumPotential
+const Equilibrium = EquilibriumPotential
 
-function EquilibriumPotential(ion::IonSpecies, val; dynamic = false, name::Symbol = PERIODIC_SYMBOL[I])
+function EquilibriumPotential(ion::IonSpecies, val; dynamic = false, name::Symbol = PERIODIC_SYMBOL[ion])
     sym = Symbol("E", name)
     var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
-    setmetadata(var, EquilibriumPotential, EquilibriumPotential(ion))
+    var = setmetadata(var, EquilibriumPotential, EquilibriumPotential(ion))
     if !isnothing(val)
         if val isa Voltage
             var = setmetadata(var, ConductorUnits, unit(val))
-            raw_val = ustrip(Float64, val)
+            # FIXME: not sure if we should hardcode mV here
+            raw_val = ustrip(Float64, mV, val)
             var = setdefault(var, raw_val)
             return var
         else
@@ -116,10 +117,10 @@ getion(x::EquilibriumPotential) = getfield(getreversal(x), :ion)
 function Equilibria(equil::Vector)
     out = Num[]
     for x in equil
-        !(x.first <: IonSpecies) && throw("Equilibrium potential must be associated with an ion type.")
-        if typeof(x.second) <: Tuple
+        x.first isa IonSpecies || throw("Equilibrium potential must be associated with an ion type.")
+        if x.second isa Tuple
             tup = x.second
-            typeof(tup[2]) !== Symbol && throw("Second tuple argument for $(x.first) must be a symbol.")
+            tup[2] isa Symbol || throw("Second tuple argument for $(x.first) must be a symbol.")
             push!(out, Equilibrium(x.first, tup...))
         else
             push!(out, Equilibrium(x.first, x.second))
