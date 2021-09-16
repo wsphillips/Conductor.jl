@@ -81,8 +81,8 @@ end
 
 iscurrent(x) = hasmetadata(value(x), IonCurrent)
 getcurrent(x) = iscurrent(x) ? getmetadata(value(x), IonCurrent) : nothing
-getion(x::IonCurrent) = getfield(getcurrent(x), :ion)
-isaggregate(x::IonCurrent) = getfield(getcurrent(x), :agg)
+getion(x::IonCurrent) = getfield(x, :ion)
+isaggregate(x::IonCurrent) = getfield(x, :agg)
 
 struct EquilibriumPotential
     ion::IonSpecies
@@ -111,7 +111,13 @@ end
 
 isreversal(x) = hasmetadata(value(x), EquilibriumPotential)
 getreversal(x) = isreversal(x) ? getmetadata(value(x), EquilibriumPotential) : nothing
-getion(x::EquilibriumPotential) = getfield(getreversal(x), :ion)
+getion(x::EquilibriumPotential) = getfield(x, :ion)
+
+function getion(x)
+    iscurrent(x) && return getion(getcurrent(x))
+    isreversal(x) && return getion(getreversal(x))
+    return nothing
+end
 
 # Alternate constructor
 function Equilibria(equil::Vector)

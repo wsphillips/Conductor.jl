@@ -63,7 +63,9 @@ export Simulation, Concentration, IonConcentration
 export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
 
+export CompartmentSystem, ConductanceSystem
 export output, timeconstant, steadystate, forward_rate, reverse_rate, hasexponent, exponent
+export Sphere, Cylinder, Point, area, radius, height
 
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 const t = let name = :t; only(@parameters $name) end

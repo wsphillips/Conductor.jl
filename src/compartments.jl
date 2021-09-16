@@ -48,6 +48,7 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     stimuli::Vector{Stimulus}
     extensions::Vector{ODESystem}
     defaults::Dict
+    name::Symbol
 end
 
 function CompartmentSystem(
@@ -62,14 +63,14 @@ function CompartmentSystem(
     @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
     foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"), reversals)
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(channels), Set(reversals), Set(),
-                             Set(), Stimulus[], extensions, Dict())
+                             Set(), Stimulus[], extensions, Dict(), name)
 end
 
 # AbstractSystem interface extensions
 get_geometry(x::AbstractCompartmentSystem) = getfield(x, :geometry)
 area(x::AbstractCompartmentSystem) = only(@parameters aₘ = area(get_geometry(x)))
 capacitance(x::AbstractCompartmentSystem) = getfield(x, :capacitance)
-output(x::AbstractCompartmentSystem) = getfield(x, :voltage)
+get_output(x::AbstractCompartmentSystem) = getfield(x, :voltage)
 
 get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 get_channels(x::AbstractCompartmentSystem) = getfield(x, :chans)
@@ -94,8 +95,8 @@ end
 
 function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     aₘ = area(comp_sys)
-    cₘ = capactiance(comp_sys)
-    Vₘ = output(comp_sys)
+    cₘ = capacitance(comp_sys)
+    Vₘ = get_output(comp_sys)
 
     currents = Set{Num}()
 
@@ -118,11 +119,11 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     foreach(x -> isparameter(x) && push!(ps, x), rev_eq_vars)
 
     # Gather channel current equations
-    for chan in get_channels(x)
+    for chan in get_channels(comp_sys)
         ion = permeability(chan)
-        Erev = chan_revs[findfirst(x -> isequal(getion(x), ion), chan_revs)]
+        Erev = only(filter(x -> isequal(getion(x), ion), chan_revs))
         I = IonCurrent(ion, name = nameof(chan))
-        g = output(chan)
+        g = get_output(chan)
         # TODO: checks for whether we need area scaling
         push!(eqs, I ~ g*aₘ*(Vₘ - Erev))
         push!(dvs, I)
@@ -131,11 +132,11 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     end
 
     # Gather synaptic current equations
-    for synapse in get_synapses(x)
+    for synapse in get_synapses(comp_sys)
         ion = permeability(synapse)
-        Esyn = syn_revs[findfirst(x -> isequal(getion(x), ion), syn_revs)]
+        Esyn = only(filter(x -> isequal(getion(x), ion), syn_revs))
         I = IonCurrent(ion, name = nameof(chan))
-        g = output(synapse)
+        g = get_output(synapse)
         push!(eqs, I ~ g*(Vₘ - Esyn))
         push!(dvs, I)
         push!(currents, I)
@@ -143,7 +144,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     end
 
     # Gather extension equations
-    for extension in get_extensions(x)
+    for extension in get_extensions(comp_sys)
         union!(eqs, equations(extension))
         union!(ps, parameters(extension))
         union!(dvs, states(extension))
@@ -153,30 +154,32 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     # FIXME: separate field for applied current(s)?
 
     # voltage equation
-    push!(eqs, D(output(comp_sys)) ~ -sum(currents)/cₘ*aₘ)
+    push!(eqs, D(get_output(comp_sys)) ~ -sum(currents)/cₘ*aₘ)
 end
 
 # collect _top level_ eqs including from extension + currents + reversals + Vₘ
 function get_eqs(x::AbstractCompartmentSystem)
-    build_top_level(x)[1]
+    build_toplevel(x)[1]
 end
 
 function get_states(x::AbstractCompartmentSystem)
-    build_top_level(x)[2]
+    collect(build_toplevel(x)[2])
 end
+
+MTK.has_ps(x::CompartmentSystem) = true
 
 function get_ps(x::AbstractCompartmentSystem)
     # collect _top level_ parameters from extension + currents + capacitance + area + reversals
-    build_top_level(x)[3]
+    collect(build_toplevel(x)[3])
 end
 
 function defaults(x::AbstractCompartmentSystem)
-    build_top_level(x)[4]
+    build_toplevel(x)[4]
 end
 
 function get_systems(x::AbstractCompartmentSystem)
     # collect channels + synapses + input systems
-    union(x.chans, x.synapses)
+    collect(union(getfield(x, :chans), getfield(x, :synapses)))
 end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)

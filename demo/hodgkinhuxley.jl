@@ -25,10 +25,7 @@ kdr_kinetics = [
 @named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
 
 channels = [NaV, Kdr, leak]
-# Equilibrium potentials are a implicit description of a ion concentration gradient
-reversals = Equilibria([Na   =>  50.0mV,
-                        K    => -77.0mV,
-                        Leak => -54.4mV])
+reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
 #pulse(t, current) = 100. < t < 200. ? ustrip(Float64, µA, 400pA) : 0.0
 #@register pulse(a,b)

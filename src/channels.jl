@@ -19,15 +19,18 @@ struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceS
     name::Symbol
 end
 
-ModelingToolkit.get_systems(x::AbstractConductanceSystem) = get_systems(getfield(x, :sys))
-ModelingToolkit.get_eqs(x::AbstractConductanceSystem) = get_eqs(getfield(x, :sys))
-ModelingToolkit.get_dvs(x::AbstractConductanceSystem) = get_dvs(getfield(x, :sys))
-ModelingToolkit.has_ps(x::AbstractConductanceSystem) = ModelingToolkit.has_ps(getfield(x, :sys))
-ModelingToolkit.get_ps(x::AbstractConductanceSystem) = get_ps(getfield(x, :sys))
-ModelingToolkit.get_defaults(x::AbstractConductanceSystem) = get_defaults(getfield(x, :sys))
-ModelingToolkit.get_states(x::AbstractConductanceSystem) = get_states(getfield(x, :sys))
-ModelingToolkit.get_ivs(x::AbstractConductanceSystem) = get_ivs(getfield(x, :sys))
-ModelingToolkit.get_iv(x::AbstractConductanceSystem) = get_iv(getfield(x, :sys))
+# Forward getters to internal system
+MTK.get_systems(x::AbstractConductanceSystem) = get_systems(getfield(x, :sys))
+MTK.get_eqs(x::AbstractConductanceSystem) = get_eqs(getfield(x, :sys))
+MTK.get_dvs(x::AbstractConductanceSystem) = get_dvs(getfield(x, :sys))
+MTK.has_ps(x::AbstractConductanceSystem) = MTK.has_ps(getfield(x, :sys))
+MTK.get_ps(x::AbstractConductanceSystem) = get_ps(getfield(x, :sys))
+MTK.get_defaults(x::AbstractConductanceSystem) = get_defaults(getfield(x, :sys))
+MTK.get_states(x::AbstractConductanceSystem) = get_states(getfield(x, :sys))
+MTK.get_ivs(x::AbstractConductanceSystem) = get_ivs(getfield(x, :sys))
+MTK.get_iv(x::AbstractConductanceSystem) = get_iv(getfield(x, :sys))
+MTK.independent_variables(x::AbstractConductanceSystem) = MTK.independent_variables(getfield(x, :sys))
+MTK.get_observed(x::AbstractConductanceSystem) = MTK.get_observed(getfield(x, :sys))
 
 function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVariable};
                            max_g::Real = 0.0, linearity::IVCurvature = Linear,
