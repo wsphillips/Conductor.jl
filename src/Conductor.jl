@@ -86,7 +86,9 @@ end
 
 # Basic symbols
 function MembranePotential(V0 = -60mV; dynamic = true, name::Symbol = :Vₘ)
-    return dynamic ? only(@variables $name(t) = V0) : only(@parameters $name = V0)
+    # remove when we have proper unit checks
+    V0_val = ustrip(Float64, mV, V0)
+    return dynamic ? only(@variables $name(t) = V0_val) : only(@parameters $name = V0_val)
 end
 
 @enum Location Outside Inside
@@ -114,22 +116,18 @@ function Simulation(network; time::Time, system = false)
         return ODAEProblem(simplified, [], (0., t_val), [])
     end
 end
+=#
 
-function Simulation(neuron; time::Time, system = false)
-    # for a single neuron, we just need a thin layer to set synaptic current constant
-    old_sys = neuron.sys
-    Isyn = getproperty(old_sys, :Isyn, namespace=false)
-    wrapper = ODESystem([D(Isyn) ~ 0]; name = Base.gensym(:wrapper))
-    # Use non-flattening extend
-    new_neuron_sys = _extend(wrapper, old_sys; name = nameof(old_sys))
+function Simulation(neuron::CompartmentSystem; time::Time, return_system = false)
+    odesys = convert(ODESystem, neuron)
     t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(new_neuron_sys)
-    if system
+    simplified = structural_simplify(odesys)
+    if return_system
         return simplified
     else
         @info repr("text/plain", simplified)
         return ODAEProblem(simplified, [], (0., t_val), [])
     end
 end
-=#
+
 end # module

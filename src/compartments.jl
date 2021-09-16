@@ -25,8 +25,9 @@ height(x::Geometry) = hasfield(x, :height) ? getfield(x, :height) : nothing
 radius(x::Geometry) = getfield(x, :radius)
 radius(::Point) = 0.0
 
-area(x::Sphere) = 4*π*radius(x)^2
-area(x::Cylinder) = 2*π*radius(x)*(h + x.open_ends ? 0 : radius(x))
+# TODO: Remove unit stripping when we have proper unit checking implemented
+area(x::Sphere) = ustrip(Float64, cm^2, 4*π*radius(x)^2)
+area(x::Cylinder) = ustrip(Float64, cm^2, 2*π*radius(x)*(h + x.open_ends ? 0 : radius(x)))
 area(::Point) = 1.0
 
 # stub -- TODO: implement datastructure for describing electrode stimuli
@@ -97,9 +98,10 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     aₘ = area(comp_sys)
     cₘ = capacitance(comp_sys)
     Vₘ = get_output(comp_sys)
-
+    
     currents = Set{Num}()
-
+    
+    push!(dvs, Vₘ)
     push!(ps, aₘ)
     push!(ps, cₘ)
     chan_revs, syn_revs = get_reversals(comp_sys) 
@@ -123,7 +125,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         ion = permeability(chan)
         Erev = only(filter(x -> isequal(getion(x), ion), chan_revs))
         I = IonCurrent(ion, name = nameof(chan))
-        g = get_output(chan)
+        g = renamespace(chan, get_output(chan))
         # TODO: checks for whether we need area scaling
         push!(eqs, I ~ g*aₘ*(Vₘ - Erev))
         push!(dvs, I)
@@ -136,7 +138,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         ion = permeability(synapse)
         Esyn = only(filter(x -> isequal(getion(x), ion), syn_revs))
         I = IonCurrent(ion, name = nameof(chan))
-        g = get_output(synapse)
+        g = renamespace(synapse, get_output(synapse))
         push!(eqs, I ~ g*(Vₘ - Esyn))
         push!(dvs, I)
         push!(currents, I)
@@ -186,7 +188,7 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
 
     required_states = Set{Num}()
     eqs, dvs, ps, defs = build_toplevel(compartment)
-
+    syss = convert.(ODESystem, collect(get_systems(compartment)))
     # Resolve in/out: "connect" / auto forward cell states to channels
     for x in union(get_channels(compartment), get_synapses(compartment))
         for inp in get_inputs(x)
@@ -196,7 +198,7 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
             # therefore it should remain unresolved when building the _host compartment_
             push!(required_states, inp)
             # all inputs are outright connected to the compartment top-level
-            subinp = getproperty(sys, tosymbol(inp, escape=false))
+            subinp = getproperty(x, tosymbol(inp, escape=false))
             push!(eqs, inp ~ subinp)
         end
     end
@@ -214,6 +216,6 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
         # ... other switch cases for required state handlers ...
     end
 
-    return ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(compartment))
+    return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs, name = nameof(compartment))
 end
 

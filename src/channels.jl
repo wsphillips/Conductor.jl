@@ -19,6 +19,8 @@ struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceS
     name::Symbol
 end
 
+Base.convert(::Type{ODESystem}, x::ConductanceSystem{ODESystem}) = getfield(x, :sys)
+
 # Forward getters to internal system
 MTK.get_systems(x::AbstractConductanceSystem) = get_systems(getfield(x, :sys))
 MTK.get_eqs(x::AbstractConductanceSystem) = get_eqs(getfield(x, :sys))

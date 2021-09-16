@@ -63,7 +63,7 @@ function IonCurrent(
     name::Symbol = PERIODIC_SYMBOL[ion]
 )
     sym = Symbol("I", name)
-    var = dynamic ? only(@parameters $sym) : only(@variables $sym(t))
+    var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym)
     var = setmetadata(var, IonCurrent, IonCurrent(ion, aggregate))
     if !isnothing(val)
         if val isa Current

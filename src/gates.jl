@@ -25,7 +25,6 @@ end
 const Gate = GatingVariable
 
 function GatingVariable(T::GateVarForm, x::Num, y::Num, p::Real = 1; name = Base.gensym("GateVar"))
-    out = only(@variables $name(t))
     if T == AlphaBeta
         alpha, beta = x, y
         ss = alpha/(alpha + beta)
@@ -35,6 +34,8 @@ function GatingVariable(T::GateVarForm, x::Num, y::Num, p::Real = 1; name = Base
         alpha = ss/tau
         beta = inv(tau) - alpha
     end
+
+    out = only(@variables $name(t) = ss)
     GatingVariable(out, alpha, beta, ss, tau, p, NullType)
 end
 
