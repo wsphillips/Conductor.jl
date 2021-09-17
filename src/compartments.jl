@@ -30,8 +30,27 @@ area(x::Sphere) = ustrip(Float64, cm^2, 4*π*radius(x)^2)
 area(x::Cylinder) = ustrip(Float64, cm^2, 2*π*radius(x)*(h + x.open_ends ? 0 : radius(x)))
 area(::Point) = 1.0
 
-# stub -- TODO: implement datastructure for describing electrode stimuli
-struct Stimulus end
+#=
+@enum StimulusTrigger ContinuousTrigger EdgeTriggered
+
+abstract type Stimulus end
+
+struct CurrentStimulus
+    waveform
+    offset::Current
+    trigger::StimulusTrigger
+    delay::TimeF64
+    function CurrentStimulus(waveform; offset::Current = 0nA,
+                             trigger::StimulusTrigger = ContinuousTrigger,
+                             delay::Time = 0ms)
+        return new(waveform, offset, trigger, delay)
+    end
+end
+
+struct VoltageStimulus end
+=#
+
+# IfElse.ifelse(t > 100.0, IfElse.ifelse(t <= 250.0, amplitude, 0.0), 0.0) 
 
 abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
 
@@ -46,7 +65,7 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     channel_reversals::Set{Num}
     synapses::Set{AbstractConductanceSystem} # synaptic conductance systems
     synaptic_reversals::Set{Num}
-    stimuli::Vector{Stimulus}
+    stimuli::Vector{Equation}
     extensions::Vector{ODESystem}
     defaults::Dict
     name::Symbol
@@ -59,12 +78,14 @@ function CompartmentSystem(
     capacitance = 1µF/cm^2,
     geometry::Geometry = Point(),
     extensions::Vector{ODESystem} = ODESystem[],
+    stimuli::Vector{Equation} = Equation[],
     name::Symbol = Base.gensym("Compartment")
 ) 
     @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
     foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"), reversals)
+    foreach(x -> iscurrent(x.lhs) || throw("Invalid current stimulus"), stimuli)
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(channels), Set(reversals), Set(),
-                             Set(), Stimulus[], extensions, Dict(), name)
+                             Set(), stimuli, extensions, Dict(), name)
 end
 
 # AbstractSystem interface extensions
@@ -76,7 +97,7 @@ get_output(x::AbstractCompartmentSystem) = getfield(x, :voltage)
 get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 get_channels(x::AbstractCompartmentSystem) = getfield(x, :chans)
 get_synapses(x::AbstractCompartmentSystem) = getfield(x, :synapses)
-
+get_stimuli(x::AbstractCompartmentSystem) = getfield(x, :stimuli)
 # TODO: define top-level and recursive getters for inputs
 function get_inputs(x::AbstractCompartmentSystem) end 
 function inputs(x::AbstractCompartmentSystem) end
@@ -98,9 +119,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     aₘ = area(comp_sys)
     cₘ = capacitance(comp_sys)
     Vₘ = get_output(comp_sys)
-    
     currents = Set{Num}()
-    
     push!(dvs, Vₘ)
     push!(ps, aₘ)
     push!(ps, cₘ)
@@ -153,10 +172,19 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         merge!(defs, defaults(extension))
     end
     
-    # FIXME: separate field for applied current(s)?
-
+    for stimulus in get_stimuli(comp_sys)
+        I = only(get_variables(stimulus.lhs))
+        hasdefault(I) || push!(defs, I => stimulus.rhs)
+        if isparameter(I)
+            push!(ps, I)
+        else
+            push!(eqs, stimulus)
+            push!(dvs, I)
+            push!(currents, -I)
+        end
+    end
     # voltage equation
-    push!(eqs, D(get_output(comp_sys)) ~ -sum(currents)/cₘ*aₘ)
+    push!(eqs, D(get_output(comp_sys)) ~ -sum(currents)/(cₘ*aₘ))
 end
 
 # collect _top level_ eqs including from extension + currents + reversals + Vₘ
@@ -185,7 +213,6 @@ function get_systems(x::AbstractCompartmentSystem)
 end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
-
     required_states = Set{Num}()
     eqs, dvs, ps, defs = build_toplevel(compartment)
     syss = convert.(ODESystem, collect(get_systems(compartment)))
@@ -202,7 +229,8 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
             push!(eqs, inp ~ subinp)
         end
     end
-    
+
+    # TODO: filter required states from stimuli and extensions
     setdiff!(required_states, dvs)
 
     # Resolve unavailable states
@@ -215,7 +243,6 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
         end
         # ... other switch cases for required state handlers ...
     end
-
     return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs, name = nameof(compartment))
 end
 

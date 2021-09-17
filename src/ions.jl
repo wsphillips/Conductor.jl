@@ -60,15 +60,14 @@ function IonCurrent(
     val = nothing;
     aggregate::Bool = false,
     dynamic::Bool = true,
-    name::Symbol = PERIODIC_SYMBOL[ion]
+    name::Symbol = Symbol("I", PERIODIC_SYMBOL[ion])
 )
-    sym = Symbol("I", name)
-    var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym)
+    var = dynamic ? only(@variables $name(t)) : only(@parameters $name)
     var = setmetadata(var, IonCurrent, IonCurrent(ion, aggregate))
     if !isnothing(val)
         if val isa Current
-            var = setmetadata(var, ConductorUnits, unit(val))
-            raw_val = ustrip(Float64, val)
+            #var = setmetadata(var, ConductorUnits, unit(val))
+            raw_val = ustrip(Float64, µA, val)
             var = setdefault(var, raw_val)
             return var
         else

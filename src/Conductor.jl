@@ -57,12 +57,12 @@ import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
 export Gate, AlphaBeta, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel
-export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, MembraneCurrent
+export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent
 export AuxConversion, D, Network
 export Simulation, Concentration, IonConcentration
 export @named
-export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
-
+export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion, NonIonic
+export t
 export CompartmentSystem, ConductanceSystem
 export output, timeconstant, steadystate, forward_rate, reverse_rate, hasexponent, exponent
 export Sphere, Cylinder, Point, area, radius, height
@@ -97,6 +97,8 @@ end
 @derived_dimension SpecificConductance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^3 # conductance per unit area
 @derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4 # capacitance per unit area
 @derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
+
+#const TimeF64 = Quantity{Float64, 𝐓, U} where U
 
 include("ions.jl")
 include("gates.jl")
