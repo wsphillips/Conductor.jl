@@ -21,14 +21,13 @@ channels = [NaV(100mS/cm^2),
             H(.02mS/cm^2),
             leak(.03mS/cm^2)]
 
-@named neuron = Soma(channels, gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
+@named neuron = CompartmentSystem(Vₘ, channels, gradients, geometry = geo, extensions = [calcium_conversion]);
 
-t = 2500 
-sim = Simulation(neuron, time = t*ms)
+sim = Simulation(neuron, time = 2500ms)
 solution = solve(sim, Rosenbrock23());
 
 # Plot at 5kHz sampling
-fig = plot(solution; plotdensity=Int(t*4), size=(1200,800), vars=[neuron.sys.Vₘ]);
+fig = plot(solution; plotdensity=Int(2500*4), size=(1200,800), vars=[Vₘ]);
 gui(fig)
 
 # Uncomment and eval `png(...)` to save as PNG

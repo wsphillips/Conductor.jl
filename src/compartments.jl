@@ -21,13 +21,13 @@ function Cylinder(; radius, height, open_ends = true)
     return Cylinder(radius, height, open_ends)
 end
 
-height(x::Geometry) = hasfield(x, :height) ? getfield(x, :height) : nothing
+height(x::Geometry) = isdefined(x, :height) ? getfield(x, :height) : nothing
 radius(x::Geometry) = getfield(x, :radius)
 radius(::Point) = 0.0
 
 # TODO: Remove unit stripping when we have proper unit checking implemented
 area(x::Sphere) = ustrip(Float64, cm^2, 4*π*radius(x)^2)
-area(x::Cylinder) = ustrip(Float64, cm^2, 2*π*radius(x)*(h + x.open_ends ? 0 : radius(x)))
+area(x::Cylinder) = ustrip(Float64, cm^2, 2*π*radius(x)*(height(x) + (x.open_ends ? 0µm : radius(x))))
 area(::Point) = 1.0
 
 #=
@@ -111,15 +111,15 @@ function build_toplevel(comp_sys)
     ps = Set{Num}()
     eqs = Equation[]
     defs = Dict()
-    build_toplevel!(dvs, ps, eqs, defs, comp_sys)
-    return eqs, dvs, ps, defs
+    currents = Set{Num}()
+    build_toplevel!(dvs, ps, eqs, defs, currents, comp_sys)
+    return eqs, dvs, ps, defs, currents
 end
 
-function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
+function build_toplevel!(dvs, ps, eqs, defs, currents, comp_sys::CompartmentSystem)
     aₘ = area(comp_sys)
     cₘ = capacitance(comp_sys)
     Vₘ = get_output(comp_sys)
-    currents = Set{Num}()
     push!(dvs, Vₘ)
     push!(ps, aₘ)
     push!(ps, cₘ)
@@ -142,6 +142,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     # Gather channel current equations
     for chan in get_channels(comp_sys)
         ion = permeability(chan)
+        @show ion
         Erev = only(filter(x -> isequal(getion(x), ion), chan_revs))
         I = IonCurrent(ion, name = nameof(chan))
         g = renamespace(chan, get_output(chan))
@@ -214,8 +215,9 @@ end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
     required_states = Set{Num}()
-    eqs, dvs, ps, defs = build_toplevel(compartment)
+    eqs, dvs, ps, defs, currents = build_toplevel(compartment)
     syss = convert.(ODESystem, collect(get_systems(compartment)))
+    
     # Resolve in/out: "connect" / auto forward cell states to channels
     for x in union(get_channels(compartment), get_synapses(compartment))
         for inp in get_inputs(x)
@@ -229,16 +231,19 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
             push!(eqs, inp ~ subinp)
         end
     end
-
+ 
+    int_modified = Set{Num}()
+    foreach(x -> get_variables!(int_modified, x.lhs),  eqs)
+   
     # TODO: filter required states from stimuli and extensions
-    setdiff!(required_states, dvs)
-
+    union!(required_states, setdiff(dvs, int_modified))
+    @show required_states
     # Resolve unavailable states
     for s in required_states
         # resolvedby(s) !== compartment && continue
         # Handled based on metadata of each state (for now just one case)
         if iscurrent(s) && isaggregate(s)
-            push!(eqs, s ~ sum(filter(x -> get_ion(x) == get_ion(s), currents)))
+            push!(eqs, s ~ sum(filter(x -> getion(x) == getion(s), currents)))
             push!(dvs, s)
         end
         # ... other switch cases for required state handlers ...

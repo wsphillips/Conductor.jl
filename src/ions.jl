@@ -5,6 +5,8 @@
     Potassium   = 1 << 2
     Chloride    = 1 << 3
     Calcium     = 1 << 4
+    Cationic    = 1 << 5
+    Anionic     = 1 << 6
 end
 
 const Ca = Calcium
@@ -30,13 +32,14 @@ function IonConcentration(
     name::Symbol = PERIODIC_SYMBOL[ion]
 )
 
-    sym = Symbol(name,(loc == Inside ? "ᵢ" : "ₒ"))
+    sym = Symbol(name,(location == Inside ? "ᵢ" : "ₒ"))
     var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
-    var = setmetadata(var,  IonConcentration, IonConcentration(ion, loc))
+    var = setmetadata(var,  IonConcentration, IonConcentration(ion, location))
     if !isnothing(val)
         if val isa Molarity
             var = setmetadata(var, ConductorUnits, unit(val))
-            raw_val = ustrip(Float64, val)
+            # FIXME: use proper unit checking
+            raw_val = ustrip(Float64, µM, val)
             var = setdefault(var, raw_val)
             return var
         else
@@ -66,7 +69,8 @@ function IonCurrent(
     var = setmetadata(var, IonCurrent, IonCurrent(ion, aggregate))
     if !isnothing(val)
         if val isa Current
-            #var = setmetadata(var, ConductorUnits, unit(val))
+            var = setmetadata(var, ConductorUnits, unit(val))
+            # FIXME: use proper unit checking
             raw_val = ustrip(Float64, µA, val)
             var = setdefault(var, raw_val)
             return var
@@ -79,9 +83,11 @@ function IonCurrent(
 end
 
 iscurrent(x) = hasmetadata(value(x), IonCurrent)
+iscurrent(x::IonCurrent) = true
 getcurrent(x) = iscurrent(x) ? getmetadata(value(x), IonCurrent) : nothing
-getion(x::IonCurrent) = getfield(x, :ion)
-isaggregate(x::IonCurrent) = getfield(x, :agg)
+getcurrent(x::IonCurrent) = x
+getion(x::IonCurrent) = getfield(getcurrent(x), :ion)
+isaggregate(x) = iscurrent(x) ? getfield(getcurrent(x), :agg) : false
 
 struct EquilibriumPotential
     ion::IonSpecies
@@ -96,7 +102,7 @@ function EquilibriumPotential(ion::IonSpecies, val; dynamic = false, name::Symbo
     if !isnothing(val)
         if val isa Voltage
             var = setmetadata(var, ConductorUnits, unit(val))
-            # FIXME: not sure if we should hardcode mV here
+            # FIXME: do proper unit checking
             raw_val = ustrip(Float64, mV, val)
             var = setdefault(var, raw_val)
             return var
@@ -118,7 +124,7 @@ function getion(x)
     return nothing
 end
 
-# Alternate constructor
+# Alternate constructor; this needs to be better...
 function Equilibria(equil::Vector)
     out = Num[]
     for x in equil
@@ -126,9 +132,9 @@ function Equilibria(equil::Vector)
         if x.second isa Tuple
             tup = x.second
             tup[2] isa Symbol || throw("Second tuple argument for $(x.first) must be a symbol.")
-            push!(out, Equilibrium(x.first, tup...))
+            push!(out, Equilibrium(x.first, tup[1], dynamic = tup[1] isa Voltage ? false : true, name = tup[2]))
         else
-            push!(out, Equilibrium(x.first, x.second))
+            push!(out, Equilibrium(x.first, x.second, dynamic = x.second isa Voltage ? false : true))
         end
     end
     return out
