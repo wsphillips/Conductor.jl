@@ -142,7 +142,6 @@ function build_toplevel!(dvs, ps, eqs, defs, currents, comp_sys::CompartmentSyst
     # Gather channel current equations
     for chan in get_channels(comp_sys)
         ion = permeability(chan)
-        @show ion
         Erev = only(filter(x -> isequal(getion(x), ion), chan_revs))
         I = IonCurrent(ion, name = nameof(chan))
         g = renamespace(chan, get_output(chan))
@@ -237,7 +236,6 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
    
     # TODO: filter required states from stimuli and extensions
     union!(required_states, setdiff(dvs, int_modified))
-    @show required_states
     # Resolve unavailable states
     for s in required_states
         # resolvedby(s) !== compartment && continue

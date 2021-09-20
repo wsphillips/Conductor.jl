@@ -64,7 +64,7 @@ export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion, NonIonic
 export t
 export CompartmentSystem, ConductanceSystem
-export output, timeconstant, steadystate, forward_rate, reverse_rate, hasexponent, exponent
+export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate, hasexponent, exponent
 export Sphere, Cylinder, Point, area, radius, height
 
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
