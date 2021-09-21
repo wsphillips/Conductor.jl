@@ -50,7 +50,7 @@ electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0, IfElse.ifelse(t < 200.0, ustri
 
 @test length.([equations(neuron),
                states(neuron),
-               parameters(neuron)]) == [12,13,8]
+               parameters(neuron)]) == [11,13,8]
 
 time = 300.
 sim_sys = Simulation(neuron, time = time*ms, return_system = true)
