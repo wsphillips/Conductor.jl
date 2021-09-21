@@ -5,7 +5,7 @@ output(x::AbstractGatingVariable) = getfield(x, :output)
 timeconstant(x::AbstractGatingVariable) = getfield(x, :tau)
 steadystate(x::AbstractGatingVariable) = getfield(x, :steadystate)
 forward_rate(x::AbstractGatingVariable) = getfield(x, :alpha)
-backward_rate(x::AbstractGatingVariable) = getfield(x: :beta)
+reverse_rate(x::AbstractGatingVariable) = getfield(x, :beta)
 hasexponent(x::AbstractGatingVariable) = hasfield(typeof(x), :p) ? getfield(x, :p) !== one(typeof(x.p)) : false
 exponent(x::AbstractGatingVariable) = hasexponent(x) ? getfield(x, :p) : nothing
 
@@ -25,7 +25,6 @@ end
 const Gate = GatingVariable
 
 function GatingVariable(T::GateVarForm, x::Num, y::Num, p::Real = 1; name = Base.gensym("GateVar"))
-    out = only(@variables $name(t))
     if T == AlphaBeta
         alpha, beta = x, y
         ss = alpha/(alpha + beta)
@@ -35,6 +34,8 @@ function GatingVariable(T::GateVarForm, x::Num, y::Num, p::Real = 1; name = Base
         alpha = ss/tau
         beta = inv(tau) - alpha
     end
+
+    out = only(@variables $name(t) = ss)
     GatingVariable(out, alpha, beta, ss, tau, p, NullType)
 end
 

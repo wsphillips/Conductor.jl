@@ -5,59 +5,61 @@ using Test
 using Conductor, ModelingToolkit, OrdinaryDiffEq, Unitful, IfElse
 import ModelingToolkit: isparameter
 import Conductor: Na, K
-using Unitful: mV, mS, cm, µm, µA, ms
+using Unitful: mV, mS, cm, µm, µA, ms, pA
 
 @testset "Hodgkin Huxley Single Compartment" begin
 
 # Symbolic model construction
 
-Vₘ = MembranePotential()
+Vₘ = MembranePotential(-65mV)
 
 nav_kinetics = [
-    Gate(AlphaBetaRates,
-         αₘ = IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
-         βₘ = 4.0*exp(-(Vₘ + 65.0)/18.0), p = 3)
-    Gate(AlphaBetaRates,
-         αₕ = 0.07*exp(-(Vₘ+65.0)/20.0),
-         βₕ = 1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)))]
+    Gate(AlphaBeta,
+         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         4.0*exp(-(Vₘ + 65.0)/18.0), 3, name = :m)
+    Gate(AlphaBeta,
+         0.07*exp(-(Vₘ+65.0)/20.0),
+         1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)), name = :h)]
 
 kdr_kinetics = [
-    Gate(AlphaBetaRates,
-         αₙ = IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
-         βₙ = 0.125 * exp(-(Vₘ + 65.0)/80.0), p = 4)]
+    Gate(AlphaBeta,
+         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
+         0.125 * exp(-(Vₘ + 65.0)/80.0),
+         4, name = :n)]
 
 alphamss = ((4.0exp(-3.6111111111111107 - (0.05555555555555555Vₘ)) +
             IfElse.ifelse(Vₘ == -40.0, 1.0, (4.0 + 0.1Vₘ)*((1.0 - exp(-4.0 - (0.1Vₘ)))^-1)))^-1) * 
             IfElse.ifelse(Vₘ == -40.0, 1.0, (4.0 + 0.1Vₘ)*((1.0 - exp(-4.0 - (0.1Vₘ)))^-1))
 
-@test isequal(nav_kinetics[1].ss, alphamss)
+@test isequal(steadystate(nav_kinetics[1]), alphamss)
 
-@named NaV = IonChannel(Sodium, nav_kinetics, 120mS/cm^2) 
-@named Kdr = IonChannel(Potassium, kdr_kinetics, 36mS/cm^2)
-@named leak = PassiveChannel(Leak, 0.3mS/cm^2)
+@named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2) 
+@named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
+@named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
 
-@test isparameter(leak.sys.g) && !isparameter(NaV.sys.g)
+@test isparameter(leak.gbar) && !isparameter(get_output(NaV))
 channels = [NaV, Kdr, leak]
-@test [length(equations(x.sys)) for x in channels] == [3,2,0]
+@test [length(equations(x)) for x in channels] == [3,2,1]
+reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
+@named Iₑ = IonCurrent(NonIonic)
+electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0, IfElse.ifelse(t < 200.0, ustrip(Float64, µA, 400pA), 0.0), 0.0)
 
-gradients = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
-area = 4*pi*(20µm)^2
-pulse(t, current) = IfElse.ifelse(t > 100.0, IfElse.ifelse(t < 200.0, 0.0004, 0.0), 0.0)
+@named neuron = CompartmentSystem(Vₘ, channels, reversals;
+                                  geometry = Sphere(radius = 20µm),
+                                  stimuli = [electrode_pulse])
 
-@named neuron = Soma(channels, gradients, stimulus = pulse, area = ustrip(Float64, cm^2, area));
+@test length.([equations(neuron),
+               states(neuron),
+               parameters(neuron)]) == [11,13,8]
 
-@test length.([equations(neuron.sys),
-               states(neuron.sys),
-               parameters(neuron.sys)]) == [12,13,8]
-
-t = 300.
-sim_sys = Simulation(neuron, time = t*ms, system = true)
+time = 300.
+sim_sys = Simulation(neuron, time = time*ms, return_system = true)
 
 @test length.([equations(sim_sys),
                states(sim_sys),
-               parameters(sim_sys)]) == [5,5,8]
+               parameters(sim_sys)]) == [4,4,8]
 
-expect_syms = [:Vₘ, :NaV₊m, :NaV₊h, :Kdr₊n, :Isyn]
+expect_syms = [:Vₘ, :NaV₊m, :NaV₊h, :Kdr₊n]
 @test all(x -> hasproperty(sim_sys, x), expect_syms)
 
 ### Hand-written model setup ###
@@ -119,7 +121,7 @@ function hodgkin_huxley!(du, u, p, t)
 end
 
 byhand_prob = ODEProblem{true}(hodgkin_huxley!, u0, (0.,300.), p)
-mtk_prob = ODAEProblem(sim_sys, [], (0., t), [])
+mtk_prob = ODAEProblem(sim_sys, [], (0., time), [])
 
 byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);

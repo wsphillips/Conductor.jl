@@ -11,6 +11,8 @@ using ModelingToolkit,
       Setfield,
       MacroTools
 
+const MTK = ModelingToolkit
+
 import Symbolics:
     get_variables,
     Symbolic,
@@ -35,9 +37,11 @@ import ModelingToolkit:
     renamespace,
     hasdefault,
     getdefault,
+    setdefault,
     AbstractTimeDependentSystem,
     AbstractSystem,
-    independent_variables
+    independent_variables,
+    get_variables!
 
 import ModelingToolkit.SciMLBase: parameterless_type
 
@@ -52,12 +56,16 @@ import SymbolicUtils: FnType, Rule
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
-export Gate, AlphaBetaRates, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel
-export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, MembraneCurrent
+export Gate, AlphaBeta, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel
+export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent
 export AuxConversion, D, Network
-export Soma, Simulation, Concentration, IonConcentration
+export Simulation, Concentration, IonConcentration
 export @named
-export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion
+export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion, NonIonic
+export t
+export CompartmentSystem, ConductanceSystem
+export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate, hasexponent, exponent
+export Sphere, Cylinder, Point, area, radius, height
 
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 const t = let name = :t; only(@parameters $name) end
@@ -77,9 +85,10 @@ function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
 end
 
 # Basic symbols
-function MembranePotential()
-    name = :Vₘ
-    return only(@variables $name(t))
+function MembranePotential(V0 = -60mV; dynamic = true, name::Symbol = :Vₘ)
+    # remove when we have proper unit checks
+    V0_val = ustrip(Float64, mV, V0)
+    return dynamic ? only(@variables $name(t) = V0_val) : only(@parameters $name = V0_val)
 end
 
 @enum Location Outside Inside
@@ -89,6 +98,8 @@ end
 @derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4 # capacitance per unit area
 @derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
 
+#const TimeF64 = Quantity{Float64, 𝐓, U} where U
+
 include("ions.jl")
 include("gates.jl")
 include("channels.jl")
@@ -96,6 +107,7 @@ include("compartments.jl")
 include("networks.jl")
 include("io.jl")
 
+#=
 function Simulation(network; time::Time, system = false)
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(network)
@@ -106,17 +118,13 @@ function Simulation(network; time::Time, system = false)
         return ODAEProblem(simplified, [], (0., t_val), [])
     end
 end
+=#
 
-function Simulation(neuron::Soma; time::Time, system = false)
-    # for a single neuron, we just need a thin layer to set synaptic current constant
-    old_sys = neuron.sys
-    Isyn = getproperty(old_sys, :Isyn, namespace=false)
-    wrapper = ODESystem([D(Isyn) ~ 0]; name = Base.gensym(:wrapper))
-    # Use non-flattening extend
-    new_neuron_sys = _extend(wrapper, old_sys; name = nameof(old_sys))
+function Simulation(neuron::CompartmentSystem; time::Time, return_system = false)
+    odesys = convert(ODESystem, neuron)
     t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(new_neuron_sys)
-    if system
+    simplified = structural_simplify(odesys)
+    if return_system
         return simplified
     else
         @info repr("text/plain", simplified)
