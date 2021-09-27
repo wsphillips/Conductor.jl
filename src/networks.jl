@@ -1,6 +1,16 @@
 # takes a topology, which for now is just an adjacency list; also list of neurons, but we
 # should be able to just auto-detect all the neurons in the topology
-function Network(neurons, topology; name = Base.gensym(:Network))
+
+abstract type AbstractNetworkSystem <: AbstractTimeDependentSystem
+
+struct NetworkSystem <: AbstractNetworkSystem end
+    topology
+    extensions
+    defaults
+    name
+end
+
+function NetworkSystem(neurons, topology; name = Base.gensym(:Network))
 
     all_neurons = Set(getproperty.(neurons, :sys))
     eqs = Equation[]
