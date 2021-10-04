@@ -9,7 +9,9 @@ using ModelingToolkit,
       Symbolics,
       SymbolicUtils,
       Setfield,
-      MacroTools
+      MacroTools,
+      LightGraphs,
+      MetaGraphs
 
 const MTK = ModelingToolkit
 
