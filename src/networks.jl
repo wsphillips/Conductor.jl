@@ -1,5 +1,14 @@
-# takes a topology, which for now is just an adjacency list; also list of neurons, but we
-# should be able to just auto-detect all the neurons in the topology
+
+# gets converted into an edge type for MetaGraphs
+struct Synapse
+    source
+    target
+    conductance_type
+    weight
+end
+
+# Synapse(neuron1, neuron2, Glut, 100pS)
+# Expect a list of eltype Synapse => construct topology as Dict{SynapticChannel, MetaDiGraph}
 
 abstract type AbstractNetworkSystem <: AbstractTimeDependentSystem
 
@@ -9,6 +18,8 @@ struct NetworkSystem <: AbstractNetworkSystem end
     defaults
     name
 end
+
+function NetworkSystem(syn_list, extensions::Vector{ODESystem} = []; defaults = Dict(), name = Base.gensym(:Network)) end
 
 function NetworkSystem(neurons, topology; name = Base.gensym(:Network))
 
