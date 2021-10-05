@@ -19,27 +19,52 @@ abstract type AbstractNetworkSystem <: AbstractTimeDependentSystem
 
 struct NetworkSystem <: AbstractNetworkSystem end
     ivs::Num
-    topology
-    extensions
-    defaults
-    name
+    topology::Dict # implement a multiplexed network using a dictionary to access layers
+    extensions::Vector{ODESystem}
+    defaults::Dict
+    name::Symbol
 end
 
-function NetworkSystem(synapses, extensions::Vector{ODESystem} = []; defaults = Dict(), name = Base.gensym(:Network))
+function NetworkSystem(synapses, extensions::Vector{ODESystem} = []; defaults = Dict(), name::Symbol = Base.gensym(:Network))
     
     neurons = Set()
     synapse_types = Set()
+    topology = Dict()
 
     for synapse in synapses
         push!(neurons, pre(synapse))
         push!(neurons, post(synapse))
+        push!(synapse_types, class(synapse))
     end
-
-    topology = MetaGraph(SimpleDiGraph(),
-                         VertexMeta = AbstractCompartmentSystem,
-                         EdgeMeta = AbstractConductanceSystem) 
+    
+    for layer in synapse_types
+        topology[layer] = MetaGraph(SimpleDiGraph(),
+                                      VertexMeta = AbstractCompartmentSystem,
+                                      EdgeMeta = AbstractConductanceSystem) 
                          # weightfunction can be set for default weight value getter
+        for neuron in neurons
+            topology[layer][nameof(neuron)] = neuron
+        end
+    end
+    
+    for synapse in synapses
+        syntype = class(synapse)
+        wt = weight(synapse)
+        topology[class(synapse)][nameof(pre(synapse)), nameof(post(synapse))] = syntype(wt)
+    end
+    
+    NetworkSystem(t, topology, extensions, defaults, name)
+end
 
+function build_toplevel!(dvs, ps, eqs, defs, x::NetworkSystem) end
+
+function build_toplevel(x::NetworkSystem)
+    dvs
+    ps
+    eqs
+    defs
+    build_toplevel!(dvs, ps, eqs, defs, x)
+    return dvs, ps, dqs, defs
 end
 
 function get_eqs(x::AbstractNetworkSystem) end
