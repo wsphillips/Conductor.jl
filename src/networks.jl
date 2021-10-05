@@ -7,19 +7,54 @@ struct Synapse
     weight
 end
 
+pre(x::Synapse) = getfield(x, :source)
+post(x::Synapse) = getfield(x, :target)
+class(x::Synapse) = getfield(x, :conductance_type)
+weight(x::Synapse) = getfield(x, :weight)
+
 # Synapse(neuron1, neuron2, Glut, 100pS)
 # Expect a list of eltype Synapse => construct topology as Dict{SynapticChannel, MetaDiGraph}
 
 abstract type AbstractNetworkSystem <: AbstractTimeDependentSystem
 
 struct NetworkSystem <: AbstractNetworkSystem end
+    ivs::Num
     topology
     extensions
     defaults
     name
 end
 
-function NetworkSystem(syn_list, extensions::Vector{ODESystem} = []; defaults = Dict(), name = Base.gensym(:Network)) end
+function NetworkSystem(synapses, extensions::Vector{ODESystem} = []; defaults = Dict(), name = Base.gensym(:Network))
+    
+    neurons = Set()
+    synapse_types = Set()
+
+    for synapse in synapses
+        push!(neurons, pre(synapse))
+        push!(neurons, post(synapse))
+    end
+
+    topology = MetaGraph(SimpleDiGraph(),
+                         VertexMeta = AbstractCompartmentSystem,
+                         EdgeMeta = AbstractConductanceSystem) 
+                         # weightfunction can be set for default weight value getter
+
+end
+
+function get_eqs(x::AbstractNetworkSystem) end
+
+function get_states(x::AbstractNetworkSystem) end
+
+MTK.has_ps(x::NetworkSystem) = any(MTK.has_ps, getfield(x, :extensions))
+
+function get_ps(x::AbstractNetworkSystem) end
+
+function defaults(x::AbstractNetworkSystem) end
+
+function get_systems(x::AbstractNetworkSystem) end
+
+function Base.convert(::Type{ODESystem}, network::NetworkSystem) end
 
 function NetworkSystem(neurons, topology; name = Base.gensym(:Network))
 
