@@ -1,15 +1,17 @@
 
-# gets converted into an edge type for MetaGraphs
-struct Synapse
-    source
-    target
-    conductance_type
-    weight
+# used as edge metadata
+struct Synapse <: AbstractSynapse
+    source::CompartmentSystem
+    source_inputs::Set{Num}
+    target::CompartmentSystem
+    target_inputs::Set{Num}
+    system::ConductanceSystem
+    weight::ElectricalConductance
 end
 
 pre(x::Synapse) = getfield(x, :source)
 post(x::Synapse) = getfield(x, :target)
-class(x::Synapse) = getfield(x, :conductance_type)
+class(x::Synapse) = getfield(x, :system)
 weight(x::Synapse) = getfield(x, :weight)
 
 # Synapse(neuron1, neuron2, Glut, 100pS)
@@ -24,6 +26,8 @@ struct NetworkSystem <: AbstractNetworkSystem end
     defaults::Dict
     name::Symbol
 end
+
+get_topology(x::AbstractNetworkSystem) = getfield(x, :topology)
 
 function NetworkSystem(synapses, extensions::Vector{ODESystem} = []; defaults = Dict(), name::Symbol = Base.gensym(:Network))
     
@@ -40,7 +44,7 @@ function NetworkSystem(synapses, extensions::Vector{ODESystem} = []; defaults = 
     for layer in synapse_types
         topology[layer] = MetaGraph(SimpleDiGraph(),
                                       VertexMeta = AbstractCompartmentSystem,
-                                      EdgeMeta = AbstractConductanceSystem) 
+                                      EdgeMeta = AbstractSynapse) 
                          # weightfunction can be set for default weight value getter
         for neuron in neurons
             topology[layer][nameof(neuron)] = neuron
@@ -50,13 +54,16 @@ function NetworkSystem(synapses, extensions::Vector{ODESystem} = []; defaults = 
     for synapse in synapses
         syntype = class(synapse)
         wt = weight(synapse)
-        topology[class(synapse)][nameof(pre(synapse)), nameof(post(synapse))] = syntype(wt)
+        topology[syntype][nameof(pre(synapse)), nameof(post(synapse))] = syntype(wt)
     end
     
     NetworkSystem(t, topology, extensions, defaults, name)
 end
 
-function build_toplevel!(dvs, ps, eqs, defs, x::NetworkSystem) end
+function build_toplevel!(dvs, ps, eqs, defs, x::NetworkSystem)
+    
+
+end
 
 function build_toplevel(x::NetworkSystem)
     dvs
