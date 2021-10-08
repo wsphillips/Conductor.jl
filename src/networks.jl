@@ -38,31 +38,43 @@ function NetworkSystem(synapses, extensions::Vector{ODESystem} = []; defaults = 
     for synapse in synapses
         push!(neurons, pre(synapse))
         push!(neurons, post(synapse))
-        push!(synapse_types, class(synapse))
+        push!(synapse_types, nameof(class(synapse)))
     end
     
     for layer in synapse_types
         topology[layer] = MetaGraph(SimpleDiGraph(),
-                                      VertexMeta = AbstractCompartmentSystem,
-                                      EdgeMeta = AbstractSynapse) 
+                                    VertexMeta = AbstractCompartmentSystem,
+                                    EdgeMeta = AbstractSynapse) 
                          # weightfunction can be set for default weight value getter
+        # vertices are always the same
         for neuron in neurons
-            topology[layer][nameof(neuron)] = neuron
+            topology[layer][nameof(neuron)] = deepcopy(neuron)
         end
     end
     
     for synapse in synapses
-        syntype = class(synapse)
-        wt = weight(synapse)
-        topology[syntype][nameof(pre(synapse)), nameof(post(synapse))] = syntype(wt)
+        topology[syntype][nameof(pre(synapse)), nameof(post(synapse))] = deepcopy(synapse)
     end
     
     NetworkSystem(t, topology, extensions, defaults, name)
 end
 
+function get_synapses(x::NetworkSystem, layer::Symbol)
+    keys(getfield(get_topology(x)[layer], :eprops))
+end
+
+function get_neurons(x::NetworkSystem)
+    top = get_topology(x)
+
+    g = first(first(top)) # grab the first layer
+
+    neurons = Set(values()) # FINISH ME
+end
+
 function build_toplevel!(dvs, ps, eqs, defs, x::NetworkSystem)
     
-
+    # Clear existing synaptic conductances and synaptic reversals from neurons
+    # use empty!(set)
 end
 
 function build_toplevel(x::NetworkSystem)
