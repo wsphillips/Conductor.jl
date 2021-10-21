@@ -105,14 +105,29 @@ end
 
 function SynapticChannel(ion::IonSpecies,
                          gate_vars::Vector{GatingVariable} = GatingVariable[],
-                         max_s::ElectricalConductance = 0mS;
+                         max_s::Union{Num, ElectricalConductance} = 0mS;
+                         extensions::Vector{ODESystem} = ODESystem[],
                          name::Symbol = Base.gensym("SynapticChannel"),
                          linearity::IVCurvature = Linear, defaults = Dict())
+    if max_s isa Electrical Conductance
+        sbar_val = ustrip(Float64, mS, max_s)
+        @parameters sbar
+        push!(defaults, sbar => sbar_val)
+    else
+        sbar = max_s
+        if hasdefault(sbar)
+            sbar_val = getdefault(sbar)
+            if sbar_val isa ElectricalConductance
+                sbar_val = ustrip(Float64, mS, sbar_val)
+                sbar = setdefault(sbar, sbar_val)
+            end
+        end
+    end
     @variables s(t)
-    sbar_val = ustrip(Float64, mS, max_s)
     s = setmetadata(s, ConductorUnits, mS) # TODO: rework iwth MTK native unit system
     ConductanceSystem(s, ion, gate_vars;
-                      max_g = sbar_val, name = name, defaults = defaults, linearity = linearity)
+                      gbar = sbar, name = name, defaults = defaults,
+                      extensions = extensions, linearity = linearity)
 end
 
 function (cond::AbstractConductanceSystem)(newgbar::Quantity)
