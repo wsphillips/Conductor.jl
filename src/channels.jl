@@ -35,15 +35,16 @@ MTK.independent_variables(x::AbstractConductanceSystem) = MTK.independent_variab
 MTK.get_observed(x::AbstractConductanceSystem) = MTK.get_observed(getfield(x, :sys))
 
 function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVariable};
-                           max_g::Real = 0.0, linearity::IVCurvature = Linear,
+        gbar::Num, linearity::IVCurvature = Linear, extensions::Vector{ODESystem} = ODESystem[],
                            defaults = Dict(), name::Symbol = Base.gensym("Conductance"))
 
     eqs = Equation[]
     inputs = Set{Num}()
     gate_var_outputs = Set{Num}()
     embed_defaults = Dict()
-    params = Set{Num}(@parameters gbar)
-    push!(defaults, gbar => max_g)
+    params = Set{Num}()
+    
+    isparameter(gbar) && push!(params, gbar)
 
     for var in gate_vars
         x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
@@ -67,21 +68,39 @@ function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVari
     end
     sys = ODESystem(eqs, t, union(inputs, g, gate_var_outputs), params;
                     defaults = merge(embed_defaults, defaults), name = name)
+    
+    for ext in extensions
+        sys = extend(sys, ext)
+    end
 
     return ConductanceSystem(g, ion, gate_vars, inputs, sys, linearity, nothing, name)
 end
 
 function IonChannel(ion::IonSpecies,
                     gate_vars::Vector{GatingVariable} = GatingVariable[];
-                    max_g::SpecificConductance = 0mS/cm^2,
+                    max_g::Union{Num, SpecificConductance} = 0mS/cm^2,
+                    extensions::Vector{ODESystem} = ODESystem[],
                     name::Symbol = Base.gensym("IonChannel"),
                     linearity::IVCurvature = Linear, defaults = Dict())
-
+    if max_g isa SpecificConductance
+        gbar_val = ustrip(Float64, mS/cm^2, max_g)
+        @parameters gbar
+        push!(defaults, gbar => gbar_val)
+    else
+        gbar = max_g
+        if hasdefault(gbar)
+            gbar_val = getdefault(gbar)
+            if gbar_val isa SpecificConductance
+                gbar_val = ustrip(Float64, mS/cm^2, gbar_val)
+                gbar = setdefault(gbar, gbar_val)
+            end
+        end
+    end
     @variables g(t)
-    gbar_val = ustrip(Float64, mS/cm^2, max_g)
     g = setmetadata(g, ConductorUnits, mS/cm^2) # TODO: rework with MTK native unit system
     ConductanceSystem(g, ion, gate_vars;
-                      max_g = gbar_val, name = name, defaults = defaults, linearity = linearity)
+                      gbar = gbar, name = name, defaults = defaults, 
+                      extensions = extensions, linearity = linearity)
 end
 
 function SynapticChannel(ion::IonSpecies,
