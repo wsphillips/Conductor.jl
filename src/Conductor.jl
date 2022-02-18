@@ -9,9 +9,7 @@ using ModelingToolkit,
       Symbolics,
       SymbolicUtils,
       Setfield,
-      MacroTools,
-      LightGraphs,
-      MetaGraphs
+      MacroTools
 
 const MTK = ModelingToolkit
 
@@ -54,7 +52,7 @@ import Unitful:
     Molarity,
     ElectricalConductance
 
-import SymbolicUtils: FnType, Rule
+import SymbolicUtils: FnType
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 

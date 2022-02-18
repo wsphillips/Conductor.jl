@@ -1,25 +1,25 @@
 
-# used as edge metadata
+using Graphs
+
+abstract type AbstractSynapse <: AbstractEdge end
+abstract type AbstractNeuralCircuitGraph <: AbstractGraph end
+
 struct Synapse <: AbstractSynapse
     source::CompartmentSystem
-    source_inputs::Set{Num}
     target::CompartmentSystem
-    target_inputs::Set{Num}
-    system::ConductanceSystem
-    weight::ElectricalConductance
+    syntype::ConductanceSystem
 end
 
 pre(x::Synapse) = getfield(x, :source)
 post(x::Synapse) = getfield(x, :target)
-class(x::Synapse) = getfield(x, :system)
-weight(x::Synapse) = getfield(x, :weight)
+class(x::Synapse) = getfield(x, :syntype)
 
 # Synapse(neuron1, neuron2, Glut, 100pS)
 # Expect a list of eltype Synapse => construct topology as Dict{SynapticChannel, MetaDiGraph}
 
-abstract type AbstractNetworkSystem <: AbstractTimeDependentSystem
+abstract type AbstractNeuralCircuitSystem <: AbstractTimeDependentSystem end
 
-struct NetworkSystem <: AbstractNetworkSystem end
+struct NeuralCircuit <: AbstractNeuralCircuitSystem
     ivs::Num
     topology::Dict # implement a multiplexed network using a dictionary to access layers
     extensions::Vector{ODESystem}
@@ -27,9 +27,10 @@ struct NetworkSystem <: AbstractNetworkSystem end
     name::Symbol
 end
 
-get_topology(x::AbstractNetworkSystem) = getfield(x, :topology)
+get_topology(x::AbstractNeuralCircuitSystem) = getfield(x, :topology)
 
-function NetworkSystem(synapses, extensions::Vector{ODESystem} = []; defaults = Dict(), name::Symbol = Base.gensym(:Network))
+function NeuralCircuit(graph, extensions::Vector{ODESystem} = [];
+                       defaults = Dict(), name::Symbol = Base.gensym(:Network))
     
     neurons = Set()
     synapse_types = Set()
@@ -56,14 +57,22 @@ function NetworkSystem(synapses, extensions::Vector{ODESystem} = []; defaults = 
         topology[syntype][nameof(pre(synapse)), nameof(post(synapse))] = deepcopy(synapse)
     end
     
-    NetworkSystem(t, topology, extensions, defaults, name)
+    NeuralCircuit(t, topology, extensions, defaults, name)
 end
 
-function get_synapses(x::NetworkSystem, layer::Symbol)
+function get_eqs(x::AbstractNeuralCircuitSystem) end
+function get_states(x::AbstractNeuralCircuitSystem) end
+MTK.has_ps(x::NeuralCircuit) = any(MTK.has_ps, getfield(x, :extensions))
+function get_ps(x::AbstractNeuralCircuitSystem) end
+function defaults(x::AbstractNeuralCircuitSystem) end
+function get_systems(x::AbstractNeuralCircuitSystem) end
+function Base.convert(::Type{ODESystem}, network::NeuralCircuit) end
+
+function get_synapses(x::NeuralCircuit, layer::Symbol)
     keys(getfield(get_topology(x)[layer], :eprops))
 end
 
-function get_neurons(x::NetworkSystem)
+function get_neurons(x::NeuralCircuit)
     top = get_topology(x)
 
     g = first(first(top)) # grab the first layer
@@ -71,13 +80,13 @@ function get_neurons(x::NetworkSystem)
     neurons = Set(values()) # FINISH ME
 end
 
-function build_toplevel!(dvs, ps, eqs, defs, x::NetworkSystem)
+function build_toplevel!(dvs, ps, eqs, defs, x::NeuralCircuit)
     
     # Clear existing synaptic conductances and synaptic reversals from neurons
     # use empty!(set)
 end
 
-function build_toplevel(x::NetworkSystem)
+function build_toplevel(x::NeuralCircuit)
     dvs
     ps
     eqs
@@ -86,21 +95,9 @@ function build_toplevel(x::NetworkSystem)
     return dvs, ps, dqs, defs
 end
 
-function get_eqs(x::AbstractNetworkSystem) end
+## Old constructor below
 
-function get_states(x::AbstractNetworkSystem) end
-
-MTK.has_ps(x::NetworkSystem) = any(MTK.has_ps, getfield(x, :extensions))
-
-function get_ps(x::AbstractNetworkSystem) end
-
-function defaults(x::AbstractNetworkSystem) end
-
-function get_systems(x::AbstractNetworkSystem) end
-
-function Base.convert(::Type{ODESystem}, network::NetworkSystem) end
-
-function NetworkSystem(neurons, topology; name = Base.gensym(:Network))
+function NeuralCircuit(neurons, topology; name = Base.gensym(:Network))
 
     all_neurons = Set(getproperty.(neurons, :sys))
     eqs = Equation[]
