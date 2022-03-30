@@ -1,7 +1,7 @@
 # Synaptically connected STG model network built as in Prinz et al Nature Neurosci 2004
 
 using OrdinaryDiffEq, Plots
-
+import Unitful.nS
 include(joinpath(@__DIR__, "prinz_kinetics.jl"));
 include(joinpath(@__DIR__, "prinz_synapses.jl"));
 
