@@ -1,10 +1,10 @@
 
 using Graphs
 
-abstract type AbstractSynapse <: AbstractEdge end
-abstract type AbstractNeuralCircuitGraph <: AbstractGraph end
+abstract type AbstractSynapse{T} <: AbstractEdge{T} end
+abstract type AbstractNeuralCircuitGraph{T} <: AbstractGraph{T} end
 
-struct Synapse <: AbstractSynapse
+struct Synapse{T} <: AbstractSynapse{T}
     source::CompartmentSystem
     target::CompartmentSystem
     syntype::ConductanceSystem
@@ -74,9 +74,7 @@ end
 
 function get_neurons(x::NeuralCircuit)
     top = get_topology(x)
-
     g = first(first(top)) # grab the first layer
-
     neurons = Set(values()) # FINISH ME
 end
 
