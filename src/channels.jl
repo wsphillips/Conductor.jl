@@ -109,7 +109,7 @@ function SynapticChannel(ion::IonSpecies,
                          extensions::Vector{ODESystem} = ODESystem[],
                          name::Symbol = Base.gensym("SynapticChannel"),
                          linearity::IVCurvature = Linear, defaults = Dict())
-    if max_s isa Electrical Conductance
+    if max_s isa ElectricalConductance
         sbar_val = ustrip(Float64, mS, max_s)
         @parameters sbar
         push!(defaults, sbar => sbar_val)
