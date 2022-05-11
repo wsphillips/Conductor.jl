@@ -5,8 +5,8 @@
     Potassium   = 1 << 2
     Chloride    = 1 << 3
     Calcium     = 1 << 4
-    Cationic    = 1 << 5
-    Anionic     = 1 << 6
+    Cation      = 1 << 5
+    Anion       = 1 << 6
 end
 
 const Ca = Calcium

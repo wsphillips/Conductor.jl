@@ -104,8 +104,8 @@ function IonChannel(ion::IonSpecies,
 end
 
 function SynapticChannel(ion::IonSpecies,
-                         gate_vars::Vector{GatingVariable} = GatingVariable[],
-                         max_s::Union{Num, ElectricalConductance} = 0mS;
+                         gate_vars::Vector{GatingVariable} = GatingVariable[];
+                         max_s::Union{Num, ElectricalConductance} = 0mS,
                          extensions::Vector{ODESystem} = ODESystem[],
                          name::Symbol = Base.gensym("SynapticChannel"),
                          linearity::IVCurvature = Linear, defaults = Dict())
