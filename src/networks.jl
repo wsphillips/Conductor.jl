@@ -13,20 +13,24 @@ struct Synapse{T<:AbstractConductanceSystem} <: AbstractSynapse
     source::CompartmentSystem
     target::CompartmentSystem
     conductance::T
+    reversal::Num
 end
 
-function Synapse(x::Pair, cond)
-    return Synapse(pair.first, pair.second, cond) 
+function Synapse(x::Pair, cond, rev)
+    return Synapse(x.first, x.second, cond, rev) 
 end
 
 # Utility function to copy a system, but generate a new name (gensym)
-function replicate(x::AbstractConductanceSystem)
+function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem})
+    rootname = ModelingToolkit.getname(x)
+    new = deepcopy(x)
+    return ModelingToolkit.rename(new, Base.gensym(rootname))
 end
 
 presynaptic(x::Synapse) = getfield(x, :source)
 postsynaptic(x::Synapse) = getfield(x, :target)
 class(x::Synapse) = getfield(x, :conductance)
-
+equilibrium(x::Synapse) = getfield(x, :reversal)
 """
 AbstractNeuronalNetworkTopology
 
@@ -41,7 +45,6 @@ struct NetworkTopology{V<:AbstractCompartmentSystem,T} <: AbstractNetworkTopolog
     vert_idx::IdDict{V,T} # lookup neuron index
     flayer_idx::IdDict{V,T} # forward lookup index from synapse type
     blayer_idx::IdDict{V,T} # backward lookup synapse type from index
-    synapses
 end
 
 function NetworkToplogy(synapses)
@@ -96,7 +99,7 @@ MTK.get_iv(x::AbstractNeuronalNetworkSystem) = get_iv(getfield(x, :sys))
 MTK.independent_variables(x::AbstractNeuronalNetworkSystem) = MTK.independent_variables(getfield(x, :sys))
 MTK.get_observed(x::AbstractNeuronalNetworkSystem) = MTK.get_observed(getfield(x, :sys))
 
-function NeuronalNetwork(topology::NetworkTopology, extensions::Vector{ODESystem} = [];
+function NeuronalNetworkSystem(topology::NetworkTopology, extensions::Vector{ODESystem} = [];
                          defaults = Dict(), name::Symbol = Base.gensym(:Network))
     
    
@@ -118,7 +121,7 @@ function NeuronalNetwork(topology::NetworkTopology, extensions::Vector{ODESystem
     NeuralCircuit(t, topology, extensions, defaults, name)
 end
 
-function NeuronalNetwork(synapses::Vector{Synapse}, extensions::Vector{ODESystem} = [];
+function NeuronalNetworkSystem(synapses::Vector{Synapse}, extensions::Vector{ODESystem} = [];
                          defaults = Dict(), name::Symbol = Base.gensym(:Network))
 
     neurons = Set()

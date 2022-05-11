@@ -69,7 +69,18 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     extensions::Vector{ODESystem}
     defaults::Dict
     name::Symbol
+    function CompartmentSystem(ivs, voltage, capacitance, geometry, chans, channel_reversals,
+                               synapses, synaptic_reversals, stimuli, extensions, defaults,
+                               name; checks = false)
+        if checks
+        # placeholder
+        end
+        new(ivs, voltage, capacitance, geometry, chans, channel_reversals, synapses,
+            synaptic_reversals, stimuli, extensions, defaults, name)
+    end
 end
+
+const Compartment = CompartmentSystem
 
 function CompartmentSystem(
     Vₘ::Num,

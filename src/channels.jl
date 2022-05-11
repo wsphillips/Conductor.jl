@@ -17,7 +17,16 @@ struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceS
     linearity::IVCurvature
     transmatrix::Union{Matrix, Nothing}
     name::Symbol
+    function ConductanceSystem(output, ion, gate_vars, inputs, sys, linearity, transmatrix,
+                               name; checks = false)
+        if checks
+        #placeholder
+        end
+        new{S}(output, ion, gate_vars, inputs, sys::S, linearity, transmatrix, name)
+    end
 end
+
+const Conductance = ConductanceSystem
 
 Base.convert(::Type{ODESystem}, x::ConductanceSystem{ODESystem}) = getfield(x, :sys)
 
