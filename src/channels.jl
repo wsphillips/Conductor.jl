@@ -22,12 +22,15 @@ struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceS
         if checks
         #placeholder
         end
-        new{S}(output, ion, gate_vars, inputs, sys::S, linearity, transmatrix, name)
+        new{typeof(sys)}(output, ion, gate_vars, inputs, sys, linearity, transmatrix, name)
     end
 end
 
 const Conductance = ConductanceSystem
 
+import ModelingToolkit: _eq_unordered
+
+# This should trigger a rebuild instead
 Base.convert(::Type{ODESystem}, x::ConductanceSystem{ODESystem}) = getfield(x, :sys)
 
 # Forward getters to internal system
@@ -43,6 +46,19 @@ MTK.get_iv(x::AbstractConductanceSystem) = get_iv(getfield(x, :sys))
 MTK.independent_variables(x::AbstractConductanceSystem) = MTK.independent_variables(getfield(x, :sys))
 MTK.get_observed(x::AbstractConductanceSystem) = MTK.get_observed(getfield(x, :sys))
 
+function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
+    sys1 === sys2 && return true
+    iv1 = get_iv(sys1)
+    iv2 = get_iv(sys2)
+    isequal(iv1, iv2) &&
+    isequal(nameof(sys1), nameof(sys2)) &&
+    _eq_unordered(get_eqs(sys1), get_eqs(sys2)) &&
+    _eq_unordered(get_states(sys1), get_states(sys2)) &&
+    _eq_unordered(get_ps(sys1), get_ps(sys2)) &&
+    all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
+end
+
+
 function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVariable};
         gbar::Num, linearity::IVCurvature = Linear, extensions::Vector{ODESystem} = ODESystem[],
                            defaults = Dict(), name::Symbol = Base.gensym("Conductance"))
@@ -53,6 +69,7 @@ function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVari
     embed_defaults = Dict()
     params = Set{Num}()
     
+    gbar = setmetadata(gbar, ConductorMaxConductance, true)
     isparameter(gbar) && push!(params, gbar)
 
     for var in gate_vars
@@ -140,15 +157,27 @@ function SynapticChannel(ion::IonSpecies,
 end
 
 function (cond::AbstractConductanceSystem)(newgbar::Quantity)
+    
     newcond = deepcopy(cond)
     g = get_output(newcond)
     outunits = getmetadata(g, ConductorUnits)
+
     if dimension(outunits) !== dimension(newgbar)
         @error "Input Dimensions do not match output of ConductanceSystem"
     end
+
     gbar_val = ustrip(Float64, outunits, newgbar)
-    gbar_sym = getproperty(cond, :gbar, namespace=false)
+    local gbar_sym::Num
+
+    for param in parameters(cond)
+        if getmetadata(param, ConductorMaxConductance, false)
+            gbar_sym = param
+            break
+        end
+    end
+
     push!(get_defaults(newcond), gbar_sym => gbar_val)
+
     return newcond
 end
 

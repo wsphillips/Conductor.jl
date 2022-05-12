@@ -364,9 +364,9 @@ version = "1.6.0"
 
 [[deps.Groebner]]
 deps = ["AbstractAlgebra", "Combinatorics", "Logging", "MultivariatePolynomials", "Primes", "Random"]
-git-tree-sha1 = "8d5455230991c22a64f99afd3c36c476b7b8be4d"
+git-tree-sha1 = "2b40a33e4a6ada7477312c560b6d9fd53f20dee1"
 uuid = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
-version = "0.2.4"
+version = "0.2.5"
 
 [[deps.GroupsCore]]
 deps = ["Markdown", "Random"]
@@ -954,9 +954,9 @@ version = "0.19.7"
 
 [[deps.Symbolics]]
 deps = ["ArrayInterface", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "Groebner", "IfElse", "Latexify", "Libdl", "LinearAlgebra", "MacroTools", "Metatheory", "NaNMath", "RecipesBase", "Reexport", "Requires", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicUtils", "TermInterface", "TreeViews"]
-git-tree-sha1 = "aab7c217abd7427e91004a2486bef9af42a1047a"
+git-tree-sha1 = "38381b90065c4e444fcdca49b8280ba3571059f8"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "4.4.3"
+version = "4.5.1"
 
 [[deps.TOML]]
 deps = ["Dates"]

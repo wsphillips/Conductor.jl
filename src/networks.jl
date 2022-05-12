@@ -1,6 +1,7 @@
 
 #using Graphs
-    using SparseArrays
+using SparseArrays
+
 """
 AbstractSynapse
 
@@ -56,8 +57,10 @@ function NetworkToplogy(synapses)
         push!(neurons, presynaptic(synapse))
         push!(neurons, postsynaptic(synapse))
         # using nameof is a bad heuristic
-        push!(synapse_classes, nameof(class(synapse)))
+        push!(synapse_classes, class(synapse))
     end
+    
+    
 
     return
 end
@@ -98,7 +101,7 @@ MTK.get_ivs(x::AbstractNeuronalNetworkSystem) = get_ivs(getfield(x, :sys))
 MTK.get_iv(x::AbstractNeuronalNetworkSystem) = get_iv(getfield(x, :sys))
 MTK.independent_variables(x::AbstractNeuronalNetworkSystem) = MTK.independent_variables(getfield(x, :sys))
 MTK.get_observed(x::AbstractNeuronalNetworkSystem) = MTK.get_observed(getfield(x, :sys))
-
+#=
 function NeuronalNetworkSystem(topology::NetworkTopology, extensions::Vector{ODESystem} = [];
                          defaults = Dict(), name::Symbol = Base.gensym(:Network))
     
@@ -120,6 +123,7 @@ function NeuronalNetworkSystem(topology::NetworkTopology, extensions::Vector{ODE
     
     NeuralCircuit(t, topology, extensions, defaults, name)
 end
+=#
 
 function NeuronalNetworkSystem(synapses::Vector{Synapse}, extensions::Vector{ODESystem} = [];
                          defaults = Dict(), name::Symbol = Base.gensym(:Network))
@@ -133,7 +137,7 @@ function NeuronalNetworkSystem(synapses::Vector{Synapse}, extensions::Vector{ODE
         push!(synapse_types, nameof(class(synapse)))
     end
 
-    return NeuronalNetwork(topology, extensions, defaults = defaults, name = name)
+    #return NeuronalNetwork(topology, extensions, defaults = defaults, name = name)
 end
 
 #=

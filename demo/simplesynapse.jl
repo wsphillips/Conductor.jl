@@ -39,7 +39,7 @@ holding_current = Iₑ ~ ustrip(Float64, µA, 400pA)
 # Synaptic model
 syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
 τsyn = (1 - syn∞)/(1/40)
-syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :m)
+syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :s)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 

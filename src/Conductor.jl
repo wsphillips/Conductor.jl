@@ -28,6 +28,8 @@ import ModelingToolkit:
     defaults,
     AbstractSystem,
     get_eqs,
+    get_iv,
+    get_ivs,
     get_states,
     get_observed,
     get_defaults,
@@ -74,6 +76,7 @@ const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
 
 # Metadata IDs
 struct ConductorUnits end # temporary shim until we implement MTK's unit checking
+struct ConductorMaxConductance end
 
 isfunction(ex::ExprValues) = try return eval(ex) isa Function catch; return false end
 
