@@ -55,7 +55,7 @@ struct VoltageStimulus end
 abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
 
 struct CompartmentSystem <: AbstractCompartmentSystem
-    ivs::Num # usually just t
+    iv::Num # usually just t
     ## Intrinsic properties
     voltage::Num # symbol that represents membrane voltage
     capacitance::Num # specific membrane capacitance
@@ -69,14 +69,16 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     extensions::Vector{ODESystem}
     defaults::Dict
     name::Symbol
-    function CompartmentSystem(ivs, voltage, capacitance, geometry, chans, channel_reversals,
+    eqs::Vector{Equation}
+    systems::Vector{AbstractTimeDependentSystem}
+    function CompartmentSystem(iv, voltage, capacitance, geometry, chans, channel_reversals,
                                synapses, synaptic_reversals, stimuli, extensions, defaults,
-                               name; checks = false)
+                               name, eqs, systems; checks = false)
         if checks
         # placeholder
         end
-        new(ivs, voltage, capacitance, geometry, chans, channel_reversals, synapses,
-            synaptic_reversals, stimuli, extensions, defaults, name)
+        new(iv, voltage, capacitance, geometry, chans, channel_reversals, synapses,
+            synaptic_reversals, stimuli, extensions, defaults, name, eqs, systems)
     end
 end
 
@@ -95,8 +97,11 @@ function CompartmentSystem(
     @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
     foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"), reversals)
     foreach(x -> iscurrent(x.lhs) || throw("Invalid current stimulus"), stimuli)
+    eqs = Equation[]
+    systems = AbstractSystem[]
+    observed
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(channels), Set(reversals), Set(),
-                             Set(), stimuli, extensions, Dict(), name)
+                             Set(), stimuli, extensions, Dict(), name, eqs, systems)
 end
 
 # AbstractSystem interface extensions
@@ -105,10 +110,15 @@ area(x::AbstractCompartmentSystem) = only(@parameters aₘ = area(get_geometry(x
 capacitance(x::AbstractCompartmentSystem) = getfield(x, :capacitance)
 get_output(x::AbstractCompartmentSystem) = getfield(x, :voltage)
 
+# TODO: Implement these...
+get_observed(x::CompartmentSystem) = 0
+get_continuous_events(x::CompartmentSystem) = 0
+
 get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 get_channels(x::AbstractCompartmentSystem) = getfield(x, :chans)
 get_synapses(x::AbstractCompartmentSystem) = getfield(x, :synapses)
 get_stimuli(x::AbstractCompartmentSystem) = getfield(x, :stimuli)
+
 # TODO: define top-level and recursive getters for inputs
 function get_inputs(x::AbstractCompartmentSystem) end 
 function inputs(x::AbstractCompartmentSystem) end
@@ -199,8 +209,12 @@ function build_toplevel!(dvs, ps, eqs, defs, currents, comp_sys::CompartmentSyst
 end
 
 # collect _top level_ eqs including from extension + currents + reversals + Vₘ
-function get_eqs(x::AbstractCompartmentSystem)
-    build_toplevel(x)[1]
+function get_eqs(x::AbstractCompartmentSystem; rebuild = false)
+    if rebuild || isempty(getfield(x, :eqs))
+        empty!(getfield(x, :eqs))
+        union!(getfield(x, :eqs), build_toplevel(x)[1])
+    end
+    return getfield(x, :eqs)
 end
 
 function get_states(x::AbstractCompartmentSystem)
@@ -218,9 +232,25 @@ function defaults(x::AbstractCompartmentSystem)
     build_toplevel(x)[4]
 end
 
-function get_systems(x::AbstractCompartmentSystem)
+function get_systems(x::AbstractCompartmentSystem; rebuild = false)
     # collect channels + synapses + input systems
-    collect(union(getfield(x, :chans), getfield(x, :synapses)))
+    if rebuild || isempty(getfield(x, :systems))
+        empty!(getfield(x, :systems))
+        union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses))
+    end
+    return getfield(x, :systems)
+end
+
+function Base.:(==)(sys1::CompartmentSystem, sys2::CompartmentSystem)
+    sys1 === sys2 && return true
+    iv1 = get_iv(sys1)
+    iv2 = get_iv(sys2)
+    isequal(iv1, iv2) &&
+    isequal(nameof(sys1), nameof(sys2)) &&
+    _eq_unordered(get_eqs(sys1), get_eqs(sys2)) &&
+    _eq_unordered(get_states(sys1), get_states(sys2)) &&
+    _eq_unordered(get_ps(sys1), get_ps(sys2)) &&
+    all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)

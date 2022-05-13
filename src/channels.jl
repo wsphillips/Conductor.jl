@@ -9,6 +9,8 @@ get_inputs(x::AbstractConductanceSystem) = getfield(x, :inputs)
 get_output(x::AbstractConductanceSystem) = getfield(x, :output)
 # Abstract types without parametrics
 struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceSystem
+    
+    iv
     output::Num # 'g' by default 
     ion::IonSpecies # ion permeability
     gate_vars::Vector{<:AbstractGatingVariable}
@@ -17,12 +19,14 @@ struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceS
     linearity::IVCurvature
     transmatrix::Union{Matrix, Nothing}
     name::Symbol
-    function ConductanceSystem(output, ion, gate_vars, inputs, sys, linearity, transmatrix,
-                               name; checks = false)
+    eqs::Vector{Equation}
+    systems::Vector{AbstractTimeDependentSystem}
+    function ConductanceSystem(iv, output, ion, gate_vars, inputs, sys, linearity, transmatrix,
+                               name, eqs, systems; checks = false)
         if checks
         #placeholder
         end
-        new{typeof(sys)}(output, ion, gate_vars, inputs, sys, linearity, transmatrix, name)
+        new{typeof(sys)}(iv, output, ion, gate_vars, inputs, sys, linearity, transmatrix, name, eqs, systems)
     end
 end
 
@@ -34,17 +38,46 @@ import ModelingToolkit: _eq_unordered
 Base.convert(::Type{ODESystem}, x::ConductanceSystem{ODESystem}) = getfield(x, :sys)
 
 # Forward getters to internal system
-MTK.get_systems(x::AbstractConductanceSystem) = get_systems(getfield(x, :sys))
-MTK.get_eqs(x::AbstractConductanceSystem) = get_eqs(getfield(x, :sys))
-MTK.get_dvs(x::AbstractConductanceSystem) = get_dvs(getfield(x, :sys))
-MTK.has_ps(x::AbstractConductanceSystem) = MTK.has_ps(getfield(x, :sys))
-MTK.get_ps(x::AbstractConductanceSystem) = get_ps(getfield(x, :sys))
-MTK.get_defaults(x::AbstractConductanceSystem) = get_defaults(getfield(x, :sys))
-MTK.get_states(x::AbstractConductanceSystem) = get_states(getfield(x, :sys))
-MTK.get_ivs(x::AbstractConductanceSystem) = get_ivs(getfield(x, :sys))
-MTK.get_iv(x::AbstractConductanceSystem) = get_iv(getfield(x, :sys))
-MTK.independent_variables(x::AbstractConductanceSystem) = MTK.independent_variables(getfield(x, :sys))
-MTK.get_observed(x::AbstractConductanceSystem) = MTK.get_observed(getfield(x, :sys))
+for prop in [
+             :eqs
+             :noiseeqs
+             :iv
+             :states
+             :ps
+             :var_to_name
+             :ctrls
+             :defaults
+             :observed
+             :tgrad
+             :jac
+             :ctrl_jac
+             :Wfact
+             :Wfact_t
+             :systems
+             :structure
+             :op
+             :equality_constraints
+             :inequality_constraints
+             :controls
+             :loss
+             :bcs
+             :domain
+             :ivs
+             :dvs
+             :connector_type
+             :connections
+             :preface
+             :torn_matching
+             :tearing_state
+             :substitutions
+            ]
+    fname1 = Symbol(:get_, prop)
+    fname2 = Symbol(:has_, prop)
+    @eval begin
+        $fname1(x::ConductanceSystem) = getfield(getfield(x, :sys), $(QuoteNode(prop)))
+        $fname2(x::ConductanceSystem) = isdefined(getfield(x, :sys), $(QuoteNode(prop)))
+    end
+end
 
 function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
     sys1 === sys2 && return true
@@ -57,7 +90,6 @@ function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
     _eq_unordered(get_ps(sys1), get_ps(sys2)) &&
     all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end
-
 
 function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVariable};
         gbar::Num, linearity::IVCurvature = Linear, extensions::Vector{ODESystem} = ODESystem[],
@@ -99,7 +131,7 @@ function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVari
         sys = extend(sys, ext)
     end
 
-    return ConductanceSystem(g, ion, gate_vars, inputs, sys, linearity, nothing, name)
+    return ConductanceSystem(t, g, ion, gate_vars, inputs, sys, linearity, nothing, name, eqs, Vector{ODESystem}[])
 end
 
 function IonChannel(ion::IonSpecies,

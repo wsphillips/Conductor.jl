@@ -19,7 +19,7 @@ kdr_kinetics = [
          0.125 * exp(-(Vₘ + 65.0)/80.0),
          4, name = :n)]
 
-@named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2) 
+@named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2)
 @named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
 @named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
 channels = [NaV, Kdr, leak];
