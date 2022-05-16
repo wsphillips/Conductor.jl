@@ -1,4 +1,6 @@
 # Example of writing synaptic kinetics
+
+using Revise
 using Conductor, IfElse, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
@@ -43,7 +45,7 @@ syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :s)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
-network = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
+net = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
 
 t = 250
 sim = Simulation(network, time = t*ms)

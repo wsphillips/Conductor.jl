@@ -1,7 +1,4 @@
 
-#using Graphs
-using SparseArrays
-
 """
 AbstractSynapse
 
@@ -10,10 +7,10 @@ AbstractSynapse
 """
 abstract type AbstractSynapse end # <: AbstractEdge{T} end
 
-struct Synapse{T<:AbstractConductanceSystem} <: AbstractSynapse
+struct Synapse <: AbstractSynapse
     source::CompartmentSystem
     target::CompartmentSystem
-    conductance::T
+    conductance::AbstractConductanceSystem
     reversal::Num
 end
 
@@ -22,6 +19,8 @@ function Synapse(x::Pair, cond, rev)
 end
 
 # Utility function to copy a system, but generate a new name (gensym)
+# Perhaps we could cache a global index for synapse types? Then we could
+# rename using a plain integer for better readability.
 function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem})
     rootname = ModelingToolkit.getname(x)
     new = deepcopy(x)
@@ -31,77 +30,97 @@ end
 presynaptic(x::Synapse) = getfield(x, :source)
 postsynaptic(x::Synapse) = getfield(x, :target)
 class(x::Synapse) = getfield(x, :conductance)
-equilibrium(x::Synapse) = getfield(x, :reversal)
-"""
-AbstractNeuronalNetworkTopology
-
-    - multilayer graph representation of the network
-    - eventually subtype AbstractGraph and implement Graphs interface?
-"""
-abstract type AbstractNetworkTopology end #{T} <: AbstractGraph{T} end
-
-# note the eltype T _could_ be Num if we need it to
-struct NetworkTopology{V<:AbstractCompartmentSystem,T} <: AbstractNetworkTopology
-    layered_adjacency_matrix::Vector{SparseMatrixCSC{T,Int64}} # vector idx == layer
-    vert_idx::IdDict{V,T} # lookup neuron index
-    flayer_idx::IdDict{V,T} # forward lookup index from synapse type
-    blayer_idx::IdDict{V,T} # backward lookup synapse type from index
-end
-
-function NetworkToplogy(synapses)
-
-    neurons = Set()
-    synapse_classes = Set()
-
-    for synapse in synapses
-        push!(neurons, presynaptic(synapse))
-        push!(neurons, postsynaptic(synapse))
-        # using nameof is a bad heuristic
-        push!(synapse_classes, class(synapse))
-    end
-    
-    
-
-    return
-end
-
-#=
-function Base.getindex(x::NetworkTopology, pre::AbstractCompartmentSystem, post::AbstractCompartmentSystem)
-    # getkey(collection, 
-    return x.layered_adjacency_matrix[] 
-end
-=#
-
-# Synapse(neuron1, neuron2, Glut, 100pS)
-# Expect a list of eltype Synapse => construct topology as Dict{SynapticChannel, MetaDiGraph}
-
+reversal(x::Synapse) = getfield(x, :reversal)
 abstract type AbstractNeuronalNetworkSystem <: AbstractTimeDependentSystem end
 
-struct NeuronalNetworkSystem{S<:AbstractTimeDependentSystem} <: AbstractNeuronalNetworkSystem
-    topology::AbstractNetworkTopology
-    extensions::Vector{ODESystem}
-    sys::S
+struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
+    #topology::AbstractNetworkTopology
+    iv::Num
+    synapses::Vector{AbstractSynapse}
+    extensions::Vector{AbstractTimeDependentSystem}
     name::Symbol
+    eqs::Vector{Equation}
+    systems::Vector{AbstractTimeDependentSystem}
+    function NeuronalNetworkSystem(iv, synapses, extensions, name, eqs, systems; checks = false)
+        if checks
+            # placeholder
+        end
+        new(iv, synapses, extensions, name, eqs, systems)
+    end
 end
 
-get_topology(x::AbstractNeuronalNetworkSystem) = getfield(x, :topology)
-get_extensions(x::AbstractNeuronalNetworkSystem) = getfield(x, :extensions)
+function NeuronalNetworkSystem(synapses::Vector{Synapse}, extensions::Vector{AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
+                               name::Symbol = Base.gensym(:Network))
+    eqs = Equation[]
+    systems = AbstractTimeDependentSystem[]
+    return NeuronalNetworkSystem(t, synapses, extensions, name, eqs, systems)
+end
 
-Base.convert(::Type{ODESystem}, x::NeuronalNetworkSystem{ODESystem}) = getfield(x, :sys)
+#get_topology(x::AbstractNeuronalNetworkSystem) = getfield(x, :topology)
+get_extensions(x::AbstractNeuronalNetworkSystem) = getfield(x, :extensions)
+get_synapses(x::AbstractNeuronalNetworkSystem) = getfield(x, :synapses)
 
 # Forward getters to internal system
-MTK.get_systems(x::AbstractNeuronalNetworkSystem) = get_systems(getfield(x, :sys))
-MTK.get_eqs(x::AbstractNeuronalNetworkSystem) = get_eqs(getfield(x, :sys))
-MTK.get_dvs(x::AbstractNeuronalNetworkSystem) = get_dvs(getfield(x, :sys))
-MTK.has_ps(x::AbstractNeuronalNetworkSystem) = MTK.has_ps(getfield(x, :sys))
-MTK.get_ps(x::AbstractNeuronalNetworkSystem) = get_ps(getfield(x, :sys))
-MTK.get_defaults(x::AbstractNeuronalNetworkSystem) = get_defaults(getfield(x, :sys))
-MTK.get_states(x::AbstractNeuronalNetworkSystem) = get_states(getfield(x, :sys))
-MTK.get_ivs(x::AbstractNeuronalNetworkSystem) = get_ivs(getfield(x, :sys))
-MTK.get_iv(x::AbstractNeuronalNetworkSystem) = get_iv(getfield(x, :sys))
-MTK.independent_variables(x::AbstractNeuronalNetworkSystem) = MTK.independent_variables(getfield(x, :sys))
-MTK.get_observed(x::AbstractNeuronalNetworkSystem) = MTK.get_observed(getfield(x, :sys))
+MTK.get_states(x::AbstractNeuronalNetworkSystem) = collect(build_toplevel(x)[1])
+MTK.has_ps(x::AbstractNeuronalNetworkSystem) = !isempty(build_toplevel(x)[2])
+MTK.get_ps(x::AbstractNeuronalNetworkSystem) = collect(build_toplevel(x)[2])
+
+function MTK.get_eqs(x::AbstractNeuronalNetworkSystem)
+    empty!(getfield(x, :eqs))
+    union!(getfield(x, :eqs), build_toplevel(x)[3])
+end
+
+MTK.get_defaults(x::AbstractNeuronalNetworkSystem) = build_toplevel(x)[4]
+
+function MTK.get_systems(x::AbstractNeuronalNetworkSystem)
+    empty!(getfield(x, :systems))
+    union!(getfield(x, :systems), build_toplevel(x)[5])
+end
+
+function Base.convert(::Type{ODESystem}, x::NeuronalNetworkSystem) end
+
+function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
+    
+    synapses = get_synapses(network_sys)
+    preneurons = Set()
+    postneurons = Set()
+    synapse_types = Set()
+    reversals = Set()
+    
+    voltage_fwds = Set{Equation}()
+    
+    # Bin the fields
+    for synapse in synapses
+        push!(preneurons, presynaptic(synapse))
+        push!(preneurons, postsynaptic(synapse))
+        push!(synapse_types, class(synapse))
+        push!(reversals, reversal(synapse))
+    end
+    
+    # Reset all synaptic information
+    allneurons = union(preneurons, postneurons)
+    foreach(x -> empty!(get_synapses(x)), allneurons)
+    foreach(x -> empty!(get_synaptic_reversals(x)), allneurons)
+
+    # Push synaptic information to each neuron
+    for synapse in synapses
+        syn = replicate(class(synapse))
+        post = postsynaptic(synapse)
+        pre  = presynaptic(synapse)
+        push!(get_synapses(post), syn)
+        push!(get_synaptic_reversals(post), reversal(synapse))
+        # Note this will probably cause an error...
+        push!(voltage_fwds, getproperty(post, nameof(syn)).Vₘ ~ pre.Vₘ) 
+    end
+
+    union!(eqs, voltage_fwds)
+    return dvs, ps, eqs, defs, collect(allneurons)
+end
+
 #=
+using Graphs
+using SparseArrays
+
 function NeuronalNetworkSystem(topology::NetworkTopology, extensions::Vector{ODESystem} = [];
                          defaults = Dict(), name::Symbol = Base.gensym(:Network))
     
@@ -123,59 +142,31 @@ function NeuronalNetworkSystem(topology::NetworkTopology, extensions::Vector{ODE
     
     NeuralCircuit(t, topology, extensions, defaults, name)
 end
-=#
 
-function NeuronalNetworkSystem(synapses::Vector{Synapse}, extensions::Vector{ODESystem} = [];
-                         defaults = Dict(), name::Symbol = Base.gensym(:Network))
+"""
+AbstractNeuronalNetworkTopology
 
-    neurons = Set()
-    synapse_types = Set()
+    - multilayer graph representation of the network
+    - eventually subtype AbstractGraph and implement Graphs interface?
+"""
+abstract type AbstractNetworkTopology end #{T} <: AbstractGraph{T} end
 
-    for synapse in synapses
-        push!(neurons, pre(synapse))
-        push!(neurons, post(synapse))
-        push!(synapse_types, nameof(class(synapse)))
-    end
-
-    #return NeuronalNetwork(topology, extensions, defaults = defaults, name = name)
+# note the eltype T _could_ be Num if we need it to
+struct NetworkTopology{V<:AbstractCompartmentSystem,T} <: AbstractNetworkTopology
+    layered_adjacency_matrix::Vector{SparseMatrixCSC{T,Int64}} # vector idx == layer
+    vert_idx::IdDict{V,T} # lookup neuron index
+    flayer_idx::IdDict{V,T} # forward lookup index from synapse type
+    blayer_idx::IdDict{V,T} # backward lookup synapse type from index
 end
 
-#=
-function get_eqs(x::AbstractNeuralCircuitSystem) end
-function get_states(x::AbstractNeuralCircuitSystem) end
-MTK.has_ps(x::NeuralCircuit) = any(MTK.has_ps, getfield(x, :extensions))
-function get_ps(x::AbstractNeuralCircuitSystem) end
-function defaults(x::AbstractNeuralCircuitSystem) end
-function get_systems(x::AbstractNeuralCircuitSystem) end
-function Base.convert(::Type{ODESystem}, network::NeuralCircuit) end
+function NetworkToplogy(synapses) end
 
-function get_synapses(x::NeuralCircuit, layer::Symbol)
-    keys(getfield(get_topology(x)[layer], :eprops))
-end
-
-function get_neurons(x::NeuralCircuit)
-    top = get_topology(x)
-    g = first(first(top)) # grab the first layer
-    neurons = Set(values()) # FINISH ME
-end
-
-function build_toplevel!(dvs, ps, eqs, defs, x::NeuralCircuit)
-    
-    # Clear existing synaptic conductances and synaptic reversals from neurons
-    # use empty!(set)
-end
-
-function build_toplevel(x::NeuralCircuit)
-    dvs
-    ps
-    eqs
-    defs
-    build_toplevel!(dvs, ps, eqs, defs, x)
-    return dvs, ps, dqs, defs
+function Base.getindex(x::NetworkTopology, pre::AbstractCompartmentSystem, post::AbstractCompartmentSystem)
+    #getkey(collection, 
+    return x.layered_adjacency_matrix[] 
 end
 
 ## Old constructor below
-
 function NeuralCircuit(neurons, topology; name = Base.gensym(:Network))
 
     all_neurons = Set(getproperty.(neurons, :sys))

@@ -65,7 +65,7 @@ export Simulation, Concentration, IonConcentration
 export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion, NonIonic
 export t
-export CompartmentSystem, ConductanceSystem, Conductance, Compartment
+export CompartmentSystem, ConductanceSystem, NeuronalNetworkSystem, Conductance, Compartment
 export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate, hasexponent, exponent
 export Sphere, Cylinder, Point, area, radius, height
 

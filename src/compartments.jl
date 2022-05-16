@@ -127,17 +127,20 @@ function get_reversals(x::AbstractCompartmentSystem)
     return getfield(x, :channel_reversals), getfield(x, :synaptic_reversals) 
 end
 
-function build_toplevel(comp_sys)
+get_synaptic_reversals(x::AbstractCompartmentSystem) = get_reversals(x)[2]
+get_channel_reversals(x::AbstractCompartmentSystem) = get_reversals(x)[1]
+
+function build_toplevel(system)
     dvs = Set{Num}()
     ps = Set{Num}()
     eqs = Equation[]
     defs = Dict()
-    currents = Set{Num}()
-    build_toplevel!(dvs, ps, eqs, defs, currents, comp_sys)
-    return eqs, dvs, ps, defs, currents
+    build_toplevel!(dvs, ps, eqs, defs, system)
 end
 
-function build_toplevel!(dvs, ps, eqs, defs, currents, comp_sys::CompartmentSystem)
+function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
+
+    currents = Set{Num}()
     aₘ = area(comp_sys)
     cₘ = capacitance(comp_sys)
     Vₘ = get_output(comp_sys)
@@ -177,12 +180,12 @@ function build_toplevel!(dvs, ps, eqs, defs, currents, comp_sys::CompartmentSyst
     for synapse in get_synapses(comp_sys)
         ion = permeability(synapse)
         Esyn = only(filter(x -> isequal(getion(x), ion), syn_revs))
-        I = IonCurrent(ion, name = nameof(chan))
-        g = renamespace(synapse, get_output(synapse))
-        push!(eqs, I ~ g*(Vₘ - Esyn))
+        I = IonCurrent(ion, name = nameof(synapse))
+        s = renamespace(synapse, get_output(synapse))
+        push!(eqs, I ~ s*(Vₘ - Esyn))
         push!(dvs, I)
         push!(currents, I)
-        merge!(defs, defaults(chan))
+        merge!(defs, defaults(synapse))
     end
 
     # Gather extension equations
@@ -206,14 +209,16 @@ function build_toplevel!(dvs, ps, eqs, defs, currents, comp_sys::CompartmentSyst
     end
     # voltage equation
     push!(eqs, D(get_output(comp_sys)) ~ -sum(currents)/(cₘ*aₘ))
+
+    return eqs, dvs, ps, defs, currents
 end
 
 # collect _top level_ eqs including from extension + currents + reversals + Vₘ
 function get_eqs(x::AbstractCompartmentSystem; rebuild = false)
-    if rebuild || isempty(getfield(x, :eqs))
+    #if rebuild || isempty(getfield(x, :eqs))
         empty!(getfield(x, :eqs))
         union!(getfield(x, :eqs), build_toplevel(x)[1])
-    end
+    #end
     return getfield(x, :eqs)
 end
 
@@ -234,10 +239,10 @@ end
 
 function get_systems(x::AbstractCompartmentSystem; rebuild = false)
     # collect channels + synapses + input systems
-    if rebuild || isempty(getfield(x, :systems))
+    #if rebuild || isempty(getfield(x, :systems))
         empty!(getfield(x, :systems))
         union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses))
-    end
+    #end
     return getfield(x, :systems)
 end
 
