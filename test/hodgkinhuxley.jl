@@ -84,7 +84,8 @@ u0[4] = ninf(V0) # Kdr₊n
 
 # Parameters 
 p[1]  = 0.001      # cₘ      
-p[2]  = 5.02655e-5 # aₘ      
+#p[2]  = 5.02655e-5 # aₘ      
+p[2]  = area(Sphere(radius = 20µm)) # aₘ      
 p[3]  = 50.0       # ENa     
 p[4]  = -77.0      # EK      
 p[5]  = -54.4      # El      

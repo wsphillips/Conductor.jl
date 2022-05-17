@@ -85,6 +85,8 @@ for prop in [
     end
 end
 
+MTK.getvar(x::ConductanceSystem, name::Symbol; namespace::Bool) = MTK.getvar(getfield(x, :sys), name, namespace = namespace)
+
 function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
     sys1 === sys2 && return true
     iv1 = get_iv(sys1)
