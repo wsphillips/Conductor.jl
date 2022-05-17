@@ -4,7 +4,6 @@ authors = ["Wiktor Phillips <wsphillips@gmail.com>"]
 version = "0.0.3"
 
 [deps]
-Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
 IfElse = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
@@ -16,10 +15,10 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 IfElse = "0.1.0"
+MacroTools = "0.5"
 ModelingToolkit = "8"
 Setfield = "0.8"
 SymbolicUtils = "0.19"
 Symbolics = "4"
 Unitful = "1"
-MacroTools = "0.5"
 julia = "1.7"
