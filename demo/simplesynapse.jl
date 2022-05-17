@@ -1,6 +1,5 @@
 # Example of writing synaptic kinetics
 
-using Revise
 using Conductor, IfElse, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K

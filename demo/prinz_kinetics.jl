@@ -1,7 +1,7 @@
 
 using Conductor, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, ms, mM, µM
-import Conductor: Na, K, Ca, Cationic, Leak
+import Conductor: Na, K, Ca, Cation, Leak
 
 Vₘ = MembranePotential(-50mV)
 Caᵢ = Concentration(Calcium, 0.05µM, dynamic = true)
@@ -63,7 +63,7 @@ h_kinetics = [
 # TODO: combine the calcium equilibrium and Ca2+ conversion into one "IonGradient" type
 gradients = Equilibria(Pair[Sodium    =>  50.0mV,
                             Potassium => -80.0mV,
-                            Cationic    => (-20mV, :H),
+                            Cation    => (-20mV, :H),
                             Leak      => -50mV,
                             # x1000 for mV; thresholding Cai in case negative conc
                             # TODO: write nernst function + use Unitful constants (RT/zℱ)
@@ -91,6 +91,6 @@ geo = Cylinder(radius = 25µm, height = 400µm)
 @named KA  = IonChannel(Potassium, ka_kinetics)
 @named KCa = IonChannel(Potassium, kca_kinetics)
 @named Kdr = IonChannel(Potassium, kdr_kinetics)
-@named H   = IonChannel(Cationic, h_kinetics)
+@named H   = IonChannel(Cation, h_kinetics)
 @named leak = IonChannel(Leak)
 

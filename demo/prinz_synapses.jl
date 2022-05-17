@@ -1,17 +1,18 @@
+import Conductor: Cholinergic, Glutamatergic
 # Synaptic kinetics
 syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
-glut_kinetics = Gate(SteadyStateTau, :s,
+glut_kinetics = Gate(SteadyStateTau,
                      syn∞,
-                     (1 - syn∞)/(1/40), 1)
+                     (1 - syn∞)/(1/40), name = :m)
 
-chol_kinetics = Gate(SteadyStateTau, :s,
+chol_kinetics = Gate(SteadyStateTau,
                      syn∞,
-                     (1 - syn∞)/(1/100), 1)
+                     (1 - syn∞)/(1/100), name = :m)
 
-EGlut = Equilibrium{Leak}(-70mV, :Glut) # NOTE: -70mV reversal => IPSP
-EChol = Equilibrium{Leak}(-80mV, :Chol) # Leak as alias for non-specific ion current
+EGlut = Equilibrium(Glutamatergic, -70mV, name = :Glut) # NOTE: -70mV reversal => IPSP
+EChol = Equilibrium(Cholinergic, -80mV, name = :Chol) # Leak as alias for non-specific ion current
 
-@named Glut = SynapticChannel(Leak, [glut_kinetics], EGlut);
-@named Chol = SynapticChannel(Leak, [chol_kinetics], EChol);
+@named Glut = SynapticChannel(Glutamatergic, [glut_kinetics]);
+@named Chol = SynapticChannel(Cholinergic, [chol_kinetics]);
 
 

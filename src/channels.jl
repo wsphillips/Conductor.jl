@@ -37,6 +37,12 @@ import ModelingToolkit: _eq_unordered
 # This should trigger a rebuild instead
 Base.convert(::Type{ODESystem}, x::ConductanceSystem{ODESystem}) = getfield(x, :sys)
 
+function ModelingToolkit.rename(x::ConductanceSystem, name)
+    xcopy = deepcopy(x)
+    @set! xcopy.sys.name = name
+    @set xcopy.name = name
+end
+
 # Forward getters to internal system
 for prop in [
              :eqs

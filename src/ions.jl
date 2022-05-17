@@ -1,4 +1,5 @@
 # Ion species
+# TODO: Come up with a better solution for this. It should be more easily user extendable
 @enum IonSpecies::UInt128 begin
     NonIonic    = 1 << 0
     Sodium      = 1 << 1
@@ -6,7 +7,9 @@
     Chloride    = 1 << 3
     Calcium     = 1 << 4
     Cation      = 1 << 5
-    Anion       = 1 << 6
+    Anion      = 1 << 6
+    Glutamatergic = 1 << 7
+    Cholinergic = 1 << 8
 end
 
 const Ca = Calcium

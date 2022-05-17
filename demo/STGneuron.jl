@@ -21,7 +21,7 @@ channels = [NaV(100mS/cm^2),
             H(.02mS/cm^2),
             leak(.03mS/cm^2)]
 
-@named neuron = CompartmentSystem(Vₘ, channels, gradients, geometry = geo, extensions = [calcium_conversion]);
+@named neuron = CompartmentSystem(Vₘ, channels, gradients; geometry = geo, extensions = [calcium_conversion]);
 
 sim = Simulation(neuron, time = 2500ms)
 solution = solve(sim, Rosenbrock23());

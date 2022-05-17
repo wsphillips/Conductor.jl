@@ -111,8 +111,8 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
 
     # Push synaptic information to each neuron
     for synapse in synapses
-        #syn = replicate(class(synapse))
-        syn = class(synapse)
+        syn = replicate(class(synapse))
+        #syn = class(synapse)
         post = postsynaptic(synapse)
         pre  = presynaptic(synapse)
         push!(get_synapses(post), syn)

@@ -7,7 +7,7 @@ include(joinpath(@__DIR__, "prinz_synapses.jl"));
 
 # Figure 3e Prinz (qualitatively close to expected output)
 # AB/PD 2 
-@named ABPD = Soma([NaV(100mS/cm^2),
+@named ABPD = Compartment(Vₘ, [NaV(100mS/cm^2),
                     CaT(2.5mS/cm^2),
                     CaS(6mS/cm^2),
                     KA(50mS/cm^2),
@@ -15,12 +15,12 @@ include(joinpath(@__DIR__, "prinz_synapses.jl"));
                     Kdr(100mS/cm^2),
                     H(.01mS/cm^2),
                     leak(0mS/cm^2)],
-                    gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
+                    gradients, geometry = geo, extensions = [calcium_conversion]);
 
-ABPD.sys # display
+ABPD # display
 
 # LP 4
-@named LP = Soma([NaV( 100mS/cm^2),
+@named LP = Compartment(Vₘ, [NaV( 100mS/cm^2),
                   CaT(   0mS/cm^2),
                   CaS(   4mS/cm^2),
                   KA(   20mS/cm^2),
@@ -28,12 +28,12 @@ ABPD.sys # display
                   Kdr(  25mS/cm^2),
                   H(   .05mS/cm^2),
                   leak(.03mS/cm^2)],
-                  gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
+                  gradients, geometry = geo, extensions = [calcium_conversion]);
 
-LP.sys # display
+LP # display
 
 # PY 1
-@named PY = Soma([NaV( 100mS/cm^2),
+@named PY = Compartment(Vₘ, [NaV( 100mS/cm^2),
                   CaT( 2.5mS/cm^2),
                   CaS(   2mS/cm^2),
                   KA(   50mS/cm^2),
@@ -41,26 +41,26 @@ LP.sys # display
                   Kdr( 125mS/cm^2),
                   H(   .05mS/cm^2),
                   leak(.01mS/cm^2)],
-                  gradients, area = area, V0 = -50mV, aux = [calcium_conversion]);
+                  gradients, geometry = geo, extensions = [calcium_conversion]);
 
-PY.sys # display
+PY # display
 
-topology = [ABPD => (LP, Glut(30nS)),
-            ABPD => (LP, Chol(30nS)),
-            ABPD => (PY, Glut(10nS)),
-            ABPD => (PY, Chol(3nS)),
-            LP   => (ABPD, Glut(30nS)),
-            LP   => (PY, Glut(1nS)),
-            PY   => (LP, Glut(30nS))];
+topology = [Synapse(ABPD => LP, Glut(30nS), EGlut),
+            Synapse(ABPD => LP, Chol(30nS), EChol),
+            Synapse(ABPD => PY, Glut(10nS), EGlut),
+            Synapse(ABPD => PY, Chol(3nS), EChol),
+            Synapse(LP   => ABPD, Glut(30nS), EGlut),
+            Synapse(LP   => PY, Glut(1nS), EGlut),
+            Synapse(PY   => LP, Glut(30nS), EGlut)];
 
-network = Network([ABPD, LP, PY], topology)
+network = NeuronalNetworkSystem(topology)
 
 t = 10000
 sim = Simulation(network, time = t*ms)
 solution = solve(sim, Rosenbrock23())
 
 # Plot at 5kHz sampling
-fig = plot(solution; plotdensity=Int(t*5), size=(1200,800), vars = [ABPD.sys.Vₘ, LP.sys.Vₘ, PY.sys.Vₘ])
+fig = plot(solution; plotdensity=Int(t*5), size=(1200,800), vars = [ABPD.Vₘ, LP.Vₘ, PY.Vₘ])
 fig
 
 # Uncomment and eval `png(...)` to save as PNG
