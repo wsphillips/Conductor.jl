@@ -29,28 +29,29 @@ channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
 @named Iₑ = IonCurrent(NonIonic)
-holding_current = Iₑ ~ ustrip(Float64, µA, 400pA)
+holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
 
 @named neuron1 = Compartment(Vₘ, channels, reversals;
-                             geometry = Sphere(radius = 20µm),
+                             geometry = Cylinder(radius = 25µm, height = 400µm),
                              stimuli = [holding_current])
 
 @named neuron2 = Compartment(Vₘ, channels, reversals;
-                             geometry = Sphere(radius = 20µm))
+                             geometry = Cylinder(radius = 25µm, height = 400µm))
                                    
 # Synaptic model
 syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
 τsyn = (1 - syn∞)/(1/40)
-syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :s)
+syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :m)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
 net = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
 
-t = 250
-sim = Simulation(network, time = t*ms)
+ttot = 250
+sim = Simulation(net, time = ttot*ms)
+
 solution = solve(sim, Rosenbrock23())
 
 # Plot at 5kHz sampling
-plot(solution; plotdensity=Int(t*5))
+plot(solution; plotdensity=Int(ttot*5))
 

@@ -71,14 +71,15 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     name::Symbol
     eqs::Vector{Equation}
     systems::Vector{AbstractTimeDependentSystem}
+    observed::Vector{Equation}
     function CompartmentSystem(iv, voltage, capacitance, geometry, chans, channel_reversals,
                                synapses, synaptic_reversals, stimuli, extensions, defaults,
-                               name, eqs, systems; checks = false)
+                               name, eqs, systems, observed; checks = false)
         if checks
         # placeholder
         end
         new(iv, voltage, capacitance, geometry, chans, channel_reversals, synapses,
-            synaptic_reversals, stimuli, extensions, defaults, name, eqs, systems)
+            synaptic_reversals, stimuli, extensions, defaults, name, eqs, systems, observed)
     end
 end
 
@@ -99,9 +100,9 @@ function CompartmentSystem(
     foreach(x -> iscurrent(x.lhs) || throw("Invalid current stimulus"), stimuli)
     eqs = Equation[]
     systems = AbstractSystem[]
-    observed
+    observed = Equation[]
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(channels), Set(reversals), Set(),
-                             Set(), stimuli, extensions, Dict(), name, eqs, systems)
+                             Set(), stimuli, extensions, Dict(), name, eqs, systems, observed)
 end
 
 # AbstractSystem interface extensions
@@ -111,8 +112,8 @@ capacitance(x::AbstractCompartmentSystem) = getfield(x, :capacitance)
 get_output(x::AbstractCompartmentSystem) = getfield(x, :voltage)
 
 # TODO: Implement these...
-get_observed(x::CompartmentSystem) = 0
-get_continuous_events(x::CompartmentSystem) = 0
+#get_observed(x::CompartmentSystem) = 0
+#get_continuous_events(x::CompartmentSystem) = 0
 
 get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 get_channels(x::AbstractCompartmentSystem) = getfield(x, :chans)
@@ -141,6 +142,7 @@ end
 function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
 
     currents = Set{Num}()
+    syncurrents = Set{Num}()
     aₘ = area(comp_sys)
     cₘ = capacitance(comp_sys)
     Vₘ = get_output(comp_sys)
@@ -167,7 +169,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     for chan in get_channels(comp_sys)
         ion = permeability(chan)
         Erev = only(filter(x -> isequal(getion(x), ion), chan_revs))
-        I = IonCurrent(ion, name = nameof(chan))
+        I = IonCurrent(ion, name = Symbol("I", nameof(chan)))
         g = renamespace(chan, get_output(chan))
         # TODO: checks for whether we need area scaling
         push!(eqs, I ~ g*aₘ*(Vₘ - Erev))
@@ -180,11 +182,11 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     for synapse in get_synapses(comp_sys)
         ion = permeability(synapse)
         Esyn = only(filter(x -> isequal(getion(x), ion), syn_revs))
-        I = IonCurrent(ion, name = nameof(synapse))
+        I = IonCurrent(ion, name = Symbol("I", nameof(synapse)))
         s = renamespace(synapse, get_output(synapse))
         push!(eqs, I ~ s*(Vₘ - Esyn))
         push!(dvs, I)
-        push!(currents, I)
+        push!(syncurrents, I)
         merge!(defs, defaults(synapse))
     end
 
@@ -208,9 +210,9 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         end
     end
     # voltage equation
-    push!(eqs, D(get_output(comp_sys)) ~ -sum(currents)/(cₘ*aₘ))
+    push!(eqs, D(get_output(comp_sys)) ~ -sum(union(currents,syncurrents))/(cₘ*aₘ))
 
-    return eqs, dvs, ps, defs, currents
+    return eqs, dvs, ps, defs, currents, syncurrents
 end
 
 # collect _top level_ eqs including from extension + currents + reversals + Vₘ
@@ -260,11 +262,11 @@ end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
     required_states = Set{Num}()
-    eqs, dvs, ps, defs, currents = build_toplevel(compartment)
+    eqs, dvs, ps, defs, currents, syncurrents = build_toplevel(compartment)
     syss = convert.(ODESystem, collect(get_systems(compartment)))
     
     # Resolve in/out: "connect" / auto forward cell states to channels
-    for x in union(get_channels(compartment), get_synapses(compartment))
+    for x in get_channels(compartment) #union(get_channels(compartment), get_synapses(compartment))
         for inp in get_inputs(x)
             # gathering inputs
             # FIXME: add metadata indicating the level we expect to resolve at

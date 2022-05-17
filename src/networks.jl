@@ -41,11 +41,12 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     name::Symbol
     eqs::Vector{Equation}
     systems::Vector{AbstractTimeDependentSystem}
-    function NeuronalNetworkSystem(iv, synapses, extensions, name, eqs, systems; checks = false)
+    observed::Vector{Equation}
+    function NeuronalNetworkSystem(iv, synapses, extensions, name, eqs, systems, observed; checks = false)
         if checks
             # placeholder
         end
-        new(iv, synapses, extensions, name, eqs, systems)
+        new(iv, synapses, extensions, name, eqs, systems, observed)
     end
 end
 
@@ -53,7 +54,8 @@ function NeuronalNetworkSystem(synapses::Vector{Synapse}, extensions::Vector{Abs
                                name::Symbol = Base.gensym(:Network))
     eqs = Equation[]
     systems = AbstractTimeDependentSystem[]
-    return NeuronalNetworkSystem(t, synapses, extensions, name, eqs, systems)
+    observed = Equation[]
+    return NeuronalNetworkSystem(t, synapses, extensions, name, eqs, systems, observed)
 end
 
 #get_topology(x::AbstractNeuronalNetworkSystem) = getfield(x, :topology)
@@ -77,7 +79,12 @@ function MTK.get_systems(x::AbstractNeuronalNetworkSystem)
     union!(getfield(x, :systems), build_toplevel(x)[5])
 end
 
-function Base.convert(::Type{ODESystem}, x::NeuronalNetworkSystem) end
+function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
+    states, params, eqs, defs, allneurons = build_toplevel(nnsys)
+    all_systems = map(x -> convert(ODESystem, x), allneurons)
+    odesys = ODESystem(eqs, t, states, params; defaults = defs, name = nameof(nnsys))
+    return compose(odesys, all_systems)
+end
 
 function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
     
@@ -104,13 +111,14 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
 
     # Push synaptic information to each neuron
     for synapse in synapses
-        syn = replicate(class(synapse))
+        #syn = replicate(class(synapse))
+        syn = class(synapse)
         post = postsynaptic(synapse)
         pre  = presynaptic(synapse)
         push!(get_synapses(post), syn)
         push!(get_synaptic_reversals(post), reversal(synapse))
         # Note this will probably cause an error...
-        push!(voltage_fwds, getproperty(post, nameof(syn)).Vₘ ~ pre.Vₘ) 
+        push!(voltage_fwds, pre.Vₘ ~ getproperty(post, nameof(syn)).Vₘ) 
     end
 
     union!(eqs, voltage_fwds)
