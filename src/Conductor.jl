@@ -110,19 +110,6 @@ include("compartments.jl")
 include("networks.jl")
 include("io.jl")
 
-#=
-function Simulation(network; time::Time, system = false)
-    t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(network)
-    if system
-        return simplified
-    else
-        @info repr("text/plain", simplified)
-        return ODAEProblem(simplified, [], (0., t_val), [])
-    end
-end
-=#
-
 function Simulation(neuron::CompartmentSystem; time::Time, return_system = false)
     odesys = convert(ODESystem, neuron)
     t_val = ustrip(Float64, ms, time)
