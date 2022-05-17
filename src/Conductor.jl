@@ -1,7 +1,6 @@
-module Conductor
+    module Conductor
 
 using ModelingToolkit,
-      Catalyst,
       Unitful,
       Unitful.DefaultSymbols,
       InteractiveUtils,
