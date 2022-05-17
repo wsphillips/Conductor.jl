@@ -1,5 +1,5 @@
 
 include("hodgkinhuxley.jl")
 include("prinzneuron.jl")
-#include("simplesynapse.jl")
+include("simplesynapse.jl")
 

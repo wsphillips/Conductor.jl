@@ -2,65 +2,72 @@
 module SimpleSynapse
 
 using Test, Conductor, IfElse, OrdinaryDiffEq, Unitful, ModelingToolkit
-import Unitful: mV, mS, cm, pA, nA, ms, nS
+import Unitful: mV, mS, cm, pA, nA, ms, nS, pS, µA, µm
 import Conductor: Na, K
 
 @testset "Simple excitatory synapse" begin
 
-Vₘ = MembranePotential()
+Vₘ = MembranePotential(-65mV)
 
 nav_kinetics = [
-    Gate(AlphaBetaRates,
-         αₘ = IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
-         βₘ = 4.0*exp(-(Vₘ + 65.0)/18.0),
-         p = 3)
-    Gate(AlphaBetaRates,
-         αₕ = 0.07*exp(-(Vₘ+65.0)/20.0),
-         βₕ = 1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)))]
+    Gate(AlphaBeta,
+         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         4.0*exp(-(Vₘ + 65.0)/18.0),
+         3, name = :m)
+    Gate(AlphaBeta,
+         0.07*exp(-(Vₘ+65.0)/20.0),
+         1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)), name = :h)]
 
 kdr_kinetics = [
-    Gate(AlphaBetaRates,
-         αₙ = IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
-         βₙ = 0.125 * exp(-(Vₘ + 65.0)/80.0),
-         p = 4)]
+    Gate(AlphaBeta,
+         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
+         0.125 * exp(-(Vₘ + 65.0)/80.0),
+         4, name = :n)]
 
-@named NaV = IonChannel(Sodium, nav_kinetics, 120mS/cm^2) 
-@named Kdr = IonChannel(Potassium, kdr_kinetics, 36mS/cm^2)
-@named leak = PassiveChannel(Leak, 0.3mS/cm^2)
+@named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2) 
+@named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
+@named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
+channels = [NaV, Kdr, leak];
+reversals = Equilibria([Na   =>  50.0mV, K    => -77.0mV, Leak => -54.4mV])
 
-gradients = Equilibria([Na   =>  50.0mV, K    => -77.0mV, Leak => -54.4mV])
-area = 0.629e-3cm^2
-@named neuron1 = Soma([NaV,Kdr,leak], gradients, holding = 5000pA, area = ustrip(Float64, cm^2, area));
-@named neuron2 = Soma([NaV,Kdr,leak], gradients, area = ustrip(Float64, cm^2, area));
+@named Iₑ = IonCurrent(NonIonic)
+holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
+geo = Cylinder(radius = 25µm, height = 400µm)
+@named neuron1 = Compartment(Vₘ, channels, reversals;
+                             geometry = geo,
+                             stimuli = [holding_current])
 
+@named neuron2 = Compartment(Vₘ, channels, reversals;
+                             geometry = geo)
+ 
 # Synaptic model
 syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
 τsyn = (1 - syn∞)/(1/40)
-syn_kinetics = Gate(SteadyStateTau, :s, syn∞, τsyn, 1)
-EGlut = Equilibrium{Conductor.Mixed}(0mV, :Glut)
+syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :m)
+EGlut = Equilibrium(Cation, 0mV, name = :Glut)
+@named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
-@named Glut = SynapticChannel(Leak, [syn_kinetics], EGlut, 30nS);
+@test length.([equations(Glut),
+               states(Glut),
+               parameters(Glut)]) == [2,3,1]
 
-@test length.([equations(Glut.sys),
-               states(Glut.sys),
-               parameters(Glut.sys)]) == [2,3,1]
-
-topology = [neuron1 => (neuron2, Glut)];
-@named network = Network([neuron1, neuron2], topology)
+topology = [Synapse(neuron1 => neuron2, Glut, EGlut)];
+@named network = NeuronalNetworkSystem(topology)
 
 @test length.([equations(network),
                states(network),
-               parameters(network)]) == [29,29,18]
+               parameters(network)]) == [25,29,18]
 
 t = 250.
-simul_sys = Simulation(network, time = t*ms, system = true)
+simul_sys = Simulation(network, time = t*ms, return_system = true)
 
 @test length.([equations(simul_sys),
                states(simul_sys),
-               parameters(simul_sys)]) == [12,12,18]
+               parameters(simul_sys)]) == [9,9,18]
 
-expect_syms = [:Glut1₊s, :neuron1₊Isyn] # just take two for now
-@test all(x -> hasproperty(simul_sys, x), expect_syms)
+# Skipped because synaptic systems generated via Base.gensym
+#expect_syms = [:neuron1₊Isyn] # just take one for now
+#@test all(x -> hasproperty(simul_sys, x), expect_syms)
 
 # Hand written problem
 # Steady-state functions
@@ -97,7 +104,7 @@ u0[12] = 0.0      # Glut1₊s
 # Parameters 
 # Neuron 1
 p[2]   =  0.001     # neuron1₊cₘ      
-p[3]   =  0.000629  # neuron1₊aₘ      
+p[3]   =  area(geo) # neuron1₊aₘ      
 p[4]   =  50.0      # neuron1₊ENa     
 p[5]   =  -77.0     # neuron1₊EK      
 p[6]   =  -54.4     # neuron1₊El      
@@ -214,9 +221,9 @@ current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, save
 
 tsteps = 0.0:0.025:t
 byhand_out = Array(byhand_sol(tsteps, idxs=8))
-current_mtk_out = current_mtk_sol(tsteps)[neuron2.sys.Vₘ]
+current_mtk_out = current_mtk_sol(tsteps)[neuron2.Vₘ]
 
-@test isapprox(byhand_out, current_mtk_out, rtol=0.0001)
+@test isapprox(byhand_out, current_mtk_out, rtol=0.001)
 
 end # testset
 
