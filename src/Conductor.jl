@@ -28,6 +28,8 @@ import ModelingToolkit:
     defaults,
     AbstractSystem,
     get_eqs,
+    get_iv,
+    get_ivs,
     get_states,
     get_observed,
     get_defaults,
@@ -52,18 +54,18 @@ import Unitful:
     Molarity,
     ElectricalConductance
 
-import SymbolicUtils: FnType, Rule
+import SymbolicUtils: FnType
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
-export Gate, AlphaBeta, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel
+export Gate, AlphaBeta, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel, Synapse
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent
-export AuxConversion, D, Network
+export AuxConversion, D, NeuronalNetwork
 export Simulation, Concentration, IonConcentration
 export @named
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion, NonIonic
 export t
-export CompartmentSystem, ConductanceSystem
+export CompartmentSystem, ConductanceSystem, NeuronalNetworkSystem, Conductance, Compartment
 export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate, hasexponent, exponent
 export Sphere, Cylinder, Point, area, radius, height
 
@@ -74,6 +76,7 @@ const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
 
 # Metadata IDs
 struct ConductorUnits end # temporary shim until we implement MTK's unit checking
+struct ConductorMaxConductance end
 
 isfunction(ex::ExprValues) = try return eval(ex) isa Function catch; return false end
 
@@ -122,6 +125,18 @@ end
 
 function Simulation(neuron::CompartmentSystem; time::Time, return_system = false)
     odesys = convert(ODESystem, neuron)
+    t_val = ustrip(Float64, ms, time)
+    simplified = structural_simplify(odesys)
+    if return_system
+        return simplified
+    else
+        @info repr("text/plain", simplified)
+        return ODAEProblem(simplified, [], (0., t_val), [])
+    end
+end
+
+function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false)
+    odesys = convert(ODESystem, network)
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(odesys)
     if return_system

@@ -1,5 +1,6 @@
 # Example of writing synaptic kinetics
 
+using Revise
 using Conductor, IfElse, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
@@ -7,49 +8,50 @@ import Conductor: Na, K
 Vₘ = MembranePotential()
 
 nav_kinetics = [
-    Gate(AlphaBetaRates,
-         αₘ = IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
-         βₘ = 4.0*exp(-(Vₘ + 65.0)/18.0),
-         p = 3)
-    Gate(AlphaBetaRates,
-         αₕ = 0.07*exp(-(Vₘ+65.0)/20.0),
-         βₕ = 1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)))]
+    Gate(AlphaBeta,
+         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         4.0*exp(-(Vₘ + 65.0)/18.0), 3, name = :m)
+    Gate(AlphaBeta,
+         0.07*exp(-(Vₘ+65.0)/20.0),
+         1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)), name = :h)]
 
 kdr_kinetics = [
-    Gate(AlphaBetaRates,
-         αₙ = IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
-         βₙ = 0.125 * exp(-(Vₘ + 65.0)/80.0),
-         p = 4)]
+    Gate(AlphaBeta,
+         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
+         0.125 * exp(-(Vₘ + 65.0)/80.0),
+         4, name = :n)]
 
-@named NaV = IonChannel(Sodium, nav_kinetics, 120mS/cm^2) 
-@named Kdr = IonChannel(Potassium, kdr_kinetics, 36mS/cm^2)
-@named leak = PassiveChannel(Leak, 0.3mS/cm^2)
-
+@named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2)
+@named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
+@named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
+channels = [NaV, Kdr, leak];
 # Equilibrium potentials are a implicit description of a ion concentration gradient
-gradients = Equilibria([Na   =>  50.0mV,
-                        K    => -77.0mV,
-                        Leak => -54.4mV])
+reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
-#area = 4*pi*(10µm)^2
-area = 0.629e-3cm^2
+@named Iₑ = IonCurrent(NonIonic)
+holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
 
-@named neuron1 = Soma([NaV,Kdr,leak], gradients, holding = 5000pA, area = ustrip(Float64, cm^2, area));
-@named neuron2 = Soma([NaV,Kdr,leak], gradients, area = ustrip(Float64, cm^2, area));
+@named neuron1 = Compartment(Vₘ, channels, reversals;
+                             geometry = Cylinder(radius = 25µm, height = 400µm),
+                             stimuli = [holding_current])
 
+@named neuron2 = Compartment(Vₘ, channels, reversals;
+                             geometry = Cylinder(radius = 25µm, height = 400µm))
+                                   
 # Synaptic model
 syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
 τsyn = (1 - syn∞)/(1/40)
-syn_kinetics = Gate(SteadyStateTau, :s, syn∞, τsyn, 1)
-EGlut = Equilibrium{Conductor.Mixed}(0mV, :Glut)
+syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :m)
+EGlut = Equilibrium(Cation, 0mV, name = :Glut)
+@named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
-@named Glut = Conductor.SynapticChannel(Leak, [syn_kinetics], EGlut, 30nS);
-topology = [neuron1 => (neuron2, Glut)];
-network = Conductor.Network([neuron1, neuron2], topology)
+net = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
 
-t = 250
-sim = Simulation(network, time = t*ms)
+ttot = 250
+sim = Simulation(net, time = ttot*ms)
+
 solution = solve(sim, Rosenbrock23())
 
 # Plot at 5kHz sampling
-plot(solution; plotdensity=Int(t*5))
+plot(solution; plotdensity=Int(ttot*5))
 
