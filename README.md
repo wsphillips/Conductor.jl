@@ -19,12 +19,10 @@ To install, tagged releases are available through the public registry:
 ```
 
 While Conductor.jl is still in early development, you can get a feel for what's going on by looking in
-the `demo` directory of this repository. Clone the latest tagged version of this repository:
+the `demo` directory of this repository. Clone the repository:
 
 ```
 git clone https://github.com/wsphillips/Conductor.jl
-cd Conductor.jl
-git checkout v0.0.2
 ```
 Then from a Julia REPL:
 ```julia
