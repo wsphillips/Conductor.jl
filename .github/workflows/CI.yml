@@ -20,6 +20,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+      matrix:
+          test-modules: ["hodgkinhuxley",
+                         "prinzneuron",
+                         "simplesynapse",]
     steps:
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.9.1
@@ -34,20 +41,14 @@ jobs:
         with:
           version: '1.7'
 
-      - name: Cache artifacts
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-artifacts
-        with:
-          path: ~/.julia/artifacts 
-          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ env.cache-name }}-
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-
+      - name: Cache Julia artifacts and packages
+        uses: julia-actions/cache@v1.1.2
 
       - name: Build package
         uses: julia-actions/julia-buildpkg@latest
-
-      - name: Run tests
-        uses: julia-actions/julia-runtest@latest
+      
+      - name: Run Unit Tests
+        env:
+          TEST_MODULES: ${{ matrix.test-modules }}
+        run: |
+          julia --project=@. -e 'using Pkg; Pkg.test(test_args=map(String, split(ENV["TEST_MODULES"], ",")))'
