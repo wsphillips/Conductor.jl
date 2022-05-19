@@ -4,7 +4,6 @@ enabled_tests = lowercase.(ARGS)
 function addtests(fname)
     key = lowercase(splitext(fname)[1])
     if isempty(enabled_tests) || key in enabled_tests
-        Random.seed!(42)
         include(fname)
     end
 end
