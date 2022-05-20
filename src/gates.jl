@@ -9,34 +9,45 @@ reverse_rate(x::AbstractGatingVariable) = getfield(x, :beta)
 hasexponent(x::AbstractGatingVariable) = hasfield(typeof(x), :p) ? getfield(x, :p) !== one(typeof(x.p)) : false
 exponent(x::AbstractGatingVariable) = hasexponent(x) ? getfield(x, :p) : nothing
 
-@enum GateVarType NullType Activation Inactivation
-@enum GateVarForm AlphaBeta SteadyStateTau
+abstract type GateVarForm end 
+struct AlphaBeta <: GateVarForm end 
+struct SteadyStateTau <: GateVarForm end
+struct SteadyState <: GateVarForm end
+struct ConstantValue <: GateVarForm end
 
-struct GatingVariable <: AbstractGatingVariable
+struct Gate{T<:GateVarForm} <: AbstractGatingVariable
     output::Num
     alpha::Num
     beta::Num
     steadystate::Num
     tau::Num
     p::Real
-    type::GateVarType # for future use
 end
 
-const Gate = GatingVariable
-
-function GatingVariable(T::GateVarForm, x::Num, y::Num, p::Real = 1; name = Base.gensym("GateVar"))
-    if T == AlphaBeta
-        alpha, beta = x, y
-        ss = alpha/(alpha + beta)
-        tau = inv(alpha + beta)
-    elseif T == SteadyStateTau
-        ss, tau = x, y
-        alpha = ss/tau
-        beta = inv(tau) - alpha
-    end
-
+function Gate(::Type{AlphaBeta}, x::Num, y::Num, p::Real = 1; name = Base.gensym("GateVar"))
+    alpha, beta = x, y
+    ss = alpha/(alpha + beta)
+    tau = inv(alpha + beta)
     out = only(@variables $name(t) = ss)
-    GatingVariable(out, alpha, beta, ss, tau, p, NullType)
+    Gate{AlphaBeta}(out, alpha, beta, ss, tau, p)
+end
+
+function Gate(::Type{SteadyStateTau}, x::Num, y::Num, p::Real = 1; name = Base.gensym("GateVar"))
+    ss, tau = x, y
+    alpha = ss/tau
+    beta = inv(tau) - alpha
+    out = only(@variables $name(t) = ss)
+    return Gate{SteadyStateTau}(out, alpha, beta, ss, tau, p)
+end
+
+function Gate(::Type{SteadyState}, x::Num, p::Real = 1; name = Base.gensym("GateVar"))
+    out = only(@variables $name(t) = x)
+    return Gate{SteadyState}(out, 0, 0, x, 0, p)
+end
+
+function Gate(::Type{ConstantValue}, x, p::Real = 1; name = Base.gensym("GateVar"))
+    out = only(@parameters $name = x)
+    return Gate{ConstantValue}(out, 0, 0, x, 0, p)
 end
 
 macro gate(ex::Expr, p::Expr = :(p=1))
@@ -63,10 +74,10 @@ function _make_gate_variable(name::Symbol, ex::Expr, p::Expr = :(p=1))
 
     if issetequal([:α, :β], rate_vars)  # Equation order doesn't matter
         rate_type = AlphaBeta
-        gate_expr = :(GatingVariable($AlphaBeta, α, β, $gate_pow; name=$(QuoteNode(name))))
+        gate_expr = :(Gate($AlphaBeta, α, β, $gate_pow; name=$(QuoteNode(name))))
     elseif issetequal([:ss, :τ], rate_vars)  # Equation order doesn't matter
         rate_type = SteadyStateTau
-        gate_expr = :(GatingVariable($SteadyStateTau, ss, τ, $p.args[2]; name=$(QuoteNode(name))))
+        gate_expr = :(Gate($SteadyStateTau, ss, τ, $p.args[2]; name=$(QuoteNode(name))))
     else
         throw("invalid keywords")
     end
@@ -76,29 +87,3 @@ function _make_gate_variable(name::Symbol, ex::Expr, p::Expr = :(p=1))
     ex
 end
 
-# Likely replace this with macro
-# function GatingVariable(T::GateVarForm; p = one(Int64), kwargs...)
-#     syms = keys(kwargs)
-#     length(syms) !== 2 && throw("Invalid number of input equations.")
-#     if T == SteadyStateTau
-#         if issetequal([:m∞, :τₘ], syms)
-#             return Gate(SteadyStateTau, kwargs[:m∞], kwargs[:τₘ], p; name = :m)
-#         elseif issetequal([:h∞, :τₕ], syms)
-#             return Gate(SteadyStateTau, kwargs[:h∞], kwargs[:τₕ], p; name = :h)
-#         elseif isesetequal([:n∞, :τₙ], syms)
-#             return Gate(SteadyStateTau, kwargs[:n∞], kwargs[:τₙ], p; name = :n)
-#         else
-#             throw("invalid keywords")
-#         end
-#     elseif T == AlphaBeta
-#         if issetequal([:αₘ, :βₘ], syms)
-#             return Gate(AlphaBeta, kwargs[:αₘ], kwargs[:βₘ], p; name = :m)
-#         elseif issetequal([:αₕ, :βₕ], syms)
-#             return Gate(AlphaBeta, kwargs[:αₕ], kwargs[:βₕ], p; name = :h)
-#         elseif issetequal([:αₙ, :βₙ], syms)
-#             return Gate(AlphaBeta, kwargs[:αₙ], kwargs[:βₙ], p; name = :n)
-#         else
-#             throw("invalid keywords")
-#         end
-#     end
-# end
