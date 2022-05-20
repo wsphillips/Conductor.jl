@@ -99,12 +99,12 @@ function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
     all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end
 
-function build_gate_eq(var::Gate{<:Union{AlphaBeta,SteadyStateTau}})
+function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}})
     x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
-    return D(x) ~ inv(τₓ)*(x∞ - x)
+    return [D(x) ~ inv(τₓ)*(x∞ - x)]
 end
 
-build_gate_eq(var::Gate{<:Union{SteadyState,ConstantValue}}) = output(var) ~ steadystate(var)
+get_eqs(var::Gate{<:Union{SteadyState,ConstantValue}}) = [output(var) ~ steadystate(var)]
 
 function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{<:AbstractGatingVariable};
         gbar::Num, linearity::IVCurvature = Linear, extensions::Vector{ODESystem} = ODESystem[],
@@ -120,11 +120,11 @@ function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{<:Abstract
     isparameter(gbar) && push!(params, gbar)
 
     for var in gate_vars
-        eq = build_gate_eq(var)
+        vareqs = get_eqs(var)
         o = output(var)
         push!(isparameter(o) ? params : gate_var_outputs, o)
-        get_variables!(inputs, eq)
-        push!(eqs, eq)
+        foreach(x -> get_variables!(inputs, x), vareqs)
+        union!(eqs, vareqs)
     end
 
     for sym in inputs
