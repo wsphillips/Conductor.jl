@@ -13,7 +13,7 @@ struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceS
     iv
     output::Num # 'g' by default 
     ion::IonSpecies # ion permeability
-    gate_vars::Vector{<:AbstractGatingVariable}
+    gate_vars::Vector{AbstractGatingVariable}
     inputs::Set{Num} # required inputs
     sys::S
     linearity::IVCurvature
@@ -99,7 +99,14 @@ function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
     all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end
 
-function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVariable};
+function build_gate_eq(var::Gate{<:Union{AlphaBeta,SteadyStateTau}})
+    x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
+    return D(x) ~ inv(τₓ)*(x∞ - x)
+end
+
+build_gate_eq(var::Gate{<:Union{SteadyState,ConstantValue}}) = output(var) ~ steadystate(var)
+
+function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{<:AbstractGatingVariable};
         gbar::Num, linearity::IVCurvature = Linear, extensions::Vector{ODESystem} = ODESystem[],
                            defaults = Dict(), name::Symbol = Base.gensym("Conductance"))
 
@@ -113,9 +120,9 @@ function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVari
     isparameter(gbar) && push!(params, gbar)
 
     for var in gate_vars
-        x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
-        push!(gate_var_outputs, x)
-        eq = D(x) ~ inv(τₓ)*(x∞ - x)
+        eq = build_gate_eq(var)
+        o = output(var)
+        push!(isparameter(o) ? params : gate_var_outputs, o)
         get_variables!(inputs, eq)
         push!(eqs, eq)
     end
@@ -143,7 +150,7 @@ function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{GatingVari
 end
 
 function IonChannel(ion::IonSpecies,
-                    gate_vars::Vector{GatingVariable} = GatingVariable[];
+        gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
                     max_g::Union{Num, SpecificConductance} = 0mS/cm^2,
                     extensions::Vector{ODESystem} = ODESystem[],
                     name::Symbol = Base.gensym("IonChannel"),
@@ -170,7 +177,7 @@ function IonChannel(ion::IonSpecies,
 end
 
 function SynapticChannel(ion::IonSpecies,
-                         gate_vars::Vector{GatingVariable} = GatingVariable[];
+        gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
                          max_s::Union{Num, ElectricalConductance} = 0mS,
                          extensions::Vector{ODESystem} = ODESystem[],
                          name::Symbol = Base.gensym("SynapticChannel"),
@@ -235,7 +242,7 @@ end
 function _make_ionchannel(chan::Expr, ex::Expr)
     ex = MacroTools.striplines(ex)
     !@capture(chan, name_Symbol{ion_}) && throw("An ion type must be given `name{I<:Ion}`")
-    gates = GatingVariable[]
+    gates = Gate[]
     for gate in ex.args
       push!(gates, eval(gate))
     end
