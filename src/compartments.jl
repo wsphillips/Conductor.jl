@@ -248,7 +248,7 @@ function get_systems(x::AbstractCompartmentSystem; rebuild = false)
     return getfield(x, :systems)
 end
 
-function Base.:(==)(sys1::CompartmentSystem, sys2::CompartmentSystem)
+function Base.:(==)(sys1::AbstractCompartmentSystem, sys2::AbstractCompartmentSystem)
     sys1 === sys2 && return true
     iv1 = get_iv(sys1)
     iv2 = get_iv(sys2)
