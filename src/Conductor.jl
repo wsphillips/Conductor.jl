@@ -108,6 +108,7 @@ include("channels.jl")
 include("compartments.jl")
 include("networks.jl")
 include("io.jl")
+include("util.jl")
 
 function Simulation(neuron::CompartmentSystem; time::Time, return_system = false)
     odesys = convert(ODESystem, neuron)

@@ -30,28 +30,6 @@ area(x::Sphere) = ustrip(Float64, cm^2, 4*π*radius(x)^2)
 area(x::Cylinder) = ustrip(Float64, cm^2, 2*π*radius(x)*(height(x) + (x.open_ends ? 0µm : radius(x))))
 area(::Point) = 1.0
 
-#=
-@enum StimulusTrigger ContinuousTrigger EdgeTriggered
-
-abstract type Stimulus end
-
-struct CurrentStimulus
-    waveform
-    offset::Current
-    trigger::StimulusTrigger
-    delay::TimeF64
-    function CurrentStimulus(waveform; offset::Current = 0nA,
-                             trigger::StimulusTrigger = ContinuousTrigger,
-                             delay::Time = 0ms)
-        return new(waveform, offset, trigger, delay)
-    end
-end
-
-struct VoltageStimulus end
-=#
-
-# IfElse.ifelse(t > 100.0, IfElse.ifelse(t <= 250.0, amplitude, 0.0), 0.0) 
-
 abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
 
 struct CompartmentSystem <: AbstractCompartmentSystem
@@ -296,4 +274,24 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
     end
     return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs, name = nameof(compartment))
 end
+
+#=
+@enum StimulusTrigger ContinuousTrigger EdgeTriggered
+
+abstract type Stimulus end
+
+struct CurrentStimulus
+    waveform
+    offset::Current
+    trigger::StimulusTrigger
+    delay::TimeF64
+    function CurrentStimulus(waveform; offset::Current = 0nA,
+                             trigger::StimulusTrigger = ContinuousTrigger,
+                             delay::Time = 0ms)
+        return new(waveform, offset, trigger, delay)
+    end
+end
+
+struct VoltageStimulus end
+=#
 
