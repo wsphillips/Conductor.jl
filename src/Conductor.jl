@@ -57,7 +57,7 @@ import SymbolicUtils: FnType
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
-export Gate, AlphaBeta, SteadyStateTau, IonChannel, PassiveChannel, SynapticChannel, Synapse
+export Gate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue, IonChannel, PassiveChannel, SynapticChannel, Synapse
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent
 export AuxConversion, D, NeuronalNetwork
 export Simulation, Concentration, IonConcentration

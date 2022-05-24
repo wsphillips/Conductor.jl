@@ -7,7 +7,7 @@ steadystate(x::AbstractGatingVariable) = getfield(x, :steadystate)
 forward_rate(x::AbstractGatingVariable) = getfield(x, :alpha)
 reverse_rate(x::AbstractGatingVariable) = getfield(x, :beta)
 hasexponent(x::AbstractGatingVariable) = hasfield(typeof(x), :p) ? getfield(x, :p) !== one(typeof(x.p)) : false
-exponent(x::AbstractGatingVariable) = hasexponent(x) ? getfield(x, :p) : nothing
+exponent(x::AbstractGatingVariable) = getfield(x, :p)
 
 abstract type GateVarForm end 
 struct AlphaBeta <: GateVarForm end 
@@ -24,7 +24,7 @@ struct Gate{T<:GateVarForm} <: AbstractGatingVariable
     p::Real
 end
 
-function Gate(::Type{AlphaBeta}, x::Num, y::Num, p::Real = 1; name = Base.gensym("GateVar"))
+function Gate(::Type{AlphaBeta}, x, y, p = 1; name = Base.gensym("GateVar"))
     alpha, beta = x, y
     ss = alpha/(alpha + beta)
     tau = inv(alpha + beta)
@@ -32,7 +32,7 @@ function Gate(::Type{AlphaBeta}, x::Num, y::Num, p::Real = 1; name = Base.gensym
     Gate{AlphaBeta}(out, alpha, beta, ss, tau, p)
 end
 
-function Gate(::Type{SteadyStateTau}, x::Num, y::Num, p::Real = 1; name = Base.gensym("GateVar"))
+function Gate(::Type{SteadyStateTau}, x, y, p = 1; name = Base.gensym("GateVar"))
     ss, tau = x, y
     alpha = ss/tau
     beta = inv(tau) - alpha
@@ -40,12 +40,16 @@ function Gate(::Type{SteadyStateTau}, x::Num, y::Num, p::Real = 1; name = Base.g
     return Gate{SteadyStateTau}(out, alpha, beta, ss, tau, p)
 end
 
-function Gate(::Type{SteadyState}, x::Num, p::Real = 1; name = Base.gensym("GateVar"))
+function Base.convert(::Type{Gate{SteadyState}}, x::Union{Gate{AlphaBeta},Gate{SteadyStateTau}})
+    return Gate(SteadyState, steadystate(x), exponent(x), name = Symbolics.tosymbol(output(x), escape=false))
+end
+
+function Gate(::Type{SteadyState}, x, p = 1; name = Base.gensym("GateVar"))
     out = only(@variables $name(t) = x)
     return Gate{SteadyState}(out, 0, 0, x, 0, p)
 end
 
-function Gate(::Type{ConstantValue}, x, p::Real = 1; name = Base.gensym("GateVar"))
+function Gate(::Type{ConstantValue}, x, p = 1; name = Base.gensym("GateVar"))
     out = only(@parameters $name = x)
     return Gate{ConstantValue}(out, 0, 0, x, 0, p)
 end

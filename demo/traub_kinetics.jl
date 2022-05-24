@@ -13,12 +13,12 @@ nav_kinetics = [
     # Activation
     Gate(AlphaBeta,
          (0.32(13.1 - Vₘ))/(exp((13.1 - Vₘ)/4.0)-1.0),
-         (0.28(Vₘ - 40.1))/(exp((V-40.1)/5.0)-1.0),
+         (0.28(Vₘ - 40.1))/(exp((Vₘ-40.1)/5.0)-1.0),
          2,
          name = :m)
     # Inactivation
     Gate(AlphaBeta,
-         0.128*exp((17.0 - Vₘ)/18.0)
+         0.128*exp((17.0 - Vₘ)/18.0),
          4/(1 + exp((40.0 - Vₘ)/5.0)),
          name = :h)]
 
@@ -51,8 +51,8 @@ kahp_kinetics = [
          0.001,
          name = :q)]
 αc = IfElse.ifelse(Vₘ <= 50,
-                   exp(((V-10.0)/11.0)-((V-6.5)/27.0))/18.975,
-                   2*exp(-(V-6.5)/27.0))
+                   exp(((Vₘ-10.0)/11.0)-((Vₘ-6.5)/27.0))/18.975,
+                   2*exp(-(Vₘ-6.5)/27.0))
 
 # Calcium-dependent potassium
 kca_kinetics = [
@@ -61,7 +61,7 @@ kca_kinetics = [
          αc,
          IfElse.ifelse(Vₘ <= 50,
                        2*exp(-(Vₘ-6.5)/27.0) - αc,
-                       zero(Float64))
+                       zero(Float64)),
          name = :c),
     # Calcium saturation term
     Gate(SteadyState, min(ICa/250, 1),
@@ -72,20 +72,19 @@ ka_kinetics = [
     # Activation
     Gate(AlphaBeta,
          (0.02*(13.1 - Vₘ))/(exp((13.1-Vₘ)/10.)-1.),
-         (0.0175(Vₘ / 40.1))/(exp((V-40.1)/10.)-1.),
+         (0.0175(Vₘ / 40.1))/(exp((Vₘ-40.1)/10.)-1.),
          name = :a)
     # Inactivation
     Gate(AlphaBeta,
-         0.0016*exp((-13.-Vₘ)/18.),
-         0.05/(1+exp((10.1-Vₘ)/5.)),
+         0.0016*exp((-13. - Vₘ)/18.),
+         0.05/(1+exp((10.1 - Vₘ)/5.)),
          name = :b)]
 
 @named NaV = IonChannel(Sodium, nav_kinetics) 
-@named CaS = IonChannel(Calcium, cas_kinetics)
+@named CaS = IonChannel(Calcium, ca_kinetics)
 @named Kdr = IonChannel(Potassium, kdr_kinetics)
 @named KAHP = IonChannel(Potassium, kahp_kinetics)
 @named KA  = IonChannel(Potassium, ka_kinetics)
 @named KCa = IonChannel(Potassium, kca_kinetics)
-@named H   = IonChannel(Cation, h_kinetics)
 @named leak = IonChannel(Leak)
 
