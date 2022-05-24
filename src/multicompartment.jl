@@ -20,19 +20,25 @@ end
 
 const MultiCompartment = MultiCompartmentSystem
 
-struct Junction
+abstract type AbstractJunction end
+
+struct ScaledJunction <: AbstractJunction
     compartments::Vector{AbstractCompartmentSystem}
+    scale_factor::Num
 end
 
-function MultiCompartment(jxns::Vector{Junction}; extensions = ODESystem[],
+function MultiCompartment(junctions::Vector{Junction}; extensions = ODESystem[],
                           name = Base.gensym("MultiCompartment"))
 
     eqs = Equation[]
     systems = AbstractTimeDependentSystem[]
     observed = Equation[]
     defaults = Dict()
+    all_comp = Set{CompartmentSystem}()
 
-
+    for jxn in junctions
+        
+    end
 
     return MultiCompartment(t, jxns, compartments, extensions, eqs, systems, observed,
                             defaults, name)
