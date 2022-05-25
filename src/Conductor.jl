@@ -40,7 +40,6 @@ import ModelingToolkit:
     getdefault,
     setdefault,
     AbstractTimeDependentSystem,
-    AbstractSystem,
     independent_variables,
     get_variables!
 

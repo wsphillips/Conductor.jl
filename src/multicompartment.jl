@@ -2,7 +2,7 @@
 struct MultiCompartmentSystem <: AbstractCompartmentSystem
     iv::Num
     junctions::Set{Junction}
-    compartments::Set{CompartmentSystem}
+    compartments::Vector{CompartmentSystem}
     extensions::Set{ODESystem}
     eqs::Vector{Equation}
     systems::Vector{AbstractTimeDependentSystem}
@@ -27,7 +27,7 @@ struct ScaledJunction <: AbstractJunction
     scale_factor::Num
 end
 
-function MultiCompartment(junctions::Vector{Junction}; extensions = ODESystem[],
+function MultiCompartment(junctions::Vector{<:AbstractJunction}; extensions = ODESystem[],
                           name = Base.gensym("MultiCompartment"))
 
     eqs = Equation[]
@@ -37,10 +37,10 @@ function MultiCompartment(junctions::Vector{Junction}; extensions = ODESystem[],
     all_comp = Set{CompartmentSystem}()
 
     for jxn in junctions
-        
+        union!(all_comp, jxn.compartments)
     end
 
-    return MultiCompartment(t, jxns, compartments, extensions, eqs, systems, observed,
+    return MultiCompartment(t, junctions, all_comp, extensions, eqs, systems, observed,
                             defaults, name)
 end
 

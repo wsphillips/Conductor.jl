@@ -9,7 +9,6 @@ get_inputs(x::AbstractConductanceSystem) = getfield(x, :inputs)
 get_output(x::AbstractConductanceSystem) = getfield(x, :output)
 # Abstract types without parametrics
 struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceSystem
-    
     iv
     output::Num # 'g' by default 
     ion::IonSpecies # ion permeability
@@ -176,12 +175,19 @@ function IonChannel(ion::IonSpecies,
                       extensions = extensions, linearity = linearity)
 end
 
+function AxialConductance(gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
+                          max_g = 0mS/cm^2, extensions::Vector{ODESystem} = ODESystem[],
+                          name::Symbol = Base.gensym("Axial"), defaults = Dict())
+    
+end
+
 function SynapticChannel(ion::IonSpecies,
-        gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
+                         gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
                          max_s::Union{Num, ElectricalConductance} = 0mS,
                          extensions::Vector{ODESystem} = ODESystem[],
                          name::Symbol = Base.gensym("SynapticChannel"),
                          linearity::IVCurvature = Linear, defaults = Dict())
+    # to make generic, check for <:Quantity then write a 
     if max_s isa ElectricalConductance
         sbar_val = ustrip(Float64, mS, max_s)
         @parameters sbar

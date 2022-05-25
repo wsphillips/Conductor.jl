@@ -17,9 +17,15 @@ capacitance = 3µF/cm^2
 # Pinsky modifies NaV to have instantaneous activation,
 # so we can ignore tau
 pinsky_nav_kinetics = [convert(Gate{SteadyState}, nav_kinetics[1]),
-                nav_kinetics[2]]
+                       nav_kinetics[2]]
+
 @named NaV = IonChannel(Sodium, pinsky_nav_kinetics) 
 
 @named soma = Compartment(Vₘ, [NaV, Kdr, leak], reversals[1:3], capacitance = capacitance)
 
 @named dendrite = Compartment(Vₘ, [KAHP, CaS, KCa, leak], reversals[2:4], capacitance = capacitance)
+
+Conductor.ScaledJunction()
+
+
+
