@@ -62,7 +62,6 @@ end
 get_extensions(x::AbstractNeuronalNetworkSystem) = getfield(x, :extensions)
 get_synapses(x::AbstractNeuronalNetworkSystem) = getfield(x, :synapses)
 
-# Forward getters to internal system
 MTK.get_states(x::AbstractNeuronalNetworkSystem) = collect(build_toplevel(x)[1])
 MTK.has_ps(x::AbstractNeuronalNetworkSystem) = !isempty(build_toplevel(x)[2])
 MTK.get_ps(x::AbstractNeuronalNetworkSystem) = collect(build_toplevel(x)[2])
@@ -76,7 +75,7 @@ MTK.get_defaults(x::AbstractNeuronalNetworkSystem) = build_toplevel(x)[4]
 
 function MTK.get_systems(x::AbstractNeuronalNetworkSystem)
     empty!(getfield(x, :systems))
-    union!(getfield(x, :systems), build_toplevel(x)[5])
+    union!(getfield(x, :systems), build_toplevel(x)[5], get_extensions(x))
 end
 
 function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
@@ -89,25 +88,19 @@ end
 function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
     
     synapses = get_synapses(network_sys)
-    preneurons = Set()
-    postneurons = Set()
-    synapse_types = Set()
-    reversals = Set()
+    neurons = Set()
     
     voltage_fwds = Set{Equation}()
     
     # Bin the fields
     for synapse in synapses
-        push!(preneurons, presynaptic(synapse))
-        push!(preneurons, postsynaptic(synapse))
-        push!(synapse_types, class(synapse))
-        push!(reversals, reversal(synapse))
+        push!(neurons, presynaptic(synapse))
+        push!(neurons, postsynaptic(synapse))
     end
     
     # Reset all synaptic information
-    allneurons = union(preneurons, postneurons)
-    foreach(x -> empty!(get_synapses(x)), allneurons)
-    foreach(x -> empty!(get_synaptic_reversals(x)), allneurons)
+    foreach(x -> empty!(get_synapses(x)), neurons)
+    foreach(x -> empty!(get_synaptic_reversals(x)), neurons)
 
     # Push synaptic information to each neuron
     for synapse in synapses
@@ -122,7 +115,7 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
     end
 
     union!(eqs, voltage_fwds)
-    return dvs, ps, eqs, defs, collect(allneurons)
+    return dvs, ps, eqs, defs, collect(neurons)
 end
 
 #=

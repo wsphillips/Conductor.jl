@@ -43,6 +43,7 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     channel_reversals::Set{Num}
     synapses::Set{AbstractConductanceSystem} # synaptic conductance systems
     synaptic_reversals::Set{Num}
+    axial_conductance::Set{AbstractConductanceSystem}
     stimuli::Vector{Equation}
     extensions::Vector{ODESystem}
     defaults::Dict
@@ -51,13 +52,13 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     systems::Vector{AbstractTimeDependentSystem}
     observed::Vector{Equation}
     function CompartmentSystem(iv, voltage, capacitance, geometry, chans, channel_reversals,
-                               synapses, synaptic_reversals, stimuli, extensions, defaults,
+                               synapses, synaptic_reversals, axial_conductance, stimuli, extensions, defaults,
                                name, eqs, systems, observed; checks = false)
         if checks
         # placeholder
         end
         new(iv, voltage, capacitance, geometry, chans, channel_reversals, synapses,
-            synaptic_reversals, stimuli, extensions, defaults, name, eqs, systems, observed)
+            synaptic_reversals, axial_conductance, stimuli, extensions, defaults, name, eqs, systems, observed)
     end
 end
 
@@ -80,7 +81,7 @@ function CompartmentSystem(
     systems = AbstractSystem[]
     observed = Equation[]
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(channels), Set(reversals), Set(),
-                             Set(), stimuli, extensions, Dict(), name, eqs, systems, observed)
+                             Set(), Set(), stimuli, extensions, Dict(), name, eqs, systems, observed)
 end
 
 # AbstractSystem interface extensions
