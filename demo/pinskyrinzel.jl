@@ -25,7 +25,9 @@ pinsky_nav_kinetics = [convert(Gate{SteadyState}, nav_kinetics[1]),
 
 @named dendrite = Compartment(Vₘ, [KAHP, CaS, KCa, leak], reversals[2:4], capacitance = capacitance)
 
-Conductor.ScaledJunction()
+@named gc = Conductor.AxialConductance([Gate(ConstantValue, 0.5, name = :p)], max_g = 1mS/cm^2)
 
+jxn = Conductor.Junction(soma => dendrite, gc, symmetric = false)
 
+Conductor.MultiCompartment([jxn])
 

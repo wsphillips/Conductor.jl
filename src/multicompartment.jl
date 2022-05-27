@@ -1,25 +1,3 @@
-
-struct MultiCompartmentSystem <: AbstractCompartmentSystem
-    iv::Num
-    junctions::Set{<:AbstractJunction}
-    compartments::Vector{CompartmentSystem}
-    extensions::Set{ODESystem}
-    eqs::Vector{Equation}
-    systems::Vector{AbstractTimeDependentSystem}
-    observed::Vector{Equation}
-    defaults::Dict
-    name::Symbol
-    function MultiCompartmentSystem(iv, junctions, compartments, extensions, eqs, systems,
-                                    observed, defaults, name; checks = false) 
-        if checks
-            #placeholder
-        end
-        return new(iv, compartments, extensions, eqs, systems, observed, defaults, name)
-    end
-end
-
-const MultiCompartment = MultiCompartmentSystem
-
 abstract type AbstractJunction end
 
 struct Junction <: AbstractJunction
@@ -33,6 +11,27 @@ Junction(x::Pair, cond; symmetric = true) = Junction(x.first, x.second, cond, sy
 get_conductance(x::Junction) = getfield(x, :conductance)
 issymmetric(x::Junction) = getfield(x, :symmetric)
 
+struct MultiCompartmentSystem <: AbstractCompartmentSystem
+    iv::Num
+    junctions::Vector{AbstractJunction}
+    compartments::Vector{CompartmentSystem}
+    extensions::Vector{ODESystem}
+    eqs::Vector{Equation}
+    systems::Vector{AbstractTimeDependentSystem}
+    observed::Vector{Equation}
+    defaults::Dict
+    name::Symbol
+    function MultiCompartmentSystem(iv, junctions, compartments, extensions, eqs, systems,
+                                    observed, defaults, name; checks = false) 
+        if checks
+            #placeholder
+        end
+        return new(iv, junctions, compartments, extensions, eqs, systems, observed, defaults, name)
+    end
+end
+
+const MultiCompartment = MultiCompartmentSystem
+
 function MultiCompartment(junctions::Vector{<:AbstractJunction}; extensions = ODESystem[],
                           name = Base.gensym("MultiCompartment"))
 
@@ -43,33 +42,34 @@ function MultiCompartment(junctions::Vector{<:AbstractJunction}; extensions = OD
     all_comp = Set{CompartmentSystem}()
 
     for jxn in junctions
-        union!(all_comp, jxn.parent, jxn.child)
+        push!(all_comp, jxn.child)
+        push!(all_comp, jxn.parent)
     end
 
-    return MultiCompartment(t, junctions, all_comp, extensions, eqs, systems, observed,
+    return MultiCompartment(t, junctions, collect(all_comp), extensions, eqs, systems, observed,
                             defaults, name)
 end
 
-get_junctions(x::AbstractMultiCompartmentSystem) =  getfield(x, :junctions)
+get_junctions(x::MultiCompartmentSystem) =  getfield(x, :junctions)
 get_axial_conductance(x::AbstractCompartmentSystem) = getfield(x, :axial_conductance)
-get_compartments(x::AbstractMultiCompartmentSystem) = getfield(x, :compartments)
+get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
 
-MTK.get_states(x::AbstractMultiCompartmentSystem) = collect(build_toplevel(x)[1])
-MTK.has_ps(x::AbstractMultiCompartmentSystem) = !isempty(build_toplevel(x)[2])
-MTK.get_ps(x::AbstractMultiCompartmentSystem) = collect(build_toplevel(x)[2])
-
-function MTK.get_eqs(x::AbstractMultiCompartmentSystem)
-    empty!(getfield(x, :eqs))
-    union!(getfield(x, :eqs), build_toplevel(x)[3])
-end
-
-MTK.get_defaults(x::AbstractMultiCompartmentSystem) = build_toplevel(x)[4]
-
-function MTK.get_systems(x::AbstractMultiCompartmentSystem)
-    empty!(getfield(x, :systems))
-    union!(getfield(x, :systems), build_toplevel(x)[5], get_extensions(x))
-end
-
+#MTK.get_states(x::MultiCompartmentSystem) = collect(build_toplevel(x)[1])
+#MTK.has_ps(x::MultiCompartmentSystem) = !isempty(build_toplevel(x)[2])
+#MTK.get_ps(x::MultiCompartmentSystem) = collect(build_toplevel(x)[2])
+#
+#function MTK.get_eqs(x::AbstractMultiCompartmentSystem)
+#    empty!(getfield(x, :eqs))
+#    union!(getfield(x, :eqs), build_toplevel(x)[3])
+#end
+#
+#MTK.get_defaults(x::AbstractMultiCompartmentSystem) = build_toplevel(x)[4]
+#
+#function MTK.get_systems(x::AbstractMultiCompartmentSystem)
+#    empty!(getfield(x, :systems))
+#    union!(getfield(x, :systems), build_toplevel(x)[5], get_extensions(x))
+#end
+#
 function build_toplevel!(dvs, ps, eqs, defs, mcsys::MultiCompartmentSystem)
 
     junctions = get_junctions(mcsys)

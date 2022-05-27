@@ -168,6 +168,16 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         push!(syncurrents, I)
         merge!(defs, defaults(synapse))
     end
+    
+    # Gather axial current equations
+    for ax in get_axial_conductance(comp_sys)
+        I = IonCurrent(ion, name = Symbol("I", nameof(ax)))
+        g = renamespace(ax, get_output(ax))
+        push!(eqs, I ~ g*aₘ*(CHILDVM - Vₘ))
+        push!(dvs, I)
+        push!(currents, I)
+        merge!(defs, defaults(ax))
+    end
 
     # Gather extension equations
     for extension in get_extensions(comp_sys)

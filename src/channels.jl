@@ -179,6 +179,8 @@ function AxialConductance(gate_vars::Vector{<:AbstractGatingVariable} = Abstract
                           max_g = 0mS/cm^2, extensions::Vector{ODESystem} = ODESystem[],
                           name::Symbol = Base.gensym("Axial"), defaults = Dict())
     
+    IonChannel(Leak, gate_vars, max_g = max_g, extensions = extensions, name = name,
+               defaults = defaults)
 end
 
 function SynapticChannel(ion::IonSpecies,
@@ -187,7 +189,8 @@ function SynapticChannel(ion::IonSpecies,
                          extensions::Vector{ODESystem} = ODESystem[],
                          name::Symbol = Base.gensym("SynapticChannel"),
                          linearity::IVCurvature = Linear, defaults = Dict())
-    # to make generic, check for <:Quantity then write a 
+    # to make generic, check for <:Quantity then write a
+    # unit specific "strip" method 
     if max_s isa ElectricalConductance
         sbar_val = ustrip(Float64, mS, max_s)
         @parameters sbar
