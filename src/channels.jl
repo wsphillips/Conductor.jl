@@ -103,7 +103,8 @@ function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}})
     return [D(x) ~ inv(τₓ)*(x∞ - x)]
 end
 
-get_eqs(var::Gate{<:Union{SteadyState,ConstantValue}}) = [output(var) ~ steadystate(var)]
+get_eqs(var::Gate{SteadyState}) = [output(var) ~ steadystate(var)]
+get_eqs(var::Gate{ConstantValue}) = Equation[]
 
 function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{<:AbstractGatingVariable};
         gbar::Num, linearity::IVCurvature = Linear, extensions::Vector{ODESystem} = ODESystem[],

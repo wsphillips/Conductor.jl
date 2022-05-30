@@ -43,7 +43,7 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     channel_reversals::Set{Num}
     synapses::Set{AbstractConductanceSystem} # synaptic conductance systems
     synaptic_reversals::Set{Num}
-    axial_conductance::Set{AbstractConductanceSystem}
+    axial_conductance::Set{Tuple{AbstractConductanceSystem,Num}}
     stimuli::Vector{Equation}
     extensions::Vector{ODESystem}
     defaults::Dict
@@ -170,11 +170,13 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     end
     
     # Gather axial current equations
-    for ax in get_axial_conductance(comp_sys)
-        I = IonCurrent(ion, name = Symbol("I", nameof(ax)))
+    for (ax, childvm) in get_axial_conductance(comp_sys)
+        I = IonCurrent(Leak, name = Symbol("I", nameof(ax)))
         g = renamespace(ax, get_output(ax))
-        push!(eqs, I ~ g*aₘ*(CHILDVM - Vₘ))
+        # TODO: we should have a metadata check for area-dependent units
+        push!(eqs, I ~ g*aₘ*(childvm - Vₘ))
         push!(dvs, I)
+        push!(dvs, childvm)
         push!(currents, I)
         merge!(defs, defaults(ax))
     end
@@ -232,7 +234,7 @@ function get_systems(x::AbstractCompartmentSystem; rebuild = false)
     # collect channels + synapses + input systems
     #if rebuild || isempty(getfield(x, :systems))
         empty!(getfield(x, :systems))
-        union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses))
+        union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses), first.(getfield(x, :axial_conductance)))
     #end
     return getfield(x, :systems)
 end

@@ -70,6 +70,13 @@ get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
 #    union!(getfield(x, :systems), build_toplevel(x)[5], get_extensions(x))
 #end
 #
+function get_systems(x::MultiCompartmentSystem; rebuild = false)
+    empty!(getfield(x, :systems))
+    union!(getfield(x, :systems), getfield(x, :compartments), getfield(x, :extensions))
+    return getfield(x, :systems)
+end
+
+
 function build_toplevel!(dvs, ps, eqs, defs, mcsys::MultiCompartmentSystem)
 
     junctions = get_junctions(mcsys)
@@ -89,17 +96,25 @@ function build_toplevel!(dvs, ps, eqs, defs, mcsys::MultiCompartmentSystem)
         axial = get_conductance(jxn) # maybe replicate? needs a toggle
         parent = jxn.parent
         child = jxn.child
-        
-        push!(get_axial_conductance(parent), axial)
-        push!(forwards, child.Vₘ ~ getproperty(parent, nameof(axial)).Vₘ)
-
+        childvm = MembranePotential(; name = Symbol(:V, nameof(child))) 
+        push!(get_axial_conductance(parent), (axial, childvm))
+        #FIXME: make this generic for any unresolved state in the conductance sys
+        if hasproperty(getproperty(parent, nameof(axial)), :Vₘ)
+            push!(forwards, child.Vₘ ~ getproperty(parent, nameof(axial)).Vₘ)
+        end
+        push!(forwards, child.Vₘ ~ getproperty(parent, tosymbol(childvm, escape=false)))
         if issymmetric(jxn)
-            push!(get_axial_conductance(child), axial)
-            push!(forwards, parent.Vₘ ~ getproperty(child, nameof(axial)).Vₘ)
-        end           
+            parentvm = MembranePotential(; name = Symbol(:V, nameof(parent)))
+            push!(get_axial_conductance(child), (axial, parentvm))
+            #FIXME: make this generic ofr any unresolved state in the cond. sys
+            if hasproperty(getproperty(child, nameof(axial)), :Vₘ)
+                push!(forwards, parent.Vₘ ~ getproperty(child, nameof(axial)).Vₘ)
+            end
+            push!(forwards, parent.Vₘ ~ getproperty(child, tosymbol(parentvm, escape=false)))
+        end
     end
 
-    union!(eqs, voltage_fwds)
+    union!(eqs, forwards)
     return dvs, ps, eqs, defs, collect(compartments)
 end
 

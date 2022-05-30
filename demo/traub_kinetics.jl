@@ -2,11 +2,11 @@ using Conductor, Unitful, ModelingToolkit, IfElse
 import Unitful: mV, mS, cm, µm, ms, mM, µM
 import Conductor: Na, K, Ca, Cation, Leak
 
-Vₘ = MembranePotential(-60mV)
-Caᵢ = Concentration(Calcium, 0.05µM, dynamic = true)
+Vₘ = MembranePotential(-64.6mV)
+Caᵢ = Concentration(Calcium, 0.2µM, dynamic = true)
 ICa = IonCurrent(Calcium, aggregate = true)
-@parameters ϕ β = 0.075
-@named calcium_conversion = ODESystem([D(Caᵢ) ~ -ϕ*ICa - β*Caᵢ]);
+#@parameters ϕ β = 0.075
+#@named calcium_conversion = ODESystem([D(Caᵢ) ~ -ϕ*ICa - β*Caᵢ]);
 
 # Sodium channels
 nav_kinetics = [
@@ -80,7 +80,7 @@ ka_kinetics = [
          0.05/(1+exp((10.1 - Vₘ)/5.)),
          name = :b)]
 
-@named NaV = IonChannel(Sodium, nav_kinetics) 
+@named NaV = IonChannel(Sodium, nav_kinetics)
 @named CaS = IonChannel(Calcium, ca_kinetics)
 @named Kdr = IonChannel(Potassium, kdr_kinetics)
 @named KAHP = IonChannel(Potassium, kahp_kinetics)

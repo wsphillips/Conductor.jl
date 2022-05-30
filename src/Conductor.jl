@@ -56,7 +56,7 @@ import SymbolicUtils: FnType
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
-export Gate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue, IonChannel, PassiveChannel, SynapticChannel, Synapse
+export Gate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue, IonChannel, PassiveChannel, SynapticChannel, Synapse, Junction, MultiCompartmentSystem, MultiCompartment, AxialConductance
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent
 export AuxConversion, D, NeuronalNetwork
 export Simulation, Concentration, IonConcentration
@@ -110,7 +110,7 @@ include("networks.jl")
 include("io.jl")
 include("util.jl")
 
-function Simulation(neuron::CompartmentSystem; time::Time, return_system = false)
+function Simulation(neuron::AbstractCompartmentSystem; time::Time, return_system = false)
     odesys = convert(ODESystem, neuron)
     t_val = ustrip(Float64, ms, time)
     simplified = structural_simplify(odesys)
