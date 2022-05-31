@@ -2,7 +2,7 @@ using Conductor, Unitful, ModelingToolkit, IfElse
 import Unitful: mV, mS, cm, µm, ms, mM, µM
 import Conductor: Na, K, Ca, Cation, Leak
 
-Vₘ = MembranePotential(-64.6mV)
+Vₘ = MembranePotential(-4.6mV)
 Caᵢ = Concentration(Calcium, 0.2µM, dynamic = true)
 ICa = IonCurrent(Calcium, aggregate = true)
 #@parameters ϕ β = 0.075
@@ -64,7 +64,7 @@ kca_kinetics = [
                        zero(Float64)),
          name = :c),
     # Calcium saturation term
-    Gate(SteadyState, min(ICa/250, 1),
+    Gate(SteadyState, min(Caᵢ/250, 1),
          name = :χ)]
 
 # A-type Potassium

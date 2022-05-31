@@ -177,7 +177,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         push!(eqs, I ~ g*aₘ*(childvm - Vₘ))
         push!(dvs, I)
         push!(dvs, childvm)
-        push!(currents, I)
+        push!(currents, -I)
         merge!(defs, defaults(ax))
     end
 
