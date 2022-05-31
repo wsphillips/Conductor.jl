@@ -9,7 +9,6 @@ get_inputs(x::AbstractConductanceSystem) = getfield(x, :inputs)
 get_output(x::AbstractConductanceSystem) = getfield(x, :output)
 # Abstract types without parametrics
 struct ConductanceSystem{S<:AbstractTimeDependentSystem} <: AbstractConductanceSystem
-    
     iv
     output::Num # 'g' by default 
     ion::IonSpecies # ion permeability
@@ -104,7 +103,8 @@ function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}})
     return [D(x) ~ inv(τₓ)*(x∞ - x)]
 end
 
-get_eqs(var::Gate{<:Union{SteadyState,ConstantValue}}) = [output(var) ~ steadystate(var)]
+get_eqs(var::Gate{SteadyState}) = [output(var) ~ steadystate(var)]
+get_eqs(var::Gate{ConstantValue}) = Equation[]
 
 function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{<:AbstractGatingVariable};
         gbar::Num, linearity::IVCurvature = Linear, extensions::Vector{ODESystem} = ODESystem[],
@@ -176,12 +176,22 @@ function IonChannel(ion::IonSpecies,
                       extensions = extensions, linearity = linearity)
 end
 
+function AxialConductance(gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
+                          max_g = 0mS/cm^2, extensions::Vector{ODESystem} = ODESystem[],
+                          name::Symbol = Base.gensym("Axial"), defaults = Dict())
+    
+    IonChannel(Leak, gate_vars, max_g = max_g, extensions = extensions, name = name,
+               defaults = defaults)
+end
+
 function SynapticChannel(ion::IonSpecies,
-        gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
+                         gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
                          max_s::Union{Num, ElectricalConductance} = 0mS,
                          extensions::Vector{ODESystem} = ODESystem[],
                          name::Symbol = Base.gensym("SynapticChannel"),
                          linearity::IVCurvature = Linear, defaults = Dict())
+    # to make generic, check for <:Quantity then write a
+    # unit specific "strip" method 
     if max_s isa ElectricalConductance
         sbar_val = ustrip(Float64, mS, max_s)
         @parameters sbar

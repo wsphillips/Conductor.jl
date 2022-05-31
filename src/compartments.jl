@@ -11,6 +11,10 @@ end
 
 struct Point <: Geometry end
 
+struct Unitless <: Geometry
+    value
+end
+
 struct Cylinder <: Geometry
     radius
     height
@@ -23,34 +27,13 @@ end
 
 height(x::Geometry) = isdefined(x, :height) ? getfield(x, :height) : nothing
 radius(x::Geometry) = getfield(x, :radius)
-radius(::Point) = 0.0
+radius(::Union{Point,Unitless}) = 0.0
 
 # TODO: Remove unit stripping when we have proper unit checking implemented
 area(x::Sphere) = ustrip(Float64, cm^2, 4*π*radius(x)^2)
 area(x::Cylinder) = ustrip(Float64, cm^2, 2*π*radius(x)*(height(x) + (x.open_ends ? 0µm : radius(x))))
 area(::Point) = 1.0
-
-#=
-@enum StimulusTrigger ContinuousTrigger EdgeTriggered
-
-abstract type Stimulus end
-
-struct CurrentStimulus
-    waveform
-    offset::Current
-    trigger::StimulusTrigger
-    delay::TimeF64
-    function CurrentStimulus(waveform; offset::Current = 0nA,
-                             trigger::StimulusTrigger = ContinuousTrigger,
-                             delay::Time = 0ms)
-        return new(waveform, offset, trigger, delay)
-    end
-end
-
-struct VoltageStimulus end
-=#
-
-# IfElse.ifelse(t > 100.0, IfElse.ifelse(t <= 250.0, amplitude, 0.0), 0.0) 
+area(x::Unitless) = x.value
 
 abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
 
@@ -65,6 +48,7 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     channel_reversals::Set{Num}
     synapses::Set{AbstractConductanceSystem} # synaptic conductance systems
     synaptic_reversals::Set{Num}
+    axial_conductance::Set{Tuple{AbstractConductanceSystem,Num}}
     stimuli::Vector{Equation}
     extensions::Vector{ODESystem}
     defaults::Dict
@@ -73,13 +57,13 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     systems::Vector{AbstractTimeDependentSystem}
     observed::Vector{Equation}
     function CompartmentSystem(iv, voltage, capacitance, geometry, chans, channel_reversals,
-                               synapses, synaptic_reversals, stimuli, extensions, defaults,
+                               synapses, synaptic_reversals, axial_conductance, stimuli, extensions, defaults,
                                name, eqs, systems, observed; checks = false)
         if checks
         # placeholder
         end
         new(iv, voltage, capacitance, geometry, chans, channel_reversals, synapses,
-            synaptic_reversals, stimuli, extensions, defaults, name, eqs, systems, observed)
+            synaptic_reversals, axial_conductance, stimuli, extensions, defaults, name, eqs, systems, observed)
     end
 end
 
@@ -102,7 +86,7 @@ function CompartmentSystem(
     systems = AbstractSystem[]
     observed = Equation[]
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(channels), Set(reversals), Set(),
-                             Set(), stimuli, extensions, Dict(), name, eqs, systems, observed)
+                             Set(), Set(), stimuli, extensions, Dict(), name, eqs, systems, observed)
 end
 
 # AbstractSystem interface extensions
@@ -163,6 +147,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         end
     end
     
+    filter!(x -> !isequal(x, t), rev_eq_vars)
     foreach(x -> isparameter(x) && push!(ps, x), rev_eq_vars)
 
     # Gather channel current equations
@@ -189,6 +174,18 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         push!(syncurrents, I)
         merge!(defs, defaults(synapse))
     end
+    
+    # Gather axial current equations
+    for (ax, childvm) in get_axial_conductance(comp_sys)
+        I = IonCurrent(Leak, name = Symbol("I", nameof(ax)))
+        g = renamespace(ax, get_output(ax))
+        # TODO: we should have a metadata check for area-dependent units
+        push!(eqs, I ~ g*aₘ*(childvm - Vₘ))
+        push!(dvs, I)
+        push!(dvs, childvm)
+        push!(currents, -I)
+        merge!(defs, defaults(ax))
+    end
 
     # Gather extension equations
     for extension in get_extensions(comp_sys)
@@ -200,9 +197,12 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     
     for stimulus in get_stimuli(comp_sys)
         I = only(get_variables(stimulus.lhs))
+        _vars = filter!(x -> !isequal(x,t), get_variables(stimulus.rhs))
+        foreach(x -> push!(isparameter(x) ? ps : dvs, x), _vars)
         hasdefault(I) || push!(defs, I => stimulus.rhs)
         if isparameter(I)
             push!(ps, I)
+            push!(currents, -I)
         else
             push!(eqs, stimulus)
             push!(dvs, I)
@@ -243,12 +243,12 @@ function get_systems(x::AbstractCompartmentSystem; rebuild = false)
     # collect channels + synapses + input systems
     #if rebuild || isempty(getfield(x, :systems))
         empty!(getfield(x, :systems))
-        union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses))
+        union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses), first.(getfield(x, :axial_conductance)))
     #end
     return getfield(x, :systems)
 end
 
-function Base.:(==)(sys1::CompartmentSystem, sys2::CompartmentSystem)
+function Base.:(==)(sys1::AbstractCompartmentSystem, sys2::AbstractCompartmentSystem)
     sys1 === sys2 && return true
     iv1 = get_iv(sys1)
     iv2 = get_iv(sys2)
@@ -296,4 +296,24 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
     end
     return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs, name = nameof(compartment))
 end
+
+#=
+@enum StimulusTrigger ContinuousTrigger EdgeTriggered
+
+abstract type Stimulus end
+
+struct CurrentStimulus
+    waveform
+    offset::Current
+    trigger::StimulusTrigger
+    delay::TimeF64
+    function CurrentStimulus(waveform; offset::Current = 0nA,
+                             trigger::StimulusTrigger = ContinuousTrigger,
+                             delay::Time = 0ms)
+        return new(waveform, offset, trigger, delay)
+    end
+end
+
+struct VoltageStimulus end
+=#
 
