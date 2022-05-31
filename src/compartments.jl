@@ -147,6 +147,7 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         end
     end
     
+    filter!(x -> !isequal(x, t), rev_eq_vars)
     foreach(x -> isparameter(x) && push!(ps, x), rev_eq_vars)
 
     # Gather channel current equations
@@ -196,7 +197,8 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     
     for stimulus in get_stimuli(comp_sys)
         I = only(get_variables(stimulus.lhs))
-        foreach(x -> push!(isparameter(x) ? ps : dvs, x), get_variables(stimulus.rhs))
+        _vars = filter!(x -> !isequal(x,t), get_variables(stimulus.rhs))
+        foreach(x -> push!(isparameter(x) ? ps : dvs, x), _vars)
         hasdefault(I) || push!(defs, I => stimulus.rhs)
         if isparameter(I)
             push!(ps, I)

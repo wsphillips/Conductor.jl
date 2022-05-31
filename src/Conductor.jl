@@ -82,7 +82,7 @@ export output, get_output, timeconstant, steadystate, forward_rate,
 export Sphere, Cylinder, Point, Unitless, area, radius, height
 
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
-const t = let name = :t; only(@parameters $name) end
+const t = let name = :t; only(@variables $name) end
 const D = Differential(t)
 const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
 
