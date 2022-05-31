@@ -56,16 +56,30 @@ import SymbolicUtils: FnType
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
-export Gate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue, IonChannel, PassiveChannel, SynapticChannel, Synapse, Junction, MultiCompartmentSystem, MultiCompartment, AxialConductance
-export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent
-export AuxConversion, D, NeuronalNetwork
-export Simulation, Concentration, IonConcentration
+export Gate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue,
+       IonChannel, PassiveChannel, SynapticChannel, Synapse, Junction,
+       AxialConductance
+
+export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential,
+       IonCurrent, IonConcentration, Concentration
+
+export AuxConversion, D
+export Simulation
 export @named
+
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion, NonIonic
+
 export t
-export CompartmentSystem, ConductanceSystem, NeuronalNetworkSystem, Conductance, Compartment
-export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate, hasexponent, exponent
-export Sphere, Cylinder, Point, area, radius, height
+
+export CompartmentSystem, Compartment,
+       ConductanceSystem, Conductance, 
+       NeuronalNetworkSystem, NeuronalNetwork,
+       MultiCompartmentSystem, MultiCompartment
+
+export output, get_output, timeconstant, steadystate, forward_rate,
+       reverse_rate, hasexponent, exponent
+
+export Sphere, Cylinder, Point, Unitless, area, radius, height
 
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 const t = let name = :t; only(@parameters $name) end

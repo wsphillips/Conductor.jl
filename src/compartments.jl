@@ -11,6 +11,10 @@ end
 
 struct Point <: Geometry end
 
+struct Unitless <: Geometry
+    value
+end
+
 struct Cylinder <: Geometry
     radius
     height
@@ -23,12 +27,13 @@ end
 
 height(x::Geometry) = isdefined(x, :height) ? getfield(x, :height) : nothing
 radius(x::Geometry) = getfield(x, :radius)
-radius(::Point) = 0.0
+radius(::Union{Point,Unitless}) = 0.0
 
 # TODO: Remove unit stripping when we have proper unit checking implemented
 area(x::Sphere) = ustrip(Float64, cm^2, 4*π*radius(x)^2)
 area(x::Cylinder) = ustrip(Float64, cm^2, 2*π*radius(x)*(height(x) + (x.open_ends ? 0µm : radius(x))))
 area(::Point) = 1.0
+area(x::Unitless) = x.value
 
 abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
 
@@ -191,9 +196,11 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     
     for stimulus in get_stimuli(comp_sys)
         I = only(get_variables(stimulus.lhs))
+        foreach(x -> push!(isparameter(x) ? ps : dvs, x), get_variables(stimulus.rhs))
         hasdefault(I) || push!(defs, I => stimulus.rhs)
         if isparameter(I)
             push!(ps, I)
+            push!(currents, -I)
         else
             push!(eqs, stimulus)
             push!(dvs, I)
