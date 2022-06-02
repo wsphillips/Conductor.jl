@@ -2,12 +2,26 @@
 abstract type AbstractGatingVariable end
 
 output(x::AbstractGatingVariable) = getfield(x, :output)
-timeconstant(x::AbstractGatingVariable) = getfield(x, :tau)
-steadystate(x::AbstractGatingVariable) = getfield(x, :steadystate)
-forward_rate(x::AbstractGatingVariable) = getfield(x, :alpha)
-reverse_rate(x::AbstractGatingVariable) = getfield(x, :beta)
-hasexponent(x::AbstractGatingVariable) = hasfield(typeof(x), :p) ? getfield(x, :p) !== one(typeof(x.p)) : false
-exponent(x::AbstractGatingVariable) = getfield(x, :p)
+
+function Base.getproperty(value::AbstractGatingVariable, name::Symbol)
+    return getindex(getfield(value, :props), name)
+end
+
+function Base.setproperty!(value::AbstractGatingVariable, name::Symbol, x)
+    return setindex!(getfield(value, :props), name, x)
+end
+
+function Base.propertynames(value::AbstractGatingVariable, private::Bool = false)
+    props = collect(keys(getfield(value, :props))) 
+    if private
+        union!(props, fieldnames(typeof(value)))
+    end
+    return props
+end
+
+function Base.get(collection::AbstractGatingVariable, key::Symbol, default)
+    return get(getfield(collection, :props), key, default)
+end
 
 abstract type GateVarForm end 
 struct AlphaBeta <: GateVarForm end 
@@ -17,42 +31,64 @@ struct ConstantValue <: GateVarForm end
 
 struct Gate{T<:GateVarForm} <: AbstractGatingVariable
     output::Num
-    alpha::Num
-    beta::Num
-    steadystate::Num
-    tau::Num
-    p::Real
+    props::Dict{Symbol,Any}
 end
 
-function Gate(::Type{AlphaBeta}, x, y, p = 1; name = Base.gensym("GateVar"))
-    alpha, beta = x, y
+function Gate{T}(output; kwargs...) where T <: GateVarForm
+    return Gate{T}(output, kwargs)
+end
+
+timeconstant(x::Gate{<:Union{AlphaBeta,SteadyStateTau}}) = x.tau
+steadystate(x::Gate) = x.ss
+forward_rate(x::Gate{<:Union{AlphaBeta,SteadyStateTau}}) = x.alpha
+reverse_rate(x::Gate{<:Union{AlphaBeta,SteadyStateTau}}) = x.beta
+
+Base.exponent(x::AbstractGatingVariable) = get(x, :p, 1)
+
+function Gate(::Type{AlphaBeta}, alpha, beta, p = 1; name = Base.gensym("GateVar"))
     ss = alpha/(alpha + beta)
     tau = inv(alpha + beta)
     out = only(@variables $name(t) = ss)
-    Gate{AlphaBeta}(out, alpha, beta, ss, tau, p)
+    Gate{AlphaBeta}(out; p = p, alpha = alpha, beta = beta, ss = ss, tau = tau)
 end
 
-function Gate(::Type{SteadyStateTau}, x, y, p = 1; name = Base.gensym("GateVar"))
-    ss, tau = x, y
+function Gate(::Type{SteadyStateTau}, ss, tau, p = 1; name = Base.gensym("GateVar"))
     alpha = ss/tau
     beta = inv(tau) - alpha
     out = only(@variables $name(t) = ss)
-    return Gate{SteadyStateTau}(out, alpha, beta, ss, tau, p)
+    return Gate{SteadyStateTau}(out; p = p, alpha = alpha, beta = beta, ss = ss, tau = tau)
 end
 
 function Base.convert(::Type{Gate{SteadyState}}, x::Union{Gate{AlphaBeta},Gate{SteadyStateTau}})
     return Gate(SteadyState, steadystate(x), exponent(x), name = Symbolics.tosymbol(output(x), escape=false))
 end
 
-function Gate(::Type{SteadyState}, x, p = 1; name = Base.gensym("GateVar"))
-    out = only(@variables $name(t) = x)
-    return Gate{SteadyState}(out, 0, 0, x, 0, p)
+function Gate(::Type{SteadyState}, ss, p = 1; name = Base.gensym("GateVar"))
+    out = only(@variables $name(t) = ss)
+    if p !== 1
+        return Gate{SteadyState}(out; p = p, ss = ss)
+    else
+        return Gate{SteadyState}(out; ss = ss)
+    end
 end
 
-function Gate(::Type{ConstantValue}, x, p = 1; name = Base.gensym("GateVar"))
+function Gate(::Type{ConstantValue}, val, p = 1; name = Base.gensym("GateVar"))
     out = only(@parameters $name = x)
-    return Gate{ConstantValue}(out, 0, 0, x, 0, p)
+    if p !== 1
+        return Gate{ConstantValue}(out; p = p, val = val)
+    else
+        return Gate{ConstantValue}(out; val = val)
+    end
 end
+
+function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}})
+    x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
+    return [D(x) ~ inv(τₓ)*(x∞ - x)]
+end
+
+get_eqs(var::Gate{SteadyState}) = [output(var) ~ steadystate(var)]
+get_eqs(var::Gate{ConstantValue}) = Equation[]
+
 
 macro gate(ex::Expr, p::Expr = :(p=1))
     name = Base.gensym("GateVar")
