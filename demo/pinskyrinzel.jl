@@ -1,5 +1,5 @@
 
-include(joinpath(@__DIR__, "traub_kinetics.jl")
+include(joinpath(@__DIR__, "traub_kinetics.jl"))
 
 import Unitful: µF, pA, µA, nA
 

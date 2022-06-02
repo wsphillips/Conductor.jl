@@ -98,14 +98,6 @@ function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
     all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end
 
-function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}})
-    x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
-    return [D(x) ~ inv(τₓ)*(x∞ - x)]
-end
-
-get_eqs(var::Gate{SteadyState}) = [output(var) ~ steadystate(var)]
-get_eqs(var::Gate{ConstantValue}) = Equation[]
-
 function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{<:AbstractGatingVariable};
         gbar::Num, linearity::IVCurvature = Linear, extensions::Vector{ODESystem} = ODESystem[],
                            defaults = Dict(), name::Symbol = Base.gensym("Conductance"))
@@ -135,7 +127,7 @@ function ConductanceSystem(g::Num, ion::IonSpecies, gate_vars::Vector{<:Abstract
     # Remove parameters + generated states
     setdiff!(inputs, params, gate_var_outputs)
     if length(gate_vars) > 0
-        push!(eqs, g ~ gbar * prod(hasexponent(x) ? output(x)^exponent(x) : output(x) for x in gate_vars))
+        push!(eqs, g ~ gbar * prod(output(x)^exponent(x) for x in gate_vars))
     else
         push!(eqs, g ~ gbar)
     end
