@@ -28,13 +28,14 @@ struct AlphaBeta <: GateVarForm end
 struct SteadyStateTau <: GateVarForm end
 struct SteadyState <: GateVarForm end
 struct ConstantValue <: GateVarForm end
+struct HeavisideSum <: GateVarForm end
 
 struct Gate{T<:GateVarForm} <: AbstractGatingVariable
     output::Num
     props::Dict{Symbol,Any}
 end
 
-function Gate{T}(output; kwargs...) where T <: GateVarForm
+function Gate{T}(output::Num; kwargs...) where T <: GateVarForm
     return Gate{T}(output, kwargs)
 end
 
@@ -45,11 +46,11 @@ reverse_rate(x::Gate{<:Union{AlphaBeta,SteadyStateTau}}) = x.beta
 
 Base.exponent(x::AbstractGatingVariable) = get(x, :p, 1)
 
-function Gate(::Type{AlphaBeta}, alpha, beta, p = 1; name = Base.gensym("GateVar"))
+function Gate(::Type{AlphaBeta}, alpha, beta; name = Base.gensym("GateVar"), kwargs...)
     ss = alpha/(alpha + beta)
     tau = inv(alpha + beta)
     out = only(@variables $name(t) = ss)
-    Gate{AlphaBeta}(out; p = p, alpha = alpha, beta = beta, ss = ss, tau = tau)
+    Gate{AlphaBeta}(out; alpha = alpha, beta = beta, ss = ss, tau = tau, kwargs...)
 end
 
 function Gate(::Type{SteadyStateTau}, ss, tau, p = 1; name = Base.gensym("GateVar"))
@@ -72,13 +73,26 @@ function Gate(::Type{SteadyState}, ss, p = 1; name = Base.gensym("GateVar"))
     end
 end
 
-function Gate(::Type{ConstantValue}, val, p = 1; name = Base.gensym("GateVar"))
-    out = only(@parameters $name = x)
-    if p !== 1
-        return Gate{ConstantValue}(out; p = p, val = val)
-    else
-        return Gate{ConstantValue}(out; val = val)
-    end
+function Gate(::Type{ConstantValue}, val; name = Base.gensym("GateVar"), kwargs...)
+    out = only(@parameters $name = val)
+    return Gate{ConstantValue}(out; val = val, kwargs...)
+end
+
+function Gate(::Type{HeavisideSum}, threshold = 0mV, saturation = 125;
+              name = Base.gensym("GateVar"), kwargs...) 
+    out = only(@variables $name(t) = 0.0) # synaptically activated gate inits to 0.0
+    return Gate{HeavisideSum}(out; threshold = threshold, saturation = saturation,
+                              numpre = 0, kwargs...)
+end 
+
+function get_eqs(var::Gate{HeavisideSum})
+    thold, sat, numpre = var.threshold, var.saturation, var.numpre
+    out = output(var)
+    iszero(numpre) && return [D(out) ~ 0]
+    @named Vpre = ExtrinsicPotential(n = numpre) 
+    # Derived from Pinsky & Rinzel 1994 - Equation 4 
+    # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
+    return[D(out) .~ sum(scalarize(Vpre .>= thold) .- out/sat)]
 end
 
 function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}})
@@ -89,6 +103,9 @@ end
 get_eqs(var::Gate{SteadyState}) = [output(var) ~ steadystate(var)]
 get_eqs(var::Gate{ConstantValue}) = Equation[]
 
+############################################################################################
+# Macros (needs updating)
+############################################################################################
 
 macro gate(ex::Expr, p::Expr = :(p=1))
     name = Base.gensym("GateVar")
