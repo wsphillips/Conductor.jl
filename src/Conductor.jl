@@ -18,7 +18,7 @@ import Symbolics:
     value,
     tosymbol,
     VariableDefaultValue,
-    wrap
+    wrap, unwrap, Arr
 
 import ModelingToolkit:
     toparam,
@@ -61,7 +61,8 @@ export Gate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue,
        AxialConductance
 
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential,
-       IonCurrent, IonConcentration, Concentration
+       IonCurrent, IonConcentration, Concentration, ExtrinsicPotential,
+       Instrinsic, Extrinsic
 
 export AuxConversion, D
 export Simulation
@@ -99,15 +100,62 @@ function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
     return ex
 end
 
-# Basic symbols
-function MembranePotential(V0 = -60mV; dynamic = true, name::Symbol = :Vₘ)
-    # remove when we have proper unit checks
-    V0_val = ustrip(Float64, mV, V0)
-    return dynamic ? only(@variables $name(t) = V0_val) : only(@parameters $name = V0_val)
+import Symbolics: unwrap, symtype, getindex_posthook
+
+# Hijacked and modified from Symbolics.jl
+function set_symarray_metadata(x, ctx, val)
+    if symtype(x) <: AbstractArray
+        if val isa AbstractArray
+            getindex_posthook(x) do r,x,i...
+                set_symarray_metadata(r, ctx, val[i...])
+            end
+        else
+            getindex_posthook(x) do r,x,i...
+                set_symarray_metadata(r, ctx, val)
+            end
+        end
+    else
+        setmetadata(x, ctx, val)
+    end
 end
 
-@enum Location Outside Inside
+# Basic symbols
+@enum PrimitiveSource Intrinsic Extrinsic
 
+function MembranePotential(V0 = -60mV; dynamic = true, source::PrimitiveSource = Intrinsic,
+                           n::Integer = 1, name::Symbol = :Vₘ)
+    if isnothing(V0)
+        if n == one(n) 
+            ret = dynamic ? only(@variables $name(t)) :
+                            only(@parameters $name)
+        elseif n > one(n)
+            ret = dynamic ? only(@variables $name[1:n](t)) :
+                            only(@parameters $name[1:n])
+        else
+            throw("'n' must be greater than or equal to 1")
+        end
+    else
+        V0_val = ustrip(Float64, mV, V0) #FIXME: assumes V0 <: Voltage
+        if n == one(n)
+            ret = dynamic ? only(@variables $name(t) = V0_val) :
+                            only(@parameters $name = V0_val)
+        elseif n > one(n)
+            ret = dynamic ? only(@variables $name[1:n](t) = V0_val) :
+                            only(@parameters $name[1:n] = V0_val)
+        else
+            throw("'n' must be greater than or equal to 1")
+        end
+    end
+
+    ret = set_symarray_metadata(ret, PrimitiveSource, source)
+    return ret
+end
+
+ExtrinsicPotential(;V0 = nothing, n = 1, dynamic = true,
+                   source::PrimitiveSource = Extrinsic, name::Symbol = :Vₓ) = 
+MembranePotential(V0; dynamic = dynamic, source = source, n = n, name = name)
+
+@enum Location Outside Inside
 # Custom Unitful.jl quantities
 @derived_dimension SpecificConductance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^3 # conductance per unit area
 @derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4 # capacitance per unit area
