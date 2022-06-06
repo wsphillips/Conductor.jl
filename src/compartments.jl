@@ -107,14 +107,6 @@ end
 get_synaptic_reversals(x::AbstractCompartmentSystem) = get_reversals(x)[2]
 get_channel_reversals(x::AbstractCompartmentSystem) = get_reversals(x)[1]
 
-function build_toplevel(system)
-    dvs = Set{Num}()
-    ps = Set{Num}()
-    eqs = Equation[]
-    defs = Dict()
-    build_toplevel!(dvs, ps, eqs, defs, system)
-end
-
 function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
 
     currents = Set{Num}()
