@@ -88,16 +88,19 @@ end
 function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
     
     synapses = get_synapses(network_sys)
+    preneurons  = Set()
+    postneurons = Set()
     neurons = Set()
     
     voltage_fwds = Set{Equation}()
-    
     # Bin the fields
     for synapse in synapses
-        push!(neurons, presynaptic(synapse))
-        push!(neurons, postsynaptic(synapse))
+        push!(preneurons, presynaptic(synapse))
+        push!(postneurons, postsynaptic(synapse))
     end
     
+    union!(neurons, preneurons, postneurons)
+
     # Reset all synaptic information
     foreach(x -> empty!(get_synapses(x)), neurons)
     foreach(x -> empty!(get_synaptic_reversals(x)), neurons)
