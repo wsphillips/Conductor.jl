@@ -89,35 +89,7 @@ export Sphere, Cylinder, Point, Unitless, area, radius, height
 struct ConductorUnits end # temporary shim until we implement MTK's unit checking
 struct ConductorMaxConductance end
 
-const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
-isfunction(ex::ExprValues) = try return eval(ex) isa Function catch; return false end
-
-function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
-    if ~isfunction(ex) && isa(ex, Symbol)
-        union!(out, [ex])
-    end
-    return ex
-end
-
-import Symbolics: unwrap, symtype, getindex_posthook
-
-# Hijacked and modified from Symbolics.jl
-function set_symarray_metadata(x, ctx, val)
-    if symtype(x) <: AbstractArray
-        if val isa AbstractArray
-            getindex_posthook(x) do r,x,i...
-                set_symarray_metadata(r, ctx, val[i...])
-            end
-        else
-            getindex_posthook(x) do r,x,i...
-                set_symarray_metadata(r, ctx, val)
-            end
-        end
-    else
-        setmetadata(x, ctx, val)
-    end
-end
-
+include("util.jl")
 include("primitives.jl")
 include("gates.jl")
 include("channels.jl")
@@ -125,30 +97,6 @@ include("compartments.jl")
 include("multicompartment.jl")
 include("networks.jl")
 include("io.jl")
-include("util.jl")
-
-function Simulation(neuron::AbstractCompartmentSystem; time::Time, return_system = false)
-    odesys = convert(ODESystem, neuron)
-    t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(odesys)
-    if return_system
-        return simplified
-    else
-        @info repr("text/plain", simplified)
-        return ODAEProblem(simplified, [], (0., t_val), [])
-    end
-end
-
-function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false)
-    odesys = convert(ODESystem, network)
-    t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(odesys)
-    if return_system
-        return simplified
-    else
-        @info repr("text/plain", simplified)
-        return ODAEProblem(simplified, [], (0., t_val), [])
-    end
-end
+include("simulation.jl")
 
 end # module
