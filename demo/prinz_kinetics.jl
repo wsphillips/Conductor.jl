@@ -11,7 +11,7 @@ nav_kinetics = [
     Gate(SteadyStateTau,
          1.0/(1.0 + exp((Vₘ + 25.5)/-5.29)),
          2.64 - (2.52/(1 + exp((Vₘ + 120.0)/-25.0))),
-         3, name = :m)
+         p = 3, name = :m)
     Gate(SteadyStateTau,
          1.0/(1.0 + exp((Vₘ + 48.9)/5.18)),
          (1.34/(1.0 + exp((Vₘ + 62.9)/-10.0)))*(1.5 + 1.0/(1.0 + exp((Vₘ + 34.9)/3.6))), name = :h)]
@@ -20,7 +20,7 @@ cas_kinetics = [
     Gate(SteadyStateTau,
          1.0/(1.0+exp((Vₘ+33.0)/-8.1)),
          2.8 + 14.0/(exp((Vₘ+27.0)/10.0) + exp((Vₘ+70.0)/-13.0)),
-         3, name = :m)
+         p = 3, name = :m)
     Gate(SteadyStateTau,
          1.0/(1.0+exp((Vₘ+60.0)/6.2)),
          120.0 + 300.0/(exp((Vₘ+55.0)/9.0) + exp((Vₘ+65.0)/-16.0)), name = :h)]
@@ -29,7 +29,7 @@ cat_kinetics = [
     Gate(SteadyStateTau,
          1.0/(1.0 + exp((Vₘ+27.1)/-7.2)),
          43.4 - 42.6/(1.0 + exp((Vₘ+68.1)/-20.5)),
-         3, name = :m)
+         p = 3, name = :m)
     Gate(SteadyStateTau,
          1.0/(1.0 + exp((Vₘ+32.1)/5.5)),
          210.0 - 179.6/(1.0 + exp((Vₘ+55.0)/-16.9)), name = :h)]
@@ -38,7 +38,7 @@ ka_kinetics = [
     Gate(SteadyStateTau,
          1.0/(1.0+exp((Vₘ+27.2)/-8.7)),
          23.2 - 20.8/(1.0+exp((Vₘ+32.9)/-15.2)),
-         3, name = :m)
+         p = 3, name = :m)
     Gate(SteadyStateTau,
          1.0/(1.0+exp((Vₘ+56.9)/4.9)),
          77.2 - 58.4/(1.0+exp((Vₘ+38.9)/-26.5)), name = :h)]
@@ -47,13 +47,13 @@ kca_kinetics = [
     Gate(SteadyStateTau,
          (Caᵢ/(Caᵢ+3.0))/(1.0+exp((Vₘ+28.3)/-12.6)),
          180.6 - 150.2/(1.0+exp((Vₘ+46.0)/-22.7)),
-         4, name = :m)]
+         p = 4, name = :m)]
        
 kdr_kinetics = [
     Gate(SteadyStateTau,
          1.0/(1.0+exp((Vₘ+12.3)/-11.8)),
          14.4 - 12.8/(1.0+exp((Vₘ+28.3)/-19.2)),
-         4, name = :m)]
+         p = 4, name = :m)]
 
 h_kinetics = [
     Gate(SteadyStateTau,

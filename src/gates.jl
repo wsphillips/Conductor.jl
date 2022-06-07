@@ -53,24 +53,20 @@ function Gate(::Type{AlphaBeta}, alpha, beta; name = Base.gensym("GateVar"), kwa
     Gate{AlphaBeta}(out; alpha = alpha, beta = beta, ss = ss, tau = tau, kwargs...)
 end
 
-function Gate(::Type{SteadyStateTau}, ss, tau, p = 1; name = Base.gensym("GateVar"))
+function Gate(::Type{SteadyStateTau}, ss, tau; name = Base.gensym("GateVar"), kwargs...)
     alpha = ss/tau
     beta = inv(tau) - alpha
     out = only(@variables $name(t) = ss)
-    return Gate{SteadyStateTau}(out; p = p, alpha = alpha, beta = beta, ss = ss, tau = tau)
+    return Gate{SteadyStateTau}(out; alpha = alpha, beta = beta, ss = ss, tau = tau, kwargs...)
 end
 
 function Base.convert(::Type{Gate{SteadyState}}, x::Union{Gate{AlphaBeta},Gate{SteadyStateTau}})
     return Gate(SteadyState, steadystate(x), exponent(x), name = Symbolics.tosymbol(output(x), escape=false))
 end
 
-function Gate(::Type{SteadyState}, ss, p = 1; name = Base.gensym("GateVar"))
+function Gate(::Type{SteadyState}, ss; name = Base.gensym("GateVar"), kwargs...)
     out = only(@variables $name(t) = ss)
-    if p !== 1
-        return Gate{SteadyState}(out; p = p, ss = ss)
-    else
-        return Gate{SteadyState}(out; ss = ss)
-    end
+    return Gate{SteadyState}(out; ss = ss, kwargs...)
 end
 
 function Gate(::Type{ConstantValue}, val; name = Base.gensym("GateVar"), kwargs...)

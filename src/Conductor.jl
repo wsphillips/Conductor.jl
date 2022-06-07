@@ -1,7 +1,5 @@
 module Conductor
 
-using DataStructures
-
 using ModelingToolkit,
       Unitful,
       Unitful.DefaultSymbols,
