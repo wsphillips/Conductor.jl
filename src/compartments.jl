@@ -95,18 +95,10 @@ area(x::AbstractCompartmentSystem) = only(@parameters aₘ = area(get_geometry(x
 capacitance(x::AbstractCompartmentSystem) = getfield(x, :capacitance)
 get_output(x::AbstractCompartmentSystem) = getfield(x, :voltage)
 
-# TODO: Implement these...
-#get_observed(x::CompartmentSystem) = 0
-#get_continuous_events(x::CompartmentSystem) = 0
-
 get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 get_channels(x::AbstractCompartmentSystem) = getfield(x, :chans)
 get_synapses(x::AbstractCompartmentSystem) = getfield(x, :synapses)
 get_stimuli(x::AbstractCompartmentSystem) = getfield(x, :stimuli)
-
-# TODO: define top-level and recursive getters for inputs
-function get_inputs(x::AbstractCompartmentSystem) end 
-function inputs(x::AbstractCompartmentSystem) end
 
 function get_reversals(x::AbstractCompartmentSystem)
     return getfield(x, :channel_reversals), getfield(x, :synaptic_reversals) 
@@ -114,14 +106,6 @@ end
 
 get_synaptic_reversals(x::AbstractCompartmentSystem) = get_reversals(x)[2]
 get_channel_reversals(x::AbstractCompartmentSystem) = get_reversals(x)[1]
-
-function build_toplevel(system)
-    dvs = Set{Num}()
-    ps = Set{Num}()
-    eqs = Equation[]
-    defs = Dict()
-    build_toplevel!(dvs, ps, eqs, defs, system)
-end
 
 function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
 
@@ -217,10 +201,8 @@ end
 
 # collect _top level_ eqs including from extension + currents + reversals + Vₘ
 function get_eqs(x::AbstractCompartmentSystem; rebuild = false)
-    #if rebuild || isempty(getfield(x, :eqs))
-        empty!(getfield(x, :eqs))
-        union!(getfield(x, :eqs), build_toplevel(x)[1])
-    #end
+    empty!(getfield(x, :eqs))
+    union!(getfield(x, :eqs), build_toplevel(x)[1])
     return getfield(x, :eqs)
 end
 
@@ -241,10 +223,9 @@ end
 
 function get_systems(x::AbstractCompartmentSystem; rebuild = false)
     # collect channels + synapses + input systems
-    #if rebuild || isempty(getfield(x, :systems))
-        empty!(getfield(x, :systems))
-        union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses), first.(getfield(x, :axial_conductance)))
-    #end
+    empty!(getfield(x, :systems))
+    union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses),
+           first.(getfield(x, :axial_conductance)))
     return getfield(x, :systems)
 end
 

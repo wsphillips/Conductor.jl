@@ -54,11 +54,9 @@ topology = [Synapse(ABPD => LP, Glut(30nS), EGlut),
             Synapse(PY   => LP, Glut(30nS), EGlut)];
 
 network = NeuronalNetworkSystem(topology)
-
 t = 10000
-sim = Simulation(network, time = t*ms)
-solution = solve(sim, Rosenbrock23())
-
+sim = Simulation(network, time = t*ms);
+solution = solve(sim, RadauIIA5(), reltol=1e-9, abstol=1e-9);
 # Plot at 5kHz sampling
 fig = plot(solution; plotdensity=Int(t*5), size=(1200,800), vars = [ABPD.Vₘ, LP.Vₘ, PY.Vₘ])
 fig

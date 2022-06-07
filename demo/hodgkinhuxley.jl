@@ -8,7 +8,7 @@ Vₘ = MembranePotential(-65mV) # set default V₀ = -65mV
 nav_kinetics = [
     Gate(AlphaBeta,
          IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
-         4.0*exp(-(Vₘ + 65.0)/18.0), 3, name = :m)
+         4.0*exp(-(Vₘ + 65.0)/18.0), p = 3, name = :m)
     Gate(AlphaBeta,
          0.07*exp(-(Vₘ+65.0)/20.0),
          1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)), name = :h)]

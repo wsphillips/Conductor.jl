@@ -1,3 +1,61 @@
+const ℱ = Unitful.q*Unitful.Na # Faraday's constant
+const t = let name = :t; only(@variables $name) end
+const D = Differential(t)
+
+# Properties
+@enum PrimitiveSource Intrinsic Extrinsic
+@enum PrimitiveLocation Outside Inside
+
+struct MembranePotential
+    function MembranePotential(V0 = -60mV; dynamic = true, source::PrimitiveSource = Intrinsic,
+                               n::Integer = 1, name::Symbol = :Vₘ)
+        if isnothing(V0)
+            if n == one(n) 
+                ret = dynamic ? only(@variables $name(t)) :
+                                only(@parameters $name)
+            elseif n > one(n)
+                ret = dynamic ? only(@variables $name[1:n](t)) :
+                                only(@parameters $name[1:n])
+            else
+                throw("'n' must be greater than or equal to 1")
+            end
+        else
+            V0_val = ustrip(Float64, mV, V0) #FIXME: assumes V0 <: Voltage
+            if n == one(n)
+                ret = dynamic ? only(@variables $name(t) = V0_val) :
+                                only(@parameters $name = V0_val)
+            elseif n > one(n)
+                ret = dynamic ? only(@variables $name[1:n](t) = V0_val) :
+                                only(@parameters $name[1:n] = V0_val)
+            else
+                throw("'n' must be greater than or equal to 1")
+            end
+        end
+    
+        ret = set_symarray_metadata(ret, PrimitiveSource, source)
+        ret = set_symarray_metadata(ret, MembranePotential, true)
+        return ret
+    end
+end
+
+ExtrinsicPotential(;V0 = nothing, n = 1, dynamic = true,
+                   source::PrimitiveSource = Extrinsic, name::Symbol = :Vₓ) = 
+MembranePotential(V0; dynamic = dynamic, source = source, n = n, name = name)
+
+isvoltage(x) = hasmetadata(value(x), MembranePotential)
+isintrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
+                 getmetadata(value(x), PrimitiveSource) == Intrinsic : false
+isextrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
+                 getmetadata(value(x), PrimitiveSource) == Extrinsic : false
+
+
+# Custom Unitful.jl quantities
+@derived_dimension SpecificConductance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^3 # conductance per unit area
+@derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4 # capacitance per unit area
+@derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
+
+#const TimeF64 = Quantity{Float64, 𝐓, U} where U
+
 # Ion species
 # TODO: Come up with a better solution for this. It should be more easily user extendable
 @enum IonSpecies::UInt128 begin
@@ -22,7 +80,7 @@ const PERIODIC_SYMBOL = IdDict(Na => :Na, K  => :K, Cl => :Cl, Ca => :Ca, Leak =
 
 struct IonConcentration
     ion::IonSpecies
-    loc::Location
+    loc::PrimitiveLocation
 end
 
 const Concentration = IonConcentration
@@ -30,7 +88,7 @@ const Concentration = IonConcentration
 function IonConcentration(
     ion::IonSpecies,
     val = nothing;
-    location::Location = Inside,
+    location::PrimitiveLocation = Inside,
     dynamic::Bool = false,
     name::Symbol = PERIODIC_SYMBOL[ion]
 )

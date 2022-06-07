@@ -1,4 +1,4 @@
-    module Conductor
+module Conductor
 
 using ModelingToolkit,
       Unitful,
@@ -18,7 +18,7 @@ import Symbolics:
     value,
     tosymbol,
     VariableDefaultValue,
-    wrap
+    wrap, unwrap, Arr
 
 import ModelingToolkit:
     toparam,
@@ -61,7 +61,8 @@ export Gate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue,
        AxialConductance
 
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential,
-       IonCurrent, IonConcentration, Concentration
+       IonCurrent, IonConcentration, Concentration, ExtrinsicPotential,
+       Instrinsic, Extrinsic
 
 export AuxConversion, D
 export Simulation
@@ -81,71 +82,18 @@ export output, get_output, timeconstant, steadystate, forward_rate,
 
 export Sphere, Cylinder, Point, Unitless, area, radius, height
 
-const ℱ = Unitful.q*Unitful.Na # Faraday's constant
-const t = let name = :t; only(@variables $name) end
-const D = Differential(t)
-const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
 
 # Metadata IDs
 struct ConductorUnits end # temporary shim until we implement MTK's unit checking
 struct ConductorMaxConductance end
 
-isfunction(ex::ExprValues) = try return eval(ex) isa Function catch; return false end
-
-function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
-    if ~isfunction(ex) && isa(ex, Symbol)
-        union!(out, [ex])
-    end
-    return ex
-end
-
-# Basic symbols
-function MembranePotential(V0 = -60mV; dynamic = true, name::Symbol = :Vₘ)
-    # remove when we have proper unit checks
-    V0_val = ustrip(Float64, mV, V0)
-    return dynamic ? only(@variables $name(t) = V0_val) : only(@parameters $name = V0_val)
-end
-
-@enum Location Outside Inside
-
-# Custom Unitful.jl quantities
-@derived_dimension SpecificConductance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^3 # conductance per unit area
-@derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4 # capacitance per unit area
-@derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
-
-#const TimeF64 = Quantity{Float64, 𝐓, U} where U
-
-include("ions.jl")
+include("util.jl")
+include("primitives.jl")
 include("gates.jl")
 include("channels.jl")
 include("compartments.jl")
 include("multicompartment.jl")
 include("networks.jl")
-include("io.jl")
-include("util.jl")
-
-function Simulation(neuron::AbstractCompartmentSystem; time::Time, return_system = false)
-    odesys = convert(ODESystem, neuron)
-    t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(odesys)
-    if return_system
-        return simplified
-    else
-        @info repr("text/plain", simplified)
-        return ODAEProblem(simplified, [], (0., t_val), [])
-    end
-end
-
-function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false)
-    odesys = convert(ODESystem, network)
-    t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(odesys)
-    if return_system
-        return simplified
-    else
-        @info repr("text/plain", simplified)
-        return ODAEProblem(simplified, [], (0., t_val), [])
-    end
-end
+include("simulation.jl")
 
 end # module
