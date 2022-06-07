@@ -16,7 +16,7 @@ Vₘ = MembranePotential(-65mV)
 nav_kinetics = [
     Gate(AlphaBeta,
          IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
-         4.0*exp(-(Vₘ + 65.0)/18.0), 3, name = :m)
+         4.0*exp(-(Vₘ + 65.0)/18.0), p = 3, name = :m)
     Gate(AlphaBeta,
          0.07*exp(-(Vₘ+65.0)/20.0),
          1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)), name = :h)]
@@ -25,7 +25,7 @@ kdr_kinetics = [
     Gate(AlphaBeta,
          IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
          0.125 * exp(-(Vₘ + 65.0)/80.0),
-         4, name = :n)]
+         p = 4, name = :n)]
 
 alphamss = ((4.0exp(-3.6111111111111107 - (0.05555555555555555Vₘ)) +
             IfElse.ifelse(Vₘ == -40.0, 1.0, (4.0 + 0.1Vₘ)*((1.0 - exp(-4.0 - (0.1Vₘ)))^-1)))^-1) * 
