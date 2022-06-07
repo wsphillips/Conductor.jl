@@ -96,7 +96,6 @@ include("channels.jl")
 include("compartments.jl")
 include("multicompartment.jl")
 include("networks.jl")
-include("io.jl")
 include("simulation.jl")
 
 end # module

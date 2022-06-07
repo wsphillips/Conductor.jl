@@ -55,12 +55,11 @@ topology = [Synapse(ABPD => LP, Glut(30nS), EGlut),
 
 network = NeuronalNetworkSystem(topology)
 
-t = 10000
-sim = Simulation(network, time = t*ms)
+sim = Simulation(network, time = 10000ms)
 solution = solve(sim, Rosenbrock23())
 
 # Plot at 5kHz sampling
-fig = plot(solution; plotdensity=Int(t*5), size=(1200,800), vars = [ABPD.Vₘ, LP.Vₘ, PY.Vₘ])
+fig = plot(solution; plotdensity=Int(10000*5), size=(1200,800), vars = [ABPD.Vₘ, LP.Vₘ, PY.Vₘ])
 fig
 
 # Uncomment and eval `png(...)` to save as PNG

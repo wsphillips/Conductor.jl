@@ -5,7 +5,6 @@ abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 # @enum IVCurvature Linear Rectifying
 
 permeability(x::AbstractConductanceSystem) = getfield(x, :ion)
-get_inputs(x::AbstractConductanceSystem) = getfield(x, :inputs)
 get_output(x::AbstractConductanceSystem) = getfield(x, :output)
 
 # Abstract types without parametrics
@@ -22,10 +21,7 @@ struct ConductanceSystem <: AbstractConductanceSystem
     systems::Vector{AbstractTimeDependentSystem}
     observed::Vector{Equation}
     function ConductanceSystem(iv, output, gbar, ion, gate_vars, extensions, defaults,
-                               name; checks = false)
-        eqs = Equation[]
-        systems = AbstractTimeDependentSystem[]
-        observed = Equation[]
+                               name, eqs, systems, observed; checks = false)
         if checks
         #placeholder
         end
@@ -41,7 +37,11 @@ function ConductanceSystem(g::Num, ion::IonSpecies,
         gbar::Num, extensions::Vector{ODESystem} = ODESystem[],
                            defaults = Dict(), name::Symbol = Base.gensym("Conductance"))
     gbar = setmetadata(gbar, ConductorMaxConductance, true)
-    return ConductanceSystem(t, g, gbar, ion, gate_vars, extensions, defaults, name)
+    eqs = Equation[]
+    systems = AbstractTimeDependentSystem[]
+    observed = Equation[]
+
+    return ConductanceSystem(t, g, gbar, ion, gate_vars, extensions, defaults, name, eqs, systems, observed)
 end
 
 function build_toplevel!(dvs, ps, eqs, defs, comp_sys::ConductanceSystem)
@@ -50,8 +50,10 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::ConductanceSystem)
     gate_var_outputs = Set{Num}()
     embed_defaults = Dict()
     
-    gbar = getfield(comp_sys, :gbar)
+    gbar = getfield(comp_sys, :gbar) # needs getter
     isparameter(gbar) && push!(ps, gbar)
+    g = get_output(comp_sys) 
+    gate_vars = getfield(comp_sys, :gate_vars) # needs getter
 
     for var in gate_vars
         vareqs = get_eqs(var)
@@ -66,53 +68,60 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::ConductanceSystem)
         hasdefault(sym) && push!(embed_defaults, sym => getdefault(sym))
     end
     
-    # Remove parameters + generated states
-    setdiff!(inputs, ps, gate_var_outputs)
     if isempty(gate_vars)
         push!(eqs, g ~ gbar)
     else
         push!(eqs, g ~ gbar * prod(output(x)^exponent(x) for x in gate_vars))
     end
 
-    union!(dvs, inputs, g, gate_var_outputs)
+    # Remove parameters + generated states
+    setdiff!(inputs, ps, gate_var_outputs)
+    union!(dvs, inputs, Set(g), gate_var_outputs)
 
-    sys = ODESystem(eqs, t, dvs, ps;
-                    defaults = merge(embed_defaults, defaults), name = name)
-    
+    #sys = ODESystem(eqs, t, dvs, ps;
+    #                defaults = merge(embed_defaults, defaults), name = name)
+    merge!(defs, merge(embed_defaults, getfield(comp_sys, :defaults))) 
+
+    # union dvs, ps, eqs, defs for extension?
+
     return dvs, ps, eqs, defs, inputs
 end
 
-function get_eqs(x::AbstractConductanceSystem; rebuild = false)
+get_inputs(x::ConductanceSystem) = build_toplevel(x)[5]
+
+function get_eqs(x::AbstractConductanceSystem)
     empty!(getfield(x, :eqs))
-    union!(getfield(x, :eqs), build_toplevel(x)[1])
+    union!(getfield(x, :eqs), build_toplevel(x)[3])
     return getfield(x, :eqs)
 end
 
 function get_states(x::AbstractConductanceSystem)
-    collect(build_toplevel(x)[2])
+    collect(build_toplevel(x)[1])
 end
 
 MTK.has_ps(x::ConductanceSystem) = true
 
 function get_ps(x::AbstractConductanceSystem)
-    collect(build_toplevel(x)[3])
+    collect(build_toplevel(x)[2])
 end
 
 function defaults(x::AbstractConductanceSystem)
     build_toplevel(x)[4]
 end
 
-function get_systems(x::AbstractConductanceSystem; rebuild = false)
-    empty!(getfield(x, :systems))
-    union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses), first.(getfield(x, :axial_conductance)))
+function get_systems(x::AbstractConductanceSystem)
+    #empty!(getfield(x, :systems))
+    #union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses), first.(getfield(x, :axial_conductance)))
     return getfield(x, :systems)
 end
 
-function Base.convert(::Type{ODESystem}, condsys::ConductanceSystem{ODESystem})
+get_extensions(x::AbstractConductanceSystem) = getfield(x, :extensions)
+
+function Base.convert(::Type{ODESystem}, condsys::ConductanceSystem)
     dvs, ps, eqs, defs, _ = build_toplevel(condsys)
-    
     sys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(condsys))
-    return extend(sys, extensions)
+    #return extend(sys, get_extensions(sys))
+    return sys
 end
 
 #function ModelingToolkit.rename(x::ConductanceSystem, name)
@@ -140,7 +149,7 @@ function IonChannel(ion::IonSpecies,
                     max_g::Union{Num, SpecificConductance} = 0mS/cm^2,
                     extensions::Vector{ODESystem} = ODESystem[],
                     name::Symbol = Base.gensym("IonChannel"),
-                    linearity::IVCurvature = Linear, defaults = Dict())
+                    defaults = Dict())
     if max_g isa SpecificConductance
         gbar_val = ustrip(Float64, mS/cm^2, max_g)
         @parameters gbar
@@ -159,7 +168,7 @@ function IonChannel(ion::IonSpecies,
     g = setmetadata(g, ConductorUnits, mS/cm^2) # TODO: rework with MTK native unit system
     ConductanceSystem(g, ion, gate_vars;
                       gbar = gbar, name = name, defaults = defaults, 
-                      extensions = extensions, linearity = linearity)
+                      extensions = extensions)
 end
 
 function AxialConductance(gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
@@ -175,7 +184,7 @@ function SynapticChannel(ion::IonSpecies,
                          max_s::Union{Num, ElectricalConductance} = 0mS,
                          extensions::Vector{ODESystem} = ODESystem[],
                          name::Symbol = Base.gensym("SynapticChannel"),
-                         linearity::IVCurvature = Linear, defaults = Dict())
+                         defaults = Dict())
     # to make generic, check for <:Quantity then write a
     # unit specific "strip" method 
     if max_s isa ElectricalConductance
@@ -196,7 +205,7 @@ function SynapticChannel(ion::IonSpecies,
     s = setmetadata(s, ConductorUnits, mS) # TODO: rework iwth MTK native unit system
     ConductanceSystem(s, ion, gate_vars;
                       gbar = sbar, name = name, defaults = defaults,
-                      extensions = extensions, linearity = linearity)
+                      extensions = extensions)
 end
 
 function (cond::AbstractConductanceSystem)(newgbar::Quantity)
@@ -213,8 +222,8 @@ function (cond::AbstractConductanceSystem)(newgbar::Quantity)
     local gbar_sym::Num
 
     for param in parameters(cond)
-        if getmetadata(param, ConductorMaxConductance, false)
-            gbar_sym = param
+        if getmetadata(unwrap(param), ConductorMaxConductance, false)
+            gbar_sym = wrap(param)
             break
         end
     end
