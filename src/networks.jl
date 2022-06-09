@@ -117,7 +117,7 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
             cl_copy = deepcopy(cl) 
             for syn in inc_edges_of_cl
                 if !isaggregate(cl_copy)
-                    cl_copy = replicate(cl)
+                    cl_copy = replicate(class(syn))
                 end
                 subscribe!(cl_copy, presynaptic(syn))
                 push!(get_synaptic_reversals(pn), reversal(syn))
