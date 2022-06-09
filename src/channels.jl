@@ -2,6 +2,7 @@
 # Linear Ohmic/Nernst vs non-linear GHK
 # @enum IVCurvature Linear Rectifying
 
+
 get_output(x::AbstractConductanceSystem) = getfield(x, :output)
 subscriptions(x::AbstractConductanceSystem) = getfield(x, :subscriptions)
 isaggregate(x::AbstractConductanceSystem) = getfield(x, :aggregate)
