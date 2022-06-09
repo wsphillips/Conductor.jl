@@ -148,7 +148,7 @@ iscurrent(x::IonCurrent) = true
 getcurrent(x) = iscurrent(x) ? getmetadata(value(x), IonCurrent) : nothing
 getcurrent(x::IonCurrent) = x
 getion(x::IonCurrent) = getfield(getcurrent(x), :ion)
-isaggregate(x) = iscurrent(x) ? getfield(getcurrent(x), :agg) : false
+isaggregate(x::Num) = iscurrent(x) ? getfield(getcurrent(x), :agg) : false
 
 struct EquilibriumPotential
     ion::IonSpecies

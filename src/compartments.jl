@@ -35,8 +35,6 @@ area(x::Cylinder) = ustrip(Float64, cm^2, 2*π*radius(x)*(height(x) + (x.open_en
 area(::Point) = 1.0
 area(x::Unitless) = x.value
 
-abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
-
 struct CompartmentSystem <: AbstractCompartmentSystem
     iv::Num # usually just t
     ## Intrinsic properties

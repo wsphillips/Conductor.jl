@@ -9,7 +9,7 @@ Vₘ = MembranePotential(-65mV)
 nav_kinetics = [
     Gate(AlphaBeta,
          IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
-         4.0*exp(-(Vₘ + 65.0)/18.0), 3, name = :m)
+         4.0*exp(-(Vₘ + 65.0)/18.0), p = 3, name = :m)
     Gate(AlphaBeta,
          0.07*exp(-(Vₘ+65.0)/20.0),
          1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)), name = :h)]
@@ -18,7 +18,7 @@ kdr_kinetics = [
     Gate(AlphaBeta,
          IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
          0.125 * exp(-(Vₘ + 65.0)/80.0),
-         4, name = :n)]
+         p = 4, name = :n)]
 
 @named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2)
 @named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
@@ -38,7 +38,8 @@ holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
                              geometry = Cylinder(radius = 25µm, height = 400µm))
                                    
 # Synaptic model
-syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
+Vₓ = ExtrinsicPotential()
+syn∞ = 1/(1 + exp((-35 - Vₓ)/5))
 τsyn = (1 - syn∞)/(1/40)
 syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :m)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)

@@ -17,7 +17,7 @@ kdr_kinetics = [
     Gate(AlphaBeta,
          IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
          0.125 * exp(-(Vₘ + 65.0)/80.0),
-         4, name = :n)]
+         p = 4, name = :n)]
 
 @named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2) 
 @named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
