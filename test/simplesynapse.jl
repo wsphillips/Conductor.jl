@@ -41,9 +41,10 @@ geo = Cylinder(radius = 25µm, height = 400µm)
                              geometry = geo)
  
 # Synaptic model
-syn∞ = 1/(1 + exp((-35 - Vₘ)/5))
+Vₓ = ExtrinsicPotential()
+syn∞ = 1/(1 + exp((-35 - Vₓ)/5))
 τsyn = (1 - syn∞)/(1/40)
-syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :m)
+syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 

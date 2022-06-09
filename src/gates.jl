@@ -81,7 +81,7 @@ function Gate(::Type{HeavisideSum}, threshold = 0mV, saturation = 125;
                               numpre = 0, kwargs...)
 end 
 
-function get_eqs(var::Gate{HeavisideSum})
+function get_eqs(var::Gate{HeavisideSum}, chan)
     thold, sat, numpre = var.threshold, var.saturation, var.numpre
     out = output(var)
     iszero(numpre) && return [D(out) ~ 0]
@@ -91,13 +91,13 @@ function get_eqs(var::Gate{HeavisideSum})
     return[D(out) .~ sum(scalarize(Vpre .>= thold) .- out/sat)]
 end
 
-function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}})
+function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}}, chan)
     x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
     return [D(x) ~ inv(τₓ)*(x∞ - x)]
 end
 
-get_eqs(var::Gate{SteadyState}) = [output(var) ~ steadystate(var)]
-get_eqs(var::Gate{ConstantValue}) = Equation[]
+get_eqs(var::Gate{SteadyState}, chan) = [output(var) ~ steadystate(var)]
+get_eqs(var::Gate{ConstantValue}, chan) = Equation[]
 
 ############################################################################################
 # Macros (needs updating)

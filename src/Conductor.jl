@@ -87,6 +87,10 @@ export Sphere, Cylinder, Point, Unitless, area, radius, height
 struct ConductorUnits end # temporary shim until we implement MTK's unit checking
 struct ConductorMaxConductance end
 
+abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
+abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
+abstract type AbstractNeuronalNetworkSystem <: AbstractTimeDependentSystem end
+
 include("util.jl")
 include("primitives.jl")
 include("gates.jl")

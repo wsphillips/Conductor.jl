@@ -31,7 +31,6 @@ presynaptic(x::Synapse) = getfield(x, :source)
 postsynaptic(x::Synapse) = getfield(x, :target)
 class(x::Synapse) = getfield(x, :conductance)
 reversal(x::Synapse) = getfield(x, :reversal)
-abstract type AbstractNeuronalNetworkSystem <: AbstractTimeDependentSystem end
 
 struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     #topology::AbstractNetworkTopology
@@ -91,12 +90,14 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
     preneurons  = Set()
     postneurons = Set()
     neurons = Set()
-    
+    synaptic_channel_classes = Set()
+
     voltage_fwds = Set{Equation}()
     # Bin the fields
     for synapse in synapses
         push!(preneurons, presynaptic(synapse))
         push!(postneurons, postsynaptic(synapse))
+        push!(synaptic_channel_classes, class(synapse))
     end
     
     union!(neurons, preneurons, postneurons)
@@ -104,19 +105,56 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
     # Reset all synaptic information
     foreach(x -> empty!(get_synapses(x)), neurons)
     foreach(x -> empty!(get_synaptic_reversals(x)), neurons)
+    
+    # For each post synaptic neuron
+    for pn in postneurons
+        incoming_edges = filter(x -> isequal(postsynaptic(x), pn), synapses)
+        for cl in synaptic_channel_classes
+            # filter to incoming synapses of the same type per postsynaptic compartment
+            inc_edges_of_cl = filter(x -> isequal(class(x), cl), incoming_edges)
 
+
+            cl_copy = deepcopy(cl) 
+            for syn in inc_edges_of_cl
+                if !isaggregate(cl_copy)
+                    cl_copy = replicate(class(syn))
+                end
+                subscribe!(cl_copy, presynaptic(syn))
+                push!(get_synaptic_reversals(pn), reversal(syn))
+                if !isaggregate(cl_copy)
+                    push!(get_synapses(pn), cl_copy)
+                    post_v = getproperty(pn, nameof(cl_copy)).Vₓ
+                    pre_v = presynaptic(syn).Vₘ
+                    push!(voltage_fwds, pre_v ~ post_v)
+                    push!(defs, post_v => pre_v)
+                end
+            end
+            if !isempty(subscriptions(cl_copy)) && isaggregate(cl_copy)
+                push!(get_synapses(pn), cl_copy)
+                for (i, pre) in enumerate(presynaptic.(inc_edges_of_cl))
+                    post_v = getproperty(pn, nameof(cl_copy)).Vₓ[i]
+                    pre_v = presynaptic(syn).Vₘ
+                    push!(voltage_fwds, pre_v ~ post_v)
+                    push!(defs, post_v => pre_v)
+                end
+            end
+
+
+        end
+    end
+    #=
     # Push synaptic information to each neuron
     for synapse in synapses
         syn = replicate(class(synapse))
         #syn = class(synapse)
         post = postsynaptic(synapse)
         pre  = presynaptic(synapse)
+        #subscribe!(syn, pre)
         push!(get_synapses(post), syn)
         push!(get_synaptic_reversals(post), reversal(synapse))
-        # Note this will probably cause an error...
         push!(voltage_fwds, pre.Vₘ ~ getproperty(post, nameof(syn)).Vₘ) 
     end
-
+    =# 
     union!(eqs, voltage_fwds)
     return dvs, ps, eqs, defs, collect(neurons)
 end
