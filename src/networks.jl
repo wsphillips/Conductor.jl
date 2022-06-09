@@ -123,13 +123,19 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
                 push!(get_synaptic_reversals(pn), reversal(syn))
                 if !isaggregate(cl_copy)
                     push!(get_synapses(pn), cl_copy)
-                    push!(voltage_fwds, presynaptic(syn).Vₘ ~ getproperty(pn, nameof(cl_copy)).Vₓ)
+                    post_v = getproperty(pn, nameof(cl_copy)).Vₓ
+                    pre_v = presynaptic(syn).Vₘ
+                    push!(voltage_fwds, pre_v ~ post_v)
+                    push!(defs, post_v => pre_v)
                 end
             end
             if !isempty(subscriptions(cl_copy)) && isaggregate(cl_copy)
                 push!(get_synapses(pn), cl_copy)
                 for (i, pre) in enumerate(presynaptic.(inc_edges_of_cl))
-                    push!(voltage_fwds, presynaptic(syn).Vₘ ~ getproperty(pn, nameof(cl_copy)).Vₓ[i])
+                    post_v = getproperty(pn, nameof(cl_copy)).Vₓ[i]
+                    pre_v = presynaptic(syn).Vₘ
+                    push!(voltage_fwds, pre_v ~ post_v)
+                    push!(defs, post_v => pre_v)
                 end
             end
 

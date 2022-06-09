@@ -41,14 +41,14 @@ holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
 Vₓ = ExtrinsicPotential()
 syn∞ = 1/(1 + exp((-35 - Vₓ)/5))
 τsyn = (1 - syn∞)/(1/40)
-syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :m)
+syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
 net = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
 
 ttot = 250
-sim = Simulation(net, time = ttot*ms)
+sim = Simulation(net, time = ttot*ms, return_system = false)
 
 solution = solve(sim, Rosenbrock23())
 
