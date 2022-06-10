@@ -23,7 +23,7 @@ pinsky_nav_kinetics = [convert(Gate{SteadyState}, nav_kinetics[1]), nav_kinetics
 pinsky_ca_kinetics = [ca_kinetics[1]]
 @named CaS = IonChannel(Calcium, pinsky_ca_kinetics)
 
-is_val = ustrip(Float64, µA, 0.75µA)/p
+is_val = ustrip(Float64, µA, 2.5µA)/p
 @named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
 soma_holding = Iₛ ~ is_val
 
@@ -51,14 +51,19 @@ dendrite_holding = I_d ~ id_val
                              extensions = [calcium_conversion],
                              stimuli = [dendrite_holding])
 
+dumb_Eleak = EquilibriumPotential(Leak, 20mV)
+
+@named dummy = Compartment(Vₘ, [leak(1mS/cm^2)], [dumb_Eleak])
+
 @named gc_soma = AxialConductance([Gate(SteadyState, 1/p, name = :ps)],
                                   max_g = gc_val)
 @named gc_dendrite = AxialConductance([Gate(SteadyState, 1/(1-p), name = :pd)],
                                       max_g = gc_val)
-soma2dendrite = Junction(soma => dendrite, gc_soma)
-dendrite2soma = Junction(dendrite => soma, gc_dendrite)
 
-mc_neuron = MultiCompartment([soma2dendrite, dendrite2soma])
+soma2dendrite = Junction(soma => dendrite, gc_soma, symmetric = false)
+dendrite2soma = Junction(dendrite => soma, gc_dendrite, symmetric = false)
+
+@named mcneuron = MultiCompartment([soma2dendrite, dendrite2soma])
 
 simp = Simulation(mc_neuron, time=2000ms, return_system = true)
 prob = ODAEProblem(simp, [], (0., 2000), [])
@@ -68,5 +73,31 @@ prob = ODAEProblem(simp, [], (0., 2000), [])
 using OrdinaryDiffEq, Plots
 # Pinsky & Rinzel originally solved using RK4 and dt=0.05
 #sol = solve(prob, RK4(), dt=0.05, maxiters=1e9)
-sol = solve(prob, Rosenbrock23())
+sol = solve(prob, RadauIIA5(), abstol=1e-9, reltol=1e-9)
 plot(sol, vars=[soma.Vₘ])
+
+###########################################################################################
+# Synapse models
+###########################################################################################
+import Conductor: NMDA, AMPA, HeavisideSum
+
+@named NMDAChan = SynapticChannel(NMDA,
+                [Gate(SteadyState, inv(1 + 0.28*exp(-0.062(Vₘ - 60.))); name = :e),
+                 Gate(HeavisideSum, threshold = 10mV, saturation = 150; name = :S),
+                 Gate(SteadyState, 1/p, name = :pnmda)],
+                max_s = 0mS, aggregate = true)
+
+@named AMPAChan = SynapticChannel(AMPA,
+                                [Gate(HeavisideSum, threshold = 20mV, saturation = 2;
+                                      name = :u),
+                                 Gate(SteadyState, 1/p, name = :pnmda)],
+                                max_s = 0mS, aggregate = true)
+
+ESyn = EquilibriumPotential(NMDA, 60mV, name = :syn)
+topology = [Synapse(dummy => mcneuron.dendrite, NMDAChan(1.25mS), ESyn)]
+
+network = NeuronalNetworkSystem(topology)
+
+simp = Simulation(network, time=2000ms, return_system = true)
+prob = ODAEProblem(simp, [], (0., 2000), [])
+

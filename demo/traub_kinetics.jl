@@ -14,7 +14,7 @@ nav_kinetics = [
     Gate(AlphaBeta,
          (0.32(13.1 - Vₘ))/(exp((13.1 - Vₘ)/4.)-1.),
          (0.28(Vₘ - 40.1))/(exp((Vₘ-40.1)/5.)-1.),
-         2,
+         p = 2,
          name = :m)
     # Inactivation
     Gate(AlphaBeta,
@@ -30,7 +30,7 @@ ca_kinetics = [
     Gate(AlphaBeta,
          1.6/(1. + exp(-0.072*(Vₘ - 65.0))),
          (0.02*(Vₘ - 51.1))/(exp((Vₘ - 51.1)/5.) - 1.),
-         2,
+         p = 2,
          name = :s)
     # Inactivation; unused in Pinsk & Rinzel reduction
     Gate(AlphaBeta,

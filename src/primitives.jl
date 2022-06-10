@@ -68,6 +68,8 @@ isextrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
     Anion      = 1 << 6
     Glutamatergic = 1 << 7
     Cholinergic = 1 << 8
+    AMPA        = 1 << 9
+    NMDA        = 1 << 10
 end
 
 const Ca = Calcium
