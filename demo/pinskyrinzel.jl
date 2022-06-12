@@ -23,11 +23,11 @@ pinsky_nav_kinetics = [convert(Gate{SteadyState}, nav_kinetics[1]), nav_kinetics
 pinsky_ca_kinetics = [ca_kinetics[1]]
 @named CaS = IonChannel(Calcium, pinsky_ca_kinetics)
 
-is_val = ustrip(Float64, µA, 2.5µA)/p
+is_val = ustrip(Float64, µA, -0.5µA)/p
 @named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
 soma_holding = Iₛ ~ is_val
 
-id_val = ustrip(Float64, µA, 0.0µA)/(1-p)
+id_val = ustrip(Float64, µA, -0.5µA)/(1-p)
 @named I_d = IonCurrent(NonIonic, id_val, dynamic = false)
 dendrite_holding = I_d ~ id_val
 
@@ -60,12 +60,13 @@ dumb_Eleak = EquilibriumPotential(Leak, 20mV)
 @named gc_dendrite = AxialConductance([Gate(SteadyState, 1/(1-p), name = :pd)],
                                       max_g = gc_val)
 
-soma2dendrite = Junction(soma => dendrite, gc_soma, symmetric = false)
-dendrite2soma = Junction(dendrite => soma, gc_dendrite, symmetric = false)
+soma2dendrite = Junction(soma => dendrite, gc_soma, symmetric = false);
+dendrite2soma = Junction(dendrite => soma, gc_dendrite, symmetric = false);
 
 @named mcneuron = MultiCompartment([soma2dendrite, dendrite2soma])
 
-simp = Simulation(mc_neuron, time=2000ms, return_system = true)
+simp = Simulation(mcneuron, time=2000ms, return_system = true)
+
 prob = ODAEProblem(simp, [], (0., 2000), [])
 # Uncomment to explicitly use the same u0 as published
 # prob = ODAEProblem(simp, [-4.6, 0.999, 0.001, 0.2, -4.5, 0.01, 0.009, .007], (0., 2000), [])
