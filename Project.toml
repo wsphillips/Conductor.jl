@@ -1,7 +1,7 @@
 name = "Conductor"
 uuid = "d194a933-43b5-4953-818b-974a45c81e67"
 authors = ["Wiktor Phillips <wsphillips@gmail.com>"]
-version = "0.0.3"
+version = "0.0.4"
 
 [deps]
 IfElse = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
