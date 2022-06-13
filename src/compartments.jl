@@ -54,14 +54,15 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     eqs::Vector{Equation}
     systems::Vector{AbstractTimeDependentSystem}
     observed::Vector{Equation}
+    parent::Ref{AbstractCompartmentSystem}
     function CompartmentSystem(iv, voltage, capacitance, geometry, chans, channel_reversals,
                                synapses, synaptic_reversals, axial_conductance, stimuli, extensions, defaults,
-                               name, eqs, systems, observed; checks = false)
+                               name, eqs, systems, observed, parent; checks = false)
         if checks
         # placeholder
         end
         new(iv, voltage, capacitance, geometry, chans, channel_reversals, synapses,
-            synaptic_reversals, axial_conductance, stimuli, extensions, defaults, name, eqs, systems, observed)
+            synaptic_reversals, axial_conductance, stimuli, extensions, defaults, name, eqs, systems, observed, parent)
     end
 end
 
@@ -83,8 +84,9 @@ function CompartmentSystem(
     eqs = Equation[]
     systems = AbstractSystem[]
     observed = Equation[]
+    parent = Ref{AbstractCompartmentSystem}()
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(channels), Set(reversals), Set(),
-                             Set(), Set(), stimuli, extensions, Dict(), name, eqs, systems, observed)
+                             Set(), Set(), stimuli, extensions, Dict(), name, eqs, systems, observed, parent)
 end
 
 # AbstractSystem interface extensions
@@ -97,6 +99,15 @@ get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 get_channels(x::AbstractCompartmentSystem) = getfield(x, :chans)
 get_synapses(x::AbstractCompartmentSystem) = getfield(x, :synapses)
 get_stimuli(x::AbstractCompartmentSystem) = getfield(x, :stimuli)
+
+hasparent(x::CompartmentSystem) = isassigned(getfield(x, :parent))
+parent(x::CompartmentSystem) = getfield(x, :parent)[]
+
+function setparent!(child::CompartmentSystem, parent::AbstractCompartmentSystem)
+    ref = getfield(child, :parent)
+    ref[] = parent
+    return nothing
+end
 
 function get_reversals(x::AbstractCompartmentSystem)
     return getfield(x, :channel_reversals), getfield(x, :synaptic_reversals) 
@@ -194,25 +205,25 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     # voltage equation
     push!(eqs, D(get_output(comp_sys)) ~ -sum(union(currents,syncurrents))/(cₘ*aₘ))
 
-    return eqs, dvs, ps, defs, currents, syncurrents
+    return dvs, ps, eqs, defs, currents, syncurrents
 end
 
 # collect _top level_ eqs including from extension + currents + reversals + Vₘ
 function get_eqs(x::AbstractCompartmentSystem; rebuild = false)
     empty!(getfield(x, :eqs))
-    union!(getfield(x, :eqs), build_toplevel(x)[1])
+    union!(getfield(x, :eqs), build_toplevel(x)[3])
     return getfield(x, :eqs)
 end
 
 function get_states(x::AbstractCompartmentSystem)
-    collect(build_toplevel(x)[2])
+    collect(build_toplevel(x)[1])
 end
 
 MTK.has_ps(x::CompartmentSystem) = true
 
 function get_ps(x::AbstractCompartmentSystem)
     # collect _top level_ parameters from extension + currents + capacitance + area + reversals
-    collect(build_toplevel(x)[3])
+    collect(build_toplevel(x)[2])
 end
 
 function defaults(x::AbstractCompartmentSystem)
@@ -241,18 +252,14 @@ end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
     required_states = Set{Num}()
-    eqs, dvs, ps, defs, currents, syncurrents = build_toplevel(compartment)
+    dvs, ps, eqs, defs, currents, syncurrents = build_toplevel(compartment)
     syss = convert.(ODESystem, collect(get_systems(compartment)))
     
     # Resolve in/out: "connect" / auto forward cell states to channels
-    for x in get_channels(compartment) #union(get_channels(compartment), get_synapses(compartment))
+    for x in union(get_channels(compartment), get_synapses(compartment))
         for inp in get_inputs(x)
-            # gathering inputs
-            # FIXME: add metadata indicating the level we expect to resolve at
-            # e.g. Vₘ used by a synapse is resolved at the network level (an external source)
-            # therefore it should remain unresolved when building the _host compartment_
+            isextrinsic(inp) && continue
             push!(required_states, inp)
-            # all inputs are outright connected to the compartment top-level
             subinp = getproperty(x, tosymbol(inp, escape=false))
             push!(eqs, inp ~ subinp)
         end

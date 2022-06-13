@@ -36,12 +36,14 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     #topology::AbstractNetworkTopology
     iv::Num
     synapses::Vector{AbstractSynapse}
+    #neurons::Set{AbstractCompartmentSystem}
     extensions::Vector{AbstractTimeDependentSystem}
     name::Symbol
     eqs::Vector{Equation}
     systems::Vector{AbstractTimeDependentSystem}
     observed::Vector{Equation}
-    function NeuronalNetworkSystem(iv, synapses, extensions, name, eqs, systems, observed; checks = false)
+    function NeuronalNetworkSystem(iv, synapses, extensions, name, eqs, systems, observed;
+                                   checks = false)
         if checks
             # placeholder
         end
@@ -49,7 +51,9 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     end
 end
 
-function NeuronalNetworkSystem(synapses::Vector{Synapse}, extensions::Vector{AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
+function NeuronalNetworkSystem(synapses::Vector{Synapse},
+                               #neurons::Vector{AbstractCompartmentSystem},
+                               extensions::Vector{AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
                                name::Symbol = Base.gensym(:Network))
     eqs = Equation[]
     systems = AbstractTimeDependentSystem[]
@@ -84,6 +88,16 @@ function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     return compose(odesys, all_systems)
 end
 
+function reset_synapses!(x::CompartmentSystem)
+    empty!(get_synapses(x))
+    empty!(get_synaptic_reversals(x))
+    return nothing
+end
+
+function reset_synapses!(x::MultiCompartmentSystem)
+    foreach(reset_synapses!, get_compartments(x))
+end
+
 function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
     
     synapses = get_synapses(network_sys)
@@ -100,11 +114,18 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
         push!(synaptic_channel_classes, class(synapse))
     end
     
-    union!(neurons, preneurons, postneurons)
+    all_compartments = union(preneurons, postneurons)
 
+    for comp in all_compartments
+        push!(neurons, hasparent(comp) ? parent(comp) : comp)
+    end
+
+    #union!(neurons, preneurons, postneurons)
+    
+    foreach(reset_synapses!, neurons)
     # Reset all synaptic information
-    foreach(x -> empty!(get_synapses(x)), neurons)
-    foreach(x -> empty!(get_synaptic_reversals(x)), neurons)
+    #foreach(x -> empty!(get_synapses(x)), neurons)
+    #foreach(x -> empty!(get_synaptic_reversals(x)), neurons)
     
     # For each post synaptic neuron
     for pn in postneurons
@@ -133,7 +154,7 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
                 push!(get_synapses(pn), cl_copy)
                 for (i, pre) in enumerate(presynaptic.(inc_edges_of_cl))
                     post_v = getproperty(pn, nameof(cl_copy)).Vₓ[i]
-                    pre_v = presynaptic(syn).Vₘ
+                    pre_v = pre.Vₘ
                     push!(voltage_fwds, pre_v ~ post_v)
                     push!(defs, post_v => pre_v)
                 end
@@ -142,20 +163,9 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
 
         end
     end
-    #=
-    # Push synaptic information to each neuron
-    for synapse in synapses
-        syn = replicate(class(synapse))
-        #syn = class(synapse)
-        post = postsynaptic(synapse)
-        pre  = presynaptic(synapse)
-        #subscribe!(syn, pre)
-        push!(get_synapses(post), syn)
-        push!(get_synaptic_reversals(post), reversal(synapse))
-        push!(voltage_fwds, pre.Vₘ ~ getproperty(post, nameof(syn)).Vₘ) 
-    end
-    =# 
+
     union!(eqs, voltage_fwds)
+    
     return dvs, ps, eqs, defs, collect(neurons)
 end
 

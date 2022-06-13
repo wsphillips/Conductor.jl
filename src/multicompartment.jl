@@ -26,7 +26,9 @@ struct MultiCompartmentSystem <: AbstractCompartmentSystem
         if checks
             #placeholder
         end
-        return new(iv, junctions, compartments, extensions, eqs, systems, observed, defaults, name)
+        mc = new(iv, junctions, compartments, extensions, eqs, systems, observed, defaults, name)
+        foreach(x -> setparent!(x, mc), compartments)
+        return mc
     end
 end
 
@@ -45,7 +47,7 @@ function MultiCompartment(junctions::Vector{<:AbstractJunction}; extensions = OD
         push!(all_comp, jxn.child)
         push!(all_comp, jxn.parent)
     end
-
+    
     return MultiCompartment(t, junctions, collect(all_comp), extensions, eqs, systems, observed,
                             defaults, name)
 end
@@ -53,7 +55,7 @@ end
 get_junctions(x::MultiCompartmentSystem) =  getfield(x, :junctions)
 get_axial_conductance(x::AbstractCompartmentSystem) = getfield(x, :axial_conductance)
 get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
-
+hasparent(x::MultiCompartmentSystem) = false
 #MTK.get_states(x::MultiCompartmentSystem) = collect(build_toplevel(x)[1])
 #MTK.has_ps(x::MultiCompartmentSystem) = !isempty(build_toplevel(x)[2])
 #MTK.get_ps(x::MultiCompartmentSystem) = collect(build_toplevel(x)[2])

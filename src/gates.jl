@@ -61,7 +61,7 @@ function Gate(::Type{SteadyStateTau}, ss, tau; name = Base.gensym("GateVar"), kw
 end
 
 function Base.convert(::Type{Gate{SteadyState}}, x::Union{Gate{AlphaBeta},Gate{SteadyStateTau}})
-    return Gate(SteadyState, steadystate(x), exponent(x), name = Symbolics.tosymbol(output(x), escape=false))
+    return Gate(SteadyState, steadystate(x), p = exponent(x), name = Symbolics.tosymbol(output(x), escape=false))
 end
 
 function Gate(::Type{SteadyState}, ss; name = Base.gensym("GateVar"), kwargs...)
@@ -78,17 +78,18 @@ function Gate(::Type{HeavisideSum}, threshold = 0mV, saturation = 125;
               name = Base.gensym("GateVar"), kwargs...) 
     out = only(@variables $name(t) = 0.0) # synaptically activated gate inits to 0.0
     return Gate{HeavisideSum}(out; threshold = threshold, saturation = saturation,
-                              numpre = 0, kwargs...)
+                              kwargs...)
 end 
 
 function get_eqs(var::Gate{HeavisideSum}, chan)
-    thold, sat, numpre = var.threshold, var.saturation, var.numpre
+    thold, sat = var.threshold, var.saturation
+    thold_val = ustrip(Float64, mV, thold)
     out = output(var)
-    iszero(numpre) && return [D(out) ~ 0]
-    @named Vpre = ExtrinsicPotential(n = numpre) 
+    isempty(subscriptions(chan)) && return [D(out) ~ 0]
+    @named Vₓ = ExtrinsicPotential(n = length(subscriptions(chan))) 
     # Derived from Pinsky & Rinzel 1994 - Equation 4 
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
-    return[D(out) .~ sum(scalarize(Vpre .>= thold) .- out/sat)]
+    return[D(out) .~ sum(ModelingToolkit.scalarize(Vₓ .>= thold_val) .- (out/sat))]
 end
 
 function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}}, chan)

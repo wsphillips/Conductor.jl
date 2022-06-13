@@ -54,10 +54,8 @@ isextrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
 @derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4 # capacitance per unit area
 @derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
 
-#const TimeF64 = Quantity{Float64, 𝐓, U} where U
-
 # Ion species
-# TODO: Come up with a better solution for this. It should be more easily user extendable
+# TODO: Needs to be user extendable
 @enum IonSpecies::UInt128 begin
     NonIonic    = 1 << 0
     Sodium      = 1 << 1
@@ -68,6 +66,8 @@ isextrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
     Anion      = 1 << 6
     Glutamatergic = 1 << 7
     Cholinergic = 1 << 8
+    AMPA        = 1 << 9
+    NMDA        = 1 << 10
 end
 
 const Ca = Calcium
@@ -99,7 +99,6 @@ function IonConcentration(
     if !isnothing(val)
         if val isa Molarity
             var = setmetadata(var, ConductorUnits, unit(val))
-            # FIXME: use proper unit checking
             raw_val = ustrip(Float64, µM, val)
             var = setdefault(var, raw_val)
             return var
@@ -163,7 +162,6 @@ function EquilibriumPotential(ion::IonSpecies, val; dynamic = false, name::Symbo
     if !isnothing(val)
         if val isa Voltage
             var = setmetadata(var, ConductorUnits, unit(val))
-            # FIXME: do proper unit checking
             raw_val = ustrip(Float64, mV, val)
             var = setdefault(var, raw_val)
             return var
