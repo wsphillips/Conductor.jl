@@ -60,8 +60,10 @@ function Gate(::Type{SteadyStateTau}, ss, tau; name = Base.gensym("GateVar"), kw
     return Gate{SteadyStateTau}(out; alpha = alpha, beta = beta, ss = ss, tau = tau, kwargs...)
 end
 
-function Base.convert(::Type{Gate{SteadyState}}, x::Union{Gate{AlphaBeta},Gate{SteadyStateTau}})
-    return Gate(SteadyState, steadystate(x), p = exponent(x), name = Symbolics.tosymbol(output(x), escape=false))
+function Base.convert(::Type{Gate{SteadyState}},
+                      x::Union{Gate{AlphaBeta},Gate{SteadyStateTau}})
+    return Gate(SteadyState, steadystate(x), p = exponent(x),
+                name = Symbolics.tosymbol(output(x), escape=false))
 end
 
 function Gate(::Type{SteadyState}, ss; name = Base.gensym("GateVar"), kwargs...)

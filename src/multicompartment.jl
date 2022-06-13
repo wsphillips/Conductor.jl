@@ -26,7 +26,8 @@ struct MultiCompartmentSystem <: AbstractCompartmentSystem
         if checks
             #placeholder
         end
-        mc = new(iv, junctions, compartments, extensions, eqs, systems, observed, defaults, name)
+        mc = new(iv, junctions, compartments, extensions, eqs, systems, observed, defaults,
+                 name)
         foreach(x -> setparent!(x, mc), compartments)
         return mc
     end
@@ -48,36 +49,20 @@ function MultiCompartment(junctions::Vector{<:AbstractJunction}; extensions = OD
         push!(all_comp, jxn.parent)
     end
     
-    return MultiCompartment(t, junctions, collect(all_comp), extensions, eqs, systems, observed,
-                            defaults, name)
+    return MultiCompartment(t, junctions, collect(all_comp), extensions, eqs, systems,
+                            observed, defaults, name)
 end
 
 get_junctions(x::MultiCompartmentSystem) =  getfield(x, :junctions)
 get_axial_conductance(x::AbstractCompartmentSystem) = getfield(x, :axial_conductance)
 get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
 hasparent(x::MultiCompartmentSystem) = false
-#MTK.get_states(x::MultiCompartmentSystem) = collect(build_toplevel(x)[1])
-#MTK.has_ps(x::MultiCompartmentSystem) = !isempty(build_toplevel(x)[2])
-#MTK.get_ps(x::MultiCompartmentSystem) = collect(build_toplevel(x)[2])
-#
-#function MTK.get_eqs(x::AbstractMultiCompartmentSystem)
-#    empty!(getfield(x, :eqs))
-#    union!(getfield(x, :eqs), build_toplevel(x)[3])
-#end
-#
-#MTK.get_defaults(x::AbstractMultiCompartmentSystem) = build_toplevel(x)[4]
-#
-#function MTK.get_systems(x::AbstractMultiCompartmentSystem)
-#    empty!(getfield(x, :systems))
-#    union!(getfield(x, :systems), build_toplevel(x)[5], get_extensions(x))
-#end
-#
+
 function get_systems(x::MultiCompartmentSystem; rebuild = false)
     empty!(getfield(x, :systems))
     union!(getfield(x, :systems), getfield(x, :compartments), getfield(x, :extensions))
     return getfield(x, :systems)
 end
-
 
 function build_toplevel!(dvs, ps, eqs, defs, mcsys::MultiCompartmentSystem)
 
@@ -95,12 +80,12 @@ function build_toplevel!(dvs, ps, eqs, defs, mcsys::MultiCompartmentSystem)
     foreach(x -> empty!(get_axial_conductance(x)), compartments)
     
     for jxn in junctions
-        axial = get_conductance(jxn) # maybe replicate? needs a toggle
+        axial = get_conductance(jxn)
         parent = jxn.parent
         child = jxn.child
         childvm = MembranePotential(; name = Symbol(:V, nameof(child))) 
         push!(get_axial_conductance(parent), (axial, childvm))
-        #FIXME: make this generic for any unresolved state in the conductance sys
+        #TODO: resolve arbitrary states generically
         if hasproperty(getproperty(parent, nameof(axial)), :Vₘ)
             push!(forwards, child.Vₘ ~ getproperty(parent, nameof(axial)).Vₘ)
         end
@@ -108,7 +93,7 @@ function build_toplevel!(dvs, ps, eqs, defs, mcsys::MultiCompartmentSystem)
         if issymmetric(jxn)
             parentvm = MembranePotential(; name = Symbol(:V, nameof(parent)))
             push!(get_axial_conductance(child), (axial, parentvm))
-            #FIXME: make this generic ofr any unresolved state in the cond. sys
+            #TODO: resolve arbitrary states generically
             if hasproperty(getproperty(child, nameof(axial)), :Vₘ)
                 push!(forwards, parent.Vₘ ~ getproperty(child, nameof(axial)).Vₘ)
             end
@@ -120,12 +105,8 @@ function build_toplevel!(dvs, ps, eqs, defs, mcsys::MultiCompartmentSystem)
     return dvs, ps, eqs, defs, collect(compartments)
 end
 
-#get_geometry(x::MultiCompartmentSystem)
-#area(x::MultiCompartmentSystem)
-
 function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
     states, params, eqs, defs, compartments = build_toplevel(mcsys)
-
     all_systems = map(x -> convert(ODESystem, x), compartments)
     odesys = ODESystem(eqs, t, states, params; defaults = defs, name = nameof(mcsys))
     return compose(odesys, all_systems)

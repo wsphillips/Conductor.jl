@@ -7,8 +7,9 @@ const D = Differential(t)
 @enum PrimitiveLocation Outside Inside
 
 struct MembranePotential
-    function MembranePotential(V0 = -60mV; dynamic = true, source::PrimitiveSource = Intrinsic,
-                               n::Integer = 1, name::Symbol = :Vₘ)
+    function MembranePotential(V0 = -60mV; dynamic = true,
+                               source::PrimitiveSource = Intrinsic, n::Integer = 1,
+                               name::Symbol = :Vₘ)
         if isnothing(V0)
             if n == one(n) 
                 ret = dynamic ? only(@variables $name(t)) :
@@ -38,9 +39,10 @@ struct MembranePotential
     end
 end
 
-ExtrinsicPotential(;V0 = nothing, n = 1, dynamic = true,
-                   source::PrimitiveSource = Extrinsic, name::Symbol = :Vₓ) = 
-MembranePotential(V0; dynamic = dynamic, source = source, n = n, name = name)
+function ExtrinsicPotential(;V0 = nothing, n = 1, dynamic = true,
+                            source::PrimitiveSource = Extrinsic, name::Symbol = :Vₓ)
+    return MembranePotential(V0; dynamic = dynamic, source = source, n = n, name = name)
+end
 
 isvoltage(x) = hasmetadata(value(x), MembranePotential)
 isintrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
@@ -48,14 +50,13 @@ isintrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
 isextrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
                  getmetadata(value(x), PrimitiveSource) == Extrinsic : false
 
-
 # Custom Unitful.jl quantities
 @derived_dimension SpecificConductance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^3 # conductance per unit area
 @derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4 # capacitance per unit area
 @derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
 
 # Ion species
-# TODO: Needs to be user extendable
+# TODO: Make user extendable
 @enum IonSpecies::UInt128 begin
     NonIonic    = 1 << 0
     Sodium      = 1 << 1
@@ -85,17 +86,14 @@ end
 
 const Concentration = IonConcentration
 
-function IonConcentration(
-    ion::IonSpecies,
-    val = nothing;
-    location::PrimitiveLocation = Inside,
-    dynamic::Bool = false,
-    name::Symbol = PERIODIC_SYMBOL[ion]
-)
+function IonConcentration(ion::IonSpecies, val = nothing;
+                          location::PrimitiveLocation = Inside, dynamic::Bool = false,
+                          name::Symbol = PERIODIC_SYMBOL[ion])
 
     sym = Symbol(name,(location == Inside ? "ᵢ" : "ₒ"))
     var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
     var = setmetadata(var,  IonConcentration, IonConcentration(ion, location))
+
     if !isnothing(val)
         if val isa Molarity
             var = setmetadata(var, ConductorUnits, unit(val))
@@ -107,6 +105,7 @@ function IonConcentration(
             return var
         end
     end
+
     return var
 end
 
@@ -118,15 +117,12 @@ struct IonCurrent
     agg::Bool
 end
 
-function IonCurrent(
-    ion::IonSpecies,
-    val = nothing;
-    aggregate::Bool = false,
-    dynamic::Bool = true,
-    name::Symbol = Symbol("I", PERIODIC_SYMBOL[ion])
-)
+function IonCurrent(ion::IonSpecies, val = nothing; aggregate::Bool = false,
+                    dynamic::Bool = true, name::Symbol = Symbol("I", PERIODIC_SYMBOL[ion]))
+
     var = dynamic ? only(@variables $name(t)) : only(@parameters $name)
     var = setmetadata(var, IonCurrent, IonCurrent(ion, aggregate))
+
     if !isnothing(val)
         if val isa Current
             var = setmetadata(var, ConductorUnits, unit(val))
@@ -139,6 +135,7 @@ function IonCurrent(
             return var
         end
     end
+
     return var
 end
 
@@ -155,10 +152,12 @@ end
 
 const Equilibrium = EquilibriumPotential
 
-function EquilibriumPotential(ion::IonSpecies, val; dynamic = false, name::Symbol = PERIODIC_SYMBOL[ion])
+function EquilibriumPotential(ion::IonSpecies, val; dynamic = false,
+                              name::Symbol = PERIODIC_SYMBOL[ion])
     sym = Symbol("E", name)
     var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
     var = setmetadata(var, EquilibriumPotential, EquilibriumPotential(ion))
+
     if !isnothing(val)
         if val isa Voltage
             var = setmetadata(var, ConductorUnits, unit(val))
@@ -170,6 +169,7 @@ function EquilibriumPotential(ion::IonSpecies, val; dynamic = false, name::Symbo
             return var
         end
     end
+
     return var
 end
 
@@ -183,7 +183,7 @@ function getion(x)
     return nothing
 end
 
-# Alternate constructor; this needs to be better...
+#FIXME: this is a kludge
 function Equilibria(equil::Vector)
     out = Num[]
     for x in equil

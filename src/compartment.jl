@@ -29,22 +29,21 @@ height(x::Geometry) = isdefined(x, :height) ? getfield(x, :height) : nothing
 radius(x::Geometry) = getfield(x, :radius)
 radius(::Union{Point,Unitless}) = 0.0
 
-# TODO: Remove unit stripping when we have proper unit checking implemented
 area(x::Sphere) = ustrip(Float64, cm^2, 4*π*radius(x)^2)
-area(x::Cylinder) = ustrip(Float64, cm^2, 2*π*radius(x)*(height(x) + (x.open_ends ? 0µm : radius(x))))
+function area(x::Cylinder)
+    ustrip(Float64, cm^2, 2*π*radius(x)*(height(x) + (x.open_ends ? 0µm : radius(x))))
+end
 area(::Point) = 1.0
 area(x::Unitless) = x.value
 
 struct CompartmentSystem <: AbstractCompartmentSystem
-    iv::Num # usually just t
-    ## Intrinsic properties
+    iv::Num
     voltage::Num # symbol that represents membrane voltage
-    capacitance::Num # specific membrane capacitance
-    geometry::Geometry # compartment geometry metadata (shape, dimensions, etc)
-    ## Dynamics
-    chans::Set{AbstractConductanceSystem} # conductance systems
+    capacitance::Num
+    geometry::Geometry
+    chans::Set{AbstractConductanceSystem}
     channel_reversals::Set{Num}
-    synapses::Set{AbstractConductanceSystem} # synaptic conductance systems
+    synapses::Set{AbstractConductanceSystem}
     synaptic_reversals::Set{Num}
     axial_conductance::Set{Tuple{AbstractConductanceSystem,Num}}
     stimuli::Vector{Equation}
@@ -56,13 +55,15 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     observed::Vector{Equation}
     parent::Ref{AbstractCompartmentSystem}
     function CompartmentSystem(iv, voltage, capacitance, geometry, chans, channel_reversals,
-                               synapses, synaptic_reversals, axial_conductance, stimuli, extensions, defaults,
-                               name, eqs, systems, observed, parent; checks = false)
+                               synapses, synaptic_reversals, axial_conductance, stimuli,
+                               extensions, defaults, name, eqs, systems, observed, parent;
+                               checks = false)
         if checks
         # placeholder
         end
         new(iv, voltage, capacitance, geometry, chans, channel_reversals, synapses,
-            synaptic_reversals, axial_conductance, stimuli, extensions, defaults, name, eqs, systems, observed, parent)
+            synaptic_reversals, axial_conductance, stimuli, extensions, defaults, name, eqs,
+            systems, observed, parent)
     end
 end
 
@@ -86,7 +87,8 @@ function CompartmentSystem(
     observed = Equation[]
     parent = Ref{AbstractCompartmentSystem}()
     return CompartmentSystem(t, Vₘ, cₘ, geometry, Set(channels), Set(reversals), Set(),
-                             Set(), Set(), stimuli, extensions, Dict(), name, eqs, systems, observed, parent)
+                             Set(), Set(), stimuli, extensions, Dict(), name, eqs, systems,
+                             observed, parent)
 end
 
 # AbstractSystem interface extensions
@@ -149,7 +151,6 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
         Erev = only(filter(x -> isequal(getion(x), ion), chan_revs))
         I = IonCurrent(ion, name = Symbol("I", nameof(chan)))
         g = renamespace(chan, get_output(chan))
-        # TODO: checks for whether we need area scaling
         push!(eqs, I ~ g*aₘ*(Vₘ - Erev))
         push!(dvs, I)
         push!(currents, I)
@@ -172,7 +173,6 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
     for (ax, childvm) in get_axial_conductance(comp_sys)
         I = IonCurrent(Leak, name = Symbol("I", nameof(ax)))
         g = renamespace(ax, get_output(ax))
-        # TODO: we should have a metadata check for area-dependent units
         push!(eqs, I ~ g*aₘ*(childvm - Vₘ))
         push!(dvs, I)
         push!(dvs, childvm)
@@ -202,13 +202,14 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
             push!(currents, -I)
         end
     end
-    # voltage equation
+
+    # Voltage equation
     push!(eqs, D(get_output(comp_sys)) ~ -sum(union(currents,syncurrents))/(cₘ*aₘ))
 
     return dvs, ps, eqs, defs, currents, syncurrents
 end
 
-# collect _top level_ eqs including from extension + currents + reversals + Vₘ
+# collect eqs including from extension + currents + reversals + Vₘ
 function get_eqs(x::AbstractCompartmentSystem; rebuild = false)
     empty!(getfield(x, :eqs))
     union!(getfield(x, :eqs), build_toplevel(x)[3])
@@ -221,8 +222,8 @@ end
 
 MTK.has_ps(x::CompartmentSystem) = true
 
+# collect parameters from extension + currents + capacitance + area + reversals
 function get_ps(x::AbstractCompartmentSystem)
-    # collect _top level_ parameters from extension + currents + capacitance + area + reversals
     collect(build_toplevel(x)[2])
 end
 
@@ -230,8 +231,8 @@ function defaults(x::AbstractCompartmentSystem)
     build_toplevel(x)[4]
 end
 
+# collect channels + synapses + input systems
 function get_systems(x::AbstractCompartmentSystem; rebuild = false)
-    # collect channels + synapses + input systems
     empty!(getfield(x, :systems))
     union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses),
            first.(getfield(x, :axial_conductance)))
@@ -251,6 +252,7 @@ function Base.:(==)(sys1::AbstractCompartmentSystem, sys2::AbstractCompartmentSy
 end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
+
     required_states = Set{Num}()
     dvs, ps, eqs, defs, currents, syncurrents = build_toplevel(compartment)
     syss = convert.(ODESystem, collect(get_systems(compartment)))
@@ -265,11 +267,12 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
         end
     end
  
-    int_modified = Set{Num}()
-    foreach(x -> get_variables!(int_modified, x.lhs),  eqs)
+    internally_modified = Set{Num}()
+    foreach(x -> get_variables!(internally_modified, x.lhs),  eqs)
    
-    # TODO: filter required states from stimuli and extensions
-    union!(required_states, setdiff(dvs, int_modified))
+    # TODO: also parse stimuli and extensions for required states
+    union!(required_states, setdiff(dvs, internally_modified))
+
     # Resolve unavailable states
     for s in required_states
         # resolvedby(s) !== compartment && continue
@@ -280,26 +283,7 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
         end
         # ... other switch cases for required state handlers ...
     end
-    return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs, name = nameof(compartment))
+    return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs,
+                     name = nameof(compartment))
 end
-
-#=
-@enum StimulusTrigger ContinuousTrigger EdgeTriggered
-
-abstract type Stimulus end
-
-struct CurrentStimulus
-    waveform
-    offset::Current
-    trigger::StimulusTrigger
-    delay::TimeF64
-    function CurrentStimulus(waveform; offset::Current = 0nA,
-                             trigger::StimulusTrigger = ContinuousTrigger,
-                             delay::Time = 0ms)
-        return new(waveform, offset, trigger, delay)
-    end
-end
-
-struct VoltageStimulus end
-=#
 
