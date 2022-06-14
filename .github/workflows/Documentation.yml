@@ -3,25 +3,19 @@ name: Documentation
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'docs/**'
-      - 'tutorials/**'
-      - 'src/**'
-      - 'Project.toml'
-      - 'Manifest.toml'
+    tags: '*'
   pull_request:
-    branches: [ main ]
     paths:
       - 'docs/**'
       - 'tutorials/**'
       - 'src/**'
-      - 'Project.toml'
-      - 'Manifest.toml'
 
   workflow_dispatch: # Allows running workflow manually from the Actions tab
 
 jobs:
   docs:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Cancel Previous Runs
@@ -36,18 +30,6 @@ jobs:
         uses: julia-actions/setup-julia@latest
         with:
           version: '1.7'
-
-      - name: Cache artifacts
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-artifacts
-        with:
-          path: ~/.julia/artifacts 
-          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ env.cache-name }}-
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-
 
       - name: Install Dependencies
         run: |
