@@ -18,11 +18,11 @@ Conductor.get_eqs(sigmoid, nothing) # internal API call
     # sigmoid(t) ~ 1 / (1 + exp(-Vₘ(t)))
 ```
 
-Alternatively, we can take advantage of customized constructors, which let us describe
-gate dynamics in a more canonical, domain-friendly form. For instance, in the classic
+Alternatively, we can take advantage of customized constructors, which let us describe gate
+dynamics in a more canonical, domain-friendly form. For instance, in the classic
 Hodgkin-Huxley formalism, gates are analogous to the "gating particles" used to describe the
-kinetics of voltage-gated ion channels. Ionic channel kinetics are often described in terms
-of forward (``\alpha``) and reverse (``\beta``) reaction rates:
+kinetics of voltage-gated ion channels. In literature, ionic channel kinetics are often
+described in terms of forward (``\alpha``) and reverse (``\beta``) reaction rates:
 
 ```julia
 
@@ -46,16 +46,22 @@ Conductor.get_eqs(h, nothing)
 ```
 ...which is the equivalent to:
 ```math
-\frac{dh}{dt} = \alpha_h (1-n)-\beta_h n
+\frac{dh}{dt} = \alpha_h (1-h)-\beta_h h
 ```
 
-Customized gates also enable dynamic equation writing. In some cases, the dynamics of a gate
-may depend on the structure or properties of the parent `CompartmentSystem`.
+## Advanced Gates & Customization
 
-```math
-S\prime={\displaystyle \sum_{j}H(V_{s,j}-10)-S/150} 
-```
+Conductor.jl provides a handful of ready-made `Gate` types for convenience. But gates may
+also be user-customized. The following must be implemented for each gate:
 
-Multiple gates can be combined as a product that represents the state-dependent activation
-of a conductance.
+* Create a trait label: `struct MyNewGate <: GateVarForm end`
+* Define the following methods:
+    - `Conductor.Gate(::Type{MyNewGate}, ...)`
+        * This should `return` with a call to `Gate{MyNewGate}(output::Num; kwargs...)`
+    - `Conductor.output(gate::Gate{MyNewGate})::Num`
+    - `ModelingToolkit.get_eqs(gate::Gate{MyNewGate}, compartment::AbstractCompartmentSystem)::Vector{Equation}` 
+
+!!! note
+   Keyword arguments passed to `Gate{<:GateVarType}(output::Num; kwargs...)` are stored as a
+   dictionary and can be accessed via `getproperty` or dot syntax (e.g. `mygate.x`)
 
