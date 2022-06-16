@@ -49,13 +49,28 @@ struct HeavisideSum <: GateVarForm end
 
 const SimpleGate = SteadyState
 
-""" Test for Gate """
 struct Gate{T<:GateVarForm} <: AbstractGatingVariable
-    "something about output field"
     output::Num
     props::Dict{Symbol,Any}
 end
 
+"""
+    Gate{T<:GateVarForm}(output::Num; kwargs...)
+
+Low-level contructor for `Gate`.
+
+A gate has a single symbolic `output` and stores properties (passed as a variable length
+list of keyword arguments). Gate properties are accessible via `get` and `getproperty`.
+
+# Example
+```julia-repl
+julia> @variables t X(t)
+julia> g = Gate{MyGateType}(X, prop1 = "foo", prop2 = 62)
+Gate{MyGateType}(X(t), Dict{Symbol, Any}(:prop2 => 62, :prop1 => "foo"))
+julia> (g.prop1, g.prop2)
+("foo", 62)
+```
+"""
 function Gate{T}(output::Num; kwargs...) where T <: GateVarForm
     return Gate{T}(output, kwargs)
 end
@@ -70,8 +85,8 @@ Base.exponent(x::AbstractGatingVariable) = get(x, :p, 1)
 """
     Gate(::Type{AlphaBeta}, alpha, beta; name = Base.gensym("GateVar"))
 
-A gate that accepts expressions for forward (α) and reverse (β) reaction rates as
-descriptors for its kinetics.
+Accepts expressions for forward (α) and reverse (β) reaction rates as descriptors for its
+kinetics.
 
 See also: [`get_eqs`](@ref).
 """
@@ -85,8 +100,8 @@ end
 """
     Gate(::Type{SteadyStateTau}, ss, tau; name = Base.gensym("GateVar"))
 
-A gate that accepts expressions for its steady-state activation, x∞(Vₘ), and the time
-constant, τₓ(Vₘ), as descriptors for its kinetics.
+Accepts expressions for its steady-state activation, x∞(Vₘ), and the time constant, τₓ(Vₘ),
+as descriptors for its kinetics.
 
 See also: [`get_eqs`](@ref).
 """
@@ -104,19 +119,19 @@ function Base.convert(::Type{Gate{SteadyState}},
 end
 
 """
-    Gate(::Type{SimpleGate}, ss; name = Base.gensym("GateVar"))
+    Gate(::Type{SimpleGate}, rhs; name = Base.gensym("GateVar"))
 
-
+Accepts any symbolic expression as an explicit definition of the gate dynamics.
 """
-function Gate(::Type{SteadyState}, ss; name = Base.gensym("GateVar"), kwargs...)
-    out = only(@variables $name(t) = ss)
-    return Gate{SteadyState}(out; ss = ss, kwargs...)
+function Gate(::Type{SteadyState}, rhs; name = Base.gensym("GateVar"), kwargs...)
+    out = only(@variables $name(t) = rhs)
+    return Gate{SteadyState}(out; ss = rhs, kwargs...)
 end
 
 """
     Gate(::Type{ConstantValue}, val; name = Base.gensym("GateVar"))
 
-
+A static parameter gate with initial value, `val`.
 """
 function Gate(::Type{ConstantValue}, val; name = Base.gensym("GateVar"), kwargs...)
     out = only(@parameters $name = val)
@@ -124,7 +139,12 @@ function Gate(::Type{ConstantValue}, val; name = Base.gensym("GateVar"), kwargs.
 end
 
 """
+    Gate(::Type{HeavisideSum}, threshold = 0mV, saturation = 125; name = Base.gensym("GateVar")) 
 
+Synaptically-activated dynamics. Sums the step-function values for presynaptic (extrinsic)
+voltages.
+
+See also: [`get_eqs`](@ref).
 """
 function Gate(::Type{HeavisideSum}, threshold = 0mV, saturation = 125;
               name = Base.gensym("GateVar"), kwargs...) 
@@ -136,9 +156,13 @@ end
 """
     get_eqs(var::Gate{HeavisideSum}, chan)
 
+Returns an equation of the form:
 
+``
+\\frac{dx}{dt}={\\displaystyle \\sum_{j}Heaviside(V_{j}-threshold)-x/saturation} 
+``
 """
-function get_eqs(var::Gate{HeavisideSum}, chan)
+function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     thold, sat = var.threshold, var.saturation
     thold_val = ustrip(Float64, mV, thold)
     out = output(var)
@@ -155,31 +179,30 @@ end
 Generate the voltage- and time-dependent differential equation modeling the output of a gate
 that was specified with [α(Vₘ),β(Vₘ)] or [x∞(Vₘ),τₓ(Vₘ)].
 
-For 
+For `Gate{SteadyStateTau}`, the model form is:
+
+``
+\\frac{dx}{dt}=\\frac{1}{\\tau_{x}(x_{\\infty}-x)}
+``
+
+For `Gate{AlphaBeta}`, the model form is:
+
+``
+\frac{dx}{dt} = \alpha_{x}(1-x)-\beta_{x}x
+``
 """
-function get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}}, chan)
+function ModelingToolkit.get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}}, chan)
     x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
     return [D(x) ~ inv(τₓ)*(x∞ - x)]
 end
 
-"""
-    get_eqs(var::Gate{SimpleGate}, chan)
-
-
-"""
-get_eqs(var::Gate{SteadyState}, chan) = [output(var) ~ steadystate(var)]
-
-"""
-    get_eqs(var::Gate{ConstantValue}, chan)
-
-
-"""
-get_eqs(var::Gate{ConstantValue}, chan) = Equation[]
+ModelingToolkit.get_eqs(var::Gate{SteadyState}, chan) = [output(var) ~ steadystate(var)]
+ModelingToolkit.get_eqs(var::Gate{ConstantValue}, chan) = Equation[]
 
 ############################################################################################
 # Macros (needs updating)
 ############################################################################################
-
+#=
 macro gate(ex::Expr, p::Expr = :(p=1))
     name = Base.gensym("GateVar")
     _make_gate_variable(name, ex, p)
@@ -216,4 +239,4 @@ function _make_gate_variable(name::Symbol, ex::Expr, p::Expr = :(p=1))
     push!(ex.args, gate_expr)
     ex
 end
-
+=#
