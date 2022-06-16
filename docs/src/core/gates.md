@@ -1,5 +1,5 @@
 # Gates
-
+## Overview
 Gates are the most basic building block for describing dynamics in Conductor.jl. A gate
 integrates zero or more inputs into a single unitless weighting value. If desired, we can
 explicitly define the symbolic expression that models the output of a gate:
@@ -25,7 +25,6 @@ kinetics of voltage-gated ion channels. In literature, ionic channel kinetics ar
 described in terms of forward (``\alpha``) and reverse (``\beta``) reaction rates:
 
 ```julia
-
 # Sodium channel inactivation kinetics, defined by forward and reverse rxn rates
 @named h = Gate(
     AlphaBeta,
@@ -63,5 +62,11 @@ also be user-customized. The following must be implemented for each gate:
 
 !!! note
    Keyword arguments passed to `Gate{<:GateVarType}(output::Num; kwargs...)` are stored as a
-   dictionary and can be accessed via `getproperty` or dot syntax (e.g. `mygate.x`)
+   dictionary and can be accessed via `get`, `getproperty` or (equivalently) dot syntax 
+   (e.g. `mygate.x`)
 
+```@docs
+GateVarForm
+Gate
+get_eqs
+```

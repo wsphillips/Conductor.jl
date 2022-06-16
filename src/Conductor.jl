@@ -1,5 +1,5 @@
 module Conductor
-
+using DocStringExtensions
 using ModelingToolkit,
       Unitful,
       Unitful.DefaultSymbols,

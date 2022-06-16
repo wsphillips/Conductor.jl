@@ -36,23 +36,42 @@ end
 area(::Point) = 1.0
 area(x::Unitless) = x.value
 
+"""
+$(TYPEDEF)
+
+A neuronal compartment.
+
+$(TYPEDFIELDS)
+"""
 struct CompartmentSystem <: AbstractCompartmentSystem
+    "doc me"
     iv::Num
+    "doc me"
     voltage::Num # symbol that represents membrane voltage
+    "doc me"
     capacitance::Num
+    "doc me"
     geometry::Geometry
+    "doc me"
     chans::Set{AbstractConductanceSystem}
+    "doc me"
     channel_reversals::Set{Num}
+    "doc me"
     synapses::Set{AbstractConductanceSystem}
+    "doc me"
     synaptic_reversals::Set{Num}
+    "doc me"
     axial_conductance::Set{Tuple{AbstractConductanceSystem,Num}}
+    "doc me"
     stimuli::Vector{Equation}
+    "doc me"
     extensions::Vector{ODESystem}
     defaults::Dict
     name::Symbol
     eqs::Vector{Equation}
     systems::Vector{AbstractTimeDependentSystem}
     observed::Vector{Equation}
+    "doc me"
     parent::Ref{AbstractCompartmentSystem}
     function CompartmentSystem(iv, voltage, capacitance, geometry, chans, channel_reversals,
                                synapses, synaptic_reversals, axial_conductance, stimuli,
@@ -69,6 +88,12 @@ end
 
 const Compartment = CompartmentSystem
 
+"""
+$(TYPEDSIGNATURES)
+
+# Arguments
+-
+"""
 function CompartmentSystem(
     Vₘ::Num,
     channels,
@@ -210,29 +235,29 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
 end
 
 # collect eqs including from extension + currents + reversals + Vₘ
-function get_eqs(x::AbstractCompartmentSystem; rebuild = false)
+function MTK.get_eqs(x::AbstractCompartmentSystem; rebuild = false)
     empty!(getfield(x, :eqs))
     union!(getfield(x, :eqs), build_toplevel(x)[3])
     return getfield(x, :eqs)
 end
 
-function get_states(x::AbstractCompartmentSystem)
+function MTK.get_states(x::AbstractCompartmentSystem)
     collect(build_toplevel(x)[1])
 end
 
 MTK.has_ps(x::CompartmentSystem) = true
 
 # collect parameters from extension + currents + capacitance + area + reversals
-function get_ps(x::AbstractCompartmentSystem)
+function MTK.get_ps(x::AbstractCompartmentSystem)
     collect(build_toplevel(x)[2])
 end
 
-function defaults(x::AbstractCompartmentSystem)
+function MTK.defaults(x::AbstractCompartmentSystem)
     build_toplevel(x)[4]
 end
 
 # collect channels + synapses + input systems
-function get_systems(x::AbstractCompartmentSystem; rebuild = false)
+function MTK.get_systems(x::AbstractCompartmentSystem; rebuild = false)
     empty!(getfield(x, :systems))
     union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses),
            first.(getfield(x, :axial_conductance)))

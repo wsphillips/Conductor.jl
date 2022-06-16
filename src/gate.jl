@@ -25,6 +25,8 @@ function Base.get(collection::AbstractGatingVariable, key::Symbol, default)
 end
 
 """
+$(TYPEDEF)
+
 Abstract supertype for extending the behavior of `Gate`.
 
 Stub subtypes of `GateVarForm` are used as traits when writing new methods that call `Gate`
@@ -55,7 +57,7 @@ struct Gate{T<:GateVarForm} <: AbstractGatingVariable
 end
 
 """
-    Gate{T<:GateVarForm}(output::Num; kwargs...)
+$(TYPEDEF)
 
 Low-level contructor for `Gate`.
 
@@ -83,7 +85,7 @@ reverse_rate(x::Gate{<:Union{AlphaBeta,SteadyStateTau}}) = x.beta
 Base.exponent(x::AbstractGatingVariable) = get(x, :p, 1)
 
 """
-    Gate(::Type{AlphaBeta}, alpha, beta; name = Base.gensym("GateVar"))
+$(TYPEDSIGNATURES)
 
 Accepts expressions for forward (α) and reverse (β) reaction rates as descriptors for its
 kinetics.
@@ -98,7 +100,7 @@ function Gate(::Type{AlphaBeta}, alpha, beta; name = Base.gensym("GateVar"), kwa
 end
 
 """
-    Gate(::Type{SteadyStateTau}, ss, tau; name = Base.gensym("GateVar"))
+$(TYPEDSIGNATURES)
 
 Accepts expressions for its steady-state activation, x∞(Vₘ), and the time constant, τₓ(Vₘ),
 as descriptors for its kinetics.
@@ -119,7 +121,7 @@ function Base.convert(::Type{Gate{SteadyState}},
 end
 
 """
-    Gate(::Type{SimpleGate}, rhs; name = Base.gensym("GateVar"))
+$(TYPEDSIGNATURES)
 
 Accepts any symbolic expression as an explicit definition of the gate dynamics.
 """
@@ -129,7 +131,7 @@ function Gate(::Type{SteadyState}, rhs; name = Base.gensym("GateVar"), kwargs...
 end
 
 """
-    Gate(::Type{ConstantValue}, val; name = Base.gensym("GateVar"))
+$(TYPEDSIGNATURES)
 
 A static parameter gate with initial value, `val`.
 """
@@ -139,7 +141,7 @@ function Gate(::Type{ConstantValue}, val; name = Base.gensym("GateVar"), kwargs.
 end
 
 """
-    Gate(::Type{HeavisideSum}, threshold = 0mV, saturation = 125; name = Base.gensym("GateVar")) 
+    Gate(::Type{HeavisideSum}, threshold = 0mV, saturation = 125; name = Base.gensym("GateVar")) -> Gate{HeavisideSum}
 
 Synaptically-activated dynamics. Sums the step-function values for presynaptic (extrinsic)
 voltages.
