@@ -1,7 +1,7 @@
 using Documenter, Conductor
 
 makedocs(sitename="Conductor.jl",
-         doctest = false,
+         doctest = true,
          modules = [Conductor],
          pages = ["Home" => "index.md",
                   "Basics" => "basics.md",
