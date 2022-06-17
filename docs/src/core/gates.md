@@ -49,7 +49,7 @@ t))) + 0.07exp(-3.25 - 0.05Vâ‚˜(t))), :tau => 1 / (1.0 / (1.0 + exp(-3.5 - 0.1Vâ
 ```
 
 Now when we ask for the dynamics of a `Gate{AlphaBeta}`, we get the differential form:
-```jldoctext gate_example
+```jldoctest gate_example
 Conductor.get_eqs(h, nothing)
 
 # output

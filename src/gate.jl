@@ -179,7 +179,7 @@ end
     get_eqs(var::Gate{<:Union{AlphaBeta, SteadySateTau}}, chan)
 
 Generate the voltage- and time-dependent differential equation modeling the output of a gate
-that was specified with [α(Vₘ),β(Vₘ)] or [x∞(Vₘ),τₓ(Vₘ)].
+that was specified with [α(Vₘ), β(Vₘ)] or [x∞(Vₘ), τₓ(Vₘ)].
 
 For `Gate{SteadyStateTau}`, the model form is:
 
@@ -190,7 +190,7 @@ For `Gate{SteadyStateTau}`, the model form is:
 For `Gate{AlphaBeta}`, the model form is:
 
 ``
-\frac{dx}{dt} = \alpha_{x}(1-x)-\beta_{x}x
+\\frac{dx}{dt} = \\alpha_{x}(1-x)-\\beta_{x}x
 ``
 """
 function ModelingToolkit.get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}}, chan)

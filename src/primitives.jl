@@ -22,7 +22,7 @@ julia> Conductor.ℱ
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 
 """
-The independent variable for time.
+The independent variable for time, ``t``.
 """
 const t = let name = :t; only(@variables $name) end
 
@@ -31,8 +31,7 @@ Differential with respect to time, ``t``.
 """
 const D = Differential(t)
 
-# Ion species
-# TODO: Make user extendable
+# TODO: Make IonSpecies user extendable instead of a fixed set of enums
 @enum IonSpecies::UInt128 begin
     NonIonic      = 1 << 0
     Sodium        = 1 << 1
@@ -47,6 +46,18 @@ const D = Differential(t)
     NMDA          = 1 << 10
 end
 
+ion_doc = """
+Ion species to annotate `ConductanceSystem`, `IonCurrent`, `IonConcentration`, etc. May be
+one of:
+
+"""
+
+for x in instances(IonSpecies)
+    global ion_doc *= "- "*string(x)*'\n'
+end
+
+@doc ion_doc IonSpecies
+
 const Ca = Calcium
 const Na = Sodium
 const K = Potassium
@@ -54,7 +65,6 @@ const Cl = Chloride
 const Mixed = const Leak = NonIonic
 
 const PERIODIC_SYMBOL = IdDict(Na => :Na, K  => :K, Cl => :Cl, Ca => :Ca, Leak => :l)
-
 
 # Properties
 @enum PrimitiveSource Intrinsic Extrinsic
