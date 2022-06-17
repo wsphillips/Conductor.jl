@@ -30,7 +30,7 @@ Hodgkin-Huxley formalism, gates are analogous to the "gating particles" used to 
 kinetics of voltage-gated ion channels. In the scientific literature, ionic channel kinetics
 are often described in terms of forward (``\alpha``) and reverse (``\beta``) reaction rates:
 
-```jldoctext gate_example
+```jldoctest gate_example
 # Sodium channel inactivation kinetics, defined by forward and reverse rxn rates
 @named h = Gate(
     AlphaBeta,
@@ -41,10 +41,7 @@ are often described in terms of forward (``\alpha``) and reverse (``\beta``) rea
 )
 
 # output
-Gate{AlphaBeta}(h(t), Dict{Symbol, Any}(:alpha => 0.07exp(-3.25 - 0.05Vₘ(t)), :beta => 1.0 / (1.
-0 + exp(-3.5 - 0.1Vₘ(t))), :ss => (0.07exp(-3.25 - 0.05Vₘ(t))) / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(
-t))) + 0.07exp(-3.25 - 0.05Vₘ(t))), :tau => 1 / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3
-.25 - 0.05Vₘ(t)))))
+Gate{AlphaBeta}(h(t), Dict{Symbol, Any}(:alpha => 0.07exp(-3.25 - 0.05Vₘ(t)), :beta => 1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))), :ss => (0.07exp(-3.25 - 0.05Vₘ(t))) / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t))), :tau => 1 / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t)))))
 
 ```
 
@@ -54,9 +51,7 @@ Conductor.get_eqs(h, nothing)
 
 # output
 1-element Vector{Symbolics.Equation}:
- Differential(t)(h(t)) ~ ((0.07exp(-3.25 - 0.05Vₘ(t))) / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0
-.07exp(-3.25 - 0.05Vₘ(t))) - h(t))*(1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(
-t)))
+ Differential(t)(h(t)) ~ ((0.07exp(-3.25 - 0.05Vₘ(t))) / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t))) - h(t))*(1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t)))
 ```
 ...which is the equivalent to:
 ```math
