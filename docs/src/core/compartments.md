@@ -1,1 +1,5 @@
 # Compartments
+
+```@docs
+CompartmentSystem
+```

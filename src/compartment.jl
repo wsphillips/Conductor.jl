@@ -44,7 +44,7 @@ A neuronal compartment.
 $(TYPEDFIELDS)
 """
 struct CompartmentSystem <: AbstractCompartmentSystem
-    "Independent variabe. Defaults to time (``t``)."
+    "Independent variabe. Defaults to time, ``t``."
     iv::Num
     "Voltage potential."
     voltage::Num
