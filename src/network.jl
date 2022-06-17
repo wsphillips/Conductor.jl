@@ -24,7 +24,7 @@ $(TYPEDSIGNATURES)
 
 Basic constructor for a directed `Synapse` (edge) between two compartments.
 """
-function Synapse(pre_to_post::Pair, conductance, reveversal)
+function Synapse(pre_to_post::Pair, conductance, reversal)
     return Synapse(pre_to_post.first, pre_to_post.second, conductance, reversal) 
 end
 
