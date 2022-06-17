@@ -69,7 +69,9 @@ If `V0 == nothing`, the default value of the resulting variable will be left una
 
 # Arguments
 - `dynamic::Bool = true`: when false, the voltage will be a static parameter.
-- `source::PrimitiveSource = Intrinsic`: the expected origin of a voltage state. `Intrinsic` sources are states from the parent compartment. `Extrinsic` sources come from other compartments (e.g. presynaptic compartments).
+- `source::PrimitiveSource = Intrinsic`: the expected origin of a voltage state. 
+  `Intrinsic` sources are states from the parent compartment. `Extrinsic` sources come from 
+  other compartments (e.g. presynaptic compartments).
 - `n::Integer = 1`: when `n > 1`, the voltage will be a symbolic array of length `n`.
 - `name::Symbol = :Vₘ`: the symbol to use for the symbolic variable
 """
@@ -128,7 +130,6 @@ function ExtrinsicPotential(; n = 1, name::Symbol = :Vₓ)
     return MembranePotential(nothing; dynamic = true, source = Extrinsic, n = n, name = name)
 end
 
-
 struct IonConcentration
     ion::IonSpecies
     loc::PrimitiveLocation
@@ -142,9 +143,12 @@ const Concentration = IonConcentration
 An intra/extracellular concentration of ions.
 
 # Arguments
-- `location::PrimitiveLocation = Inside`: location (`Inside` or `Outside`) w.r.t. the parent compartment (intracellular or extracellular).
+- `location::PrimitiveLocation = Inside`: location (`Inside` or `Outside`) w.r.t. the parent
+  compartment (intracellular or extracellular).
 - `dynamic::Bool = false`: when false, the concentration will be a static parameter
-- `name::Symbol = Conductor.PERIODIC_SYMBOL[ion]`: the symbol to use for the symbolic variable. By default, a lookup table is used to find the ion's symbol on the periodic table of elements.
+- `name::Symbol = Conductor.PERIODIC_SYMBOL[ion]`: the symbol to use for the symbolic 
+  variable. By default, a lookup table is used to find the ion's symbol on the periodic 
+  table of elements.
 """
 function IonConcentration(ion::IonSpecies, val = nothing;
                           location::PrimitiveLocation = Inside, dynamic::Bool = false,
@@ -184,14 +188,14 @@ end
 An ionic membrane current.
 
 # Arguments
-- `aggregate::Bool = false`: aggregate currents are the sum of all conductances (with
-matched ion species) flowing into the parent compartment. For example, an aggregate
-`IonCurrent` for Calcium will be the sum of all other Calcium-permeable currents.
-- `dynamic::Bool = true`: when `dynamic == false` the `IonCurrent` will be a static
-parameter value
-- `name::Symbol = Symbol("I", Conductor.PERIODIC_SYMBOL[ion])`: the symbol to use for the
-symbolic variable. By default, a lookup table is used to find the ion's symbol on the
-periodic table of elements.
+- `aggregate::Bool = false`: aggregate currents are the sum of all conductances (with 
+  matched ion species) flowing into the parent compartment. For example, an aggregate 
+  `IonCurrent` for Calcium will be the sum of all other Calcium-permeable currents.
+- `dynamic::Bool = true`: when `dynamic == false` the `IonCurrent` will be a static 
+  parameter value
+- `name::Symbol = Symbol("I", Conductor.PERIODIC_SYMBOL[ion])`: the symbol to use for the 
+  symbolic variable. By default, a lookup table is used to find the ion's symbol on the 
+  periodic table of elements.
 """
 function IonCurrent(ion::IonSpecies, val = nothing; aggregate::Bool = false,
                     dynamic::Bool = true, name::Symbol = Symbol("I", PERIODIC_SYMBOL[ion]))
@@ -236,10 +240,10 @@ An equilibrium (a.k.a. reversal) potential.
 
 # Arguments
 - `dynamic::Bool = false`: a dynamic `EquilbriumPotential` is assumed to vary with time
-(e.g. derived from the Nernst equation)
-- `name::Symbol = Symbol("I", Conductor.PERIODIC_SYMBOL[ion])`: the symbol to use for the
-symbolic variable. By default, a lookup table is used to find the ion's symbol on the
-periodic table of elements.
+  (e.g. derived from the Nernst equation)
+- `name::Symbol = Symbol("I", Conductor.PERIODIC_SYMBOL[ion])`: the symbol to use for the 
+  symbolic variable. By default, a lookup table is used to find the ion's symbol on the 
+  periodic table of elements.
 """
 function EquilibriumPotential(ion::IonSpecies, val; dynamic::Bool = false,
                               name::Symbol = PERIODIC_SYMBOL[ion])

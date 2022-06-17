@@ -44,34 +44,37 @@ A neuronal compartment.
 $(TYPEDFIELDS)
 """
 struct CompartmentSystem <: AbstractCompartmentSystem
-    "doc me"
+    "Independent variabe. Defaults to time (``t``)."
     iv::Num
-    "doc me"
-    voltage::Num # symbol that represents membrane voltage
-    "doc me"
+    "Voltage potential."
+    voltage::Num
+    "Membrane capacitance."
     capacitance::Num
-    "doc me"
+    "Morphological geometry of the compartment."
     geometry::Geometry
-    "doc me"
+    "Ionic conductances."
     chans::Set{AbstractConductanceSystem}
-    "doc me"
+    "Equilibrium potentials belonging to ionic membrane conductances."
     channel_reversals::Set{Num}
-    "doc me"
+    "Synaptic conductances."
     synapses::Set{AbstractConductanceSystem}
-    "doc me"
+    "Equilibrium potentials belonging to synaptic conductances."
     synaptic_reversals::Set{Num}
-    "doc me"
+    "Axial (intercompartmental) conductances."
     axial_conductance::Set{Tuple{AbstractConductanceSystem,Num}}
-    "doc me"
+    "Experimental stimuli (e.g. current injection)."
     stimuli::Vector{Equation}
-    "doc me"
+    """
+    Additional systems to extend dynamics. Extensions are composed with the parent system
+    during conversion to `ODESystem`.
+    """
     extensions::Vector{ODESystem}
     defaults::Dict
     name::Symbol
     eqs::Vector{Equation}
     systems::Vector{AbstractTimeDependentSystem}
     observed::Vector{Equation}
-    "doc me"
+    "Refers to the parent system when the compartment is a subcompartment in a `MultiCompartmentSystem`."
     parent::Ref{AbstractCompartmentSystem}
     function CompartmentSystem(iv, voltage, capacitance, geometry, chans, channel_reversals,
                                synapses, synaptic_reversals, axial_conductance, stimuli,
@@ -89,10 +92,16 @@ end
 const Compartment = CompartmentSystem
 
 """
-$(TYPEDSIGNATURES)
+    CompartmentSystem(Vₘ, channels, reversals; <keyword arguments>)
 
 # Arguments
--
+- `capacitance::SpecificCapacitance`: The capacitance of the compartment given in Farads 
+  per unit area (e.g. µF/cm^2).
+- `geometry::Geometry`: Morphological geometry of the compartment.
+- `extensions::Vector{ODESystem}`: Additional systems to extend dynamics. Extensions are
+  composed with the parent system during conversion to `ODESystem`.
+- `stimuli::Vector{Equation}`: 
+- `name::Symbol`: Name of the system.
 """
 function CompartmentSystem(
     Vₘ::Num,
