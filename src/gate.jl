@@ -34,7 +34,7 @@ objects.
 
 # Example
 ```julia
-struct MyNewGate <: GateVarForm end
+struct MyNewGate <: Conductor.GateVarForm end
 
 function Conductor.get_eqs(g::Gate{MyNewGate}, comp::CompartmentSystem)
     ...

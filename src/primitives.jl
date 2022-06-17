@@ -27,7 +27,7 @@ The independent variable for time.
 const t = let name = :t; only(@variables $name) end
 
 """
-Differential with respect to time (t).
+Differential with respect to time, ``t``.
 """
 const D = Differential(t)
 
@@ -69,9 +69,9 @@ If `V0 == nothing`, the default value of the resulting variable will be left una
 
 # Arguments
 - `dynamic::Bool = true`: when false, the voltage will be a static parameter.
-- `source::PrimitiveSource = Intrinsic`: the expected origin of a voltage state. 
-  `Intrinsic` sources are states from the parent compartment. `Extrinsic` sources come from 
-  other compartments (e.g. presynaptic compartments).
+- `source::PrimitiveSource = Intrinsic`: the expected origin of a voltage state. `Intrinsic`
+  sources are states from the parent compartment. `Extrinsic` sources come from other
+  compartments (e.g. presynaptic compartments).
 - `n::Integer = 1`: when `n > 1`, the voltage will be a symbolic array of length `n`.
 - `name::Symbol = :Vₘ`: the symbol to use for the symbolic variable
 """
@@ -146,8 +146,8 @@ An intra/extracellular concentration of ions.
 - `location::PrimitiveLocation = Inside`: location (`Inside` or `Outside`) w.r.t. the parent
   compartment (intracellular or extracellular).
 - `dynamic::Bool = false`: when false, the concentration will be a static parameter
-- `name::Symbol = Conductor.PERIODIC_SYMBOL[ion]`: the symbol to use for the symbolic 
-  variable. By default, a lookup table is used to find the ion's symbol on the periodic 
+- `name::Symbol = Conductor.PERIODIC_SYMBOL[ion]`: the symbol to use for the symbolic
+  variable. By default, a lookup table is used to find the ion's symbol on the periodic
   table of elements.
 """
 function IonConcentration(ion::IonSpecies, val = nothing;

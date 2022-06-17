@@ -15,11 +15,11 @@ A model of conductance.
 $(FIELDS)
 """
 struct ConductanceSystem <: AbstractConductanceSystem
-    "Independent variabe. Defaults to time (``t``)."
+    "Independent variabe. Defaults to time, ``t``."
     iv::Num
-    "Conductance (g) of the system."
+    "Conductance, ``g``, of the system."
     output::Num
-    "Maximum conductance ̅g"
+    "Maximum conductance, ``\\overline{g}``"
     gbar::Num
     "Permeability of the conductance." 
     ion::IonSpecies
@@ -28,7 +28,10 @@ struct ConductanceSystem <: AbstractConductanceSystem
     gate_vars::Vector{AbstractGatingVariable}
     "Extrinsic sources of state (e.g. presynaptic compartments)"
     subscriptions::Set{AbstractCompartmentSystem}
-    "Additional systems to extend dynamics. Extensions are composed with the parent system during conversion to `ODESystem`"
+    """
+    Additional systems to extend dynamics. Extensions are composed with the parent system
+    during conversion to `ODESystem`
+    """
     extensions::Vector{ODESystem}
     defaults::Dict
     name::Symbol
@@ -56,9 +59,9 @@ permeability(x::ConductanceSystem) = getfield(x, :ion)
 Main constructor for `ConductanceSystem`.
 
 # Arguments
-- `gbar::Num`: Maximum conductance, ̅g
-- `aggregate::Bool`: whether the Conductance model should aggregate extrinsic sources of
-  state instead of integrating them independently. Defaults to `false`.
+- `gbar::Num`: Maximum conductance, ``\\overline{g}``.
+- `aggregate::Bool`: determines whether the Conductance model should aggregate extrinsic
+  sources of state instead of integrating them independently. Defaults to `false`.
 - `defaults::Dict`: Default values for states and parameters.
 - `name::Symbol`: Name of the system.
 """
@@ -172,9 +175,9 @@ end
 An ionic membrane conductance.
 
 # Arguments
-- `max_g`: Maximum conductance, ̅g
+- `max_g`: Default value for maximum conductance, ``\\overline{g}``.
 - `extensions::Vector{ODESystem}`: Additional systems to extend dynamics. Extensions are
-  composed with the parent system during conversion to `ODESystem`
+  composed with the parent system during conversion to `ODESystem`.
 - `defaults::Dict`: Default values for states and parameters.
 - `name::Symbol`: Name of the system.
 """
@@ -212,9 +215,9 @@ end
 A non-specific conductance between morphologically contiguous compartments.
 
 # Arguments
-- `max_g`: Maximum conductance, ̅g
+- `max_g`: Maximum conductance, ``\\overline{g}``.
 - `extensions::Vector{ODESystem}`: Additional systems to extend dynamics. Extensions are
-  composed with the parent system during conversion to `ODESystem`
+  composed with the parent system during conversion to `ODESystem`.
 - `defaults::Dict`: Default values for states and parameters.
 - `name::Symbol`: Name of the system.
 """
@@ -232,9 +235,9 @@ end
 A synaptically activated conductance. Depends on extrinsic (i.e. presynaptic) state.
 
 # Arguments
-- `max_g`: Maximum conductance, ̅g
+- `max_g`: Maximum conductance, ``\\overline{g}``.
 - `extensions::Vector{ODESystem}`: Additional systems to extend dynamics. Extensions are
-  composed with the parent system during conversion to `ODESystem`
+  composed with the parent system during conversion to `ODESystem`.
 - `aggregate::Bool`: whether the Conductance model should aggregate extrinsic sources of
   state instead of integrating them independently. Defaults to `false`.
 - `defaults::Dict`: Default values for states and parameters.

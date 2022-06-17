@@ -56,13 +56,11 @@ import SymbolicUtils: FnType
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
-export Gate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue,
-       IonChannel, PassiveChannel, SynapticChannel, Synapse, Junction,
-       AxialConductance
+export Gate, SimpleGate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue, IonChannel,
+       PassiveChannel, SynapticChannel, Synapse, Junction, AxialConductance
 
-export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential,
-       IonCurrent, IonConcentration, Concentration, ExtrinsicPotential,
-       Instrinsic, Extrinsic
+export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent,
+       IonConcentration, Concentration, ExtrinsicPotential, Instrinsic, Extrinsic
 
 export AuxConversion, D
 export Simulation
@@ -72,13 +70,11 @@ export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion, NonIonic
 
 export t
 
-export CompartmentSystem, Compartment,
-       ConductanceSystem, Conductance, 
-       NeuronalNetworkSystem, NeuronalNetwork,
-       MultiCompartmentSystem, MultiCompartment
+export CompartmentSystem, Compartment, ConductanceSystem, Conductance,
+       NeuronalNetworkSystem, NeuronalNetwork, MultiCompartmentSystem, MultiCompartment
 
-export output, get_output, timeconstant, steadystate, forward_rate,
-       reverse_rate, hasexponent, exponent
+export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate,
+       hasexponent, exponent
 
 export Sphere, Cylinder, Point, Unitless, area, radius, height
 
