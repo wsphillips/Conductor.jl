@@ -1,11 +1,11 @@
-# Conductances
+# ConductanceSystem
 
 A `ConductanceSystem` describes the state- and time-dependence of a conductance (i.e.
 classically _g_, the inverse of resistance; typically measured in Siemens). It can be used
 to model the conductance associated with ionic membrane currents, synaptic currents, and
 axial currents that flow between connected neuronal compartments. By default, a `Conductance
 System` is composed of zero or more gates and a parameter for the maximum conductance value
-(``\overline{g}``). The output of a `ConductanceSystem` is equal to the The product of each
+(``\overline{g}``). The output of a `ConductanceSystem` is equal to the the product of each
 individual gate and ``\overline{g}``.
 
 To model sodium conductance in a Hodgkin-Huxley model:
@@ -35,3 +35,9 @@ equations(NaV) # includes: g(t) ~ gbar*(m(t)^3)*h(t)
 g(t) = \overline{g}m^3h
 ```
 
+```@docs
+ConductanceSystem
+IonChannel
+AxialConductance
+SynapticChannel
+```
