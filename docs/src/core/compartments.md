@@ -2,4 +2,6 @@
 
 ```@docs
 CompartmentSystem
+Junction
+MultiCompartmentSystem
 ```

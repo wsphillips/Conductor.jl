@@ -1,20 +1,51 @@
 abstract type AbstractJunction end
 
+
+"""
+$(TYPEDEF)
+
+A connection (edge) between two morphologically contiguous compartments.
+
+For example, a `Junction` between a somatic `CompartmentSystem` and a dendritic `CompartmentSystem`.
+"""
 struct Junction <: AbstractJunction
-    parent::CompartmentSystem
-    child::CompartmentSystem
+    trunk::CompartmentSystem
+    branch::CompartmentSystem
     conductance::ConductanceSystem
     symmetric::Bool
 end
 
-Junction(x::Pair, cond; symmetric = true) = Junction(x.first, x.second, cond, symmetric)
+"""
+    $(TYPEDSIGNATURES)
+
+Basic constructor for a `Junction`. 
+
+"""
+function Junction(x::Pair, conductance::ConductanceSystem; symmetric = true)
+    return Junction(x.first, x.second, conductance, symmetric)
+end
+
 get_conductance(x::Junction) = getfield(x, :conductance)
 issymmetric(x::Junction) = getfield(x, :symmetric)
 
+"""
+$(TYPEDEF)
+
+A neuron with 2+ morphologically connected compartments.
+
+$(TYPEDFIELDS)
+"""
 struct MultiCompartmentSystem <: AbstractCompartmentSystem
+    "Independent variabe. Defaults to time, ``t``."
     iv::Num
+    "`Junction` (edges) between subcompartments of the neuron."
     junctions::Vector{AbstractJunction}
+    "Individual subcompartments of the neuron."
     compartments::Vector{CompartmentSystem}
+    """
+    Additional systems to extend dynamics. Extensions are composed with the parent system
+    during conversion to `ODESystem`.
+    """
     extensions::Vector{ODESystem}
     eqs::Vector{Equation}
     systems::Vector{AbstractTimeDependentSystem}
@@ -35,6 +66,11 @@ end
 
 const MultiCompartment = MultiCompartmentSystem
 
+"""
+$(TYPEDSIGNATURES)
+
+Basic constructor for a `MultiCompartmentSystem`.
+"""
 function MultiCompartment(junctions::Vector{<:AbstractJunction}; extensions = ODESystem[],
                           name = Base.gensym("MultiCompartment"))
 
@@ -45,8 +81,8 @@ function MultiCompartment(junctions::Vector{<:AbstractJunction}; extensions = OD
     all_comp = Set{CompartmentSystem}()
 
     for jxn in junctions
-        push!(all_comp, jxn.child)
-        push!(all_comp, jxn.parent)
+        push!(all_comp, jxn.branch)
+        push!(all_comp, jxn.trunk)
     end
     
     return MultiCompartment(t, junctions, collect(all_comp), extensions, eqs, systems,
@@ -81,23 +117,23 @@ function build_toplevel!(dvs, ps, eqs, defs, mcsys::MultiCompartmentSystem)
     
     for jxn in junctions
         axial = get_conductance(jxn)
-        parent = jxn.parent
-        child = jxn.child
-        childvm = MembranePotential(; name = Symbol(:V, nameof(child))) 
-        push!(get_axial_conductance(parent), (axial, childvm))
-        #TODO: resolve arbitrary states generically
-        if hasproperty(getproperty(parent, nameof(axial)), :Vₘ)
-            push!(forwards, child.Vₘ ~ getproperty(parent, nameof(axial)).Vₘ)
+        trunk = jxn.trunk
+        branch = jxn.branch
+        branchvm = MembranePotential(; name = Symbol(:V, nameof(branch))) 
+        push!(get_axial_conductance(trunk), (axial, branchvm))
+        #TODO: resolve arbitrary states generically, not just hardcoded Vₘ
+        if hasproperty(getproperty(trunk, nameof(axial)), :Vₘ)
+            push!(forwards, branch.Vₘ ~ getproperty(trunk, nameof(axial)).Vₘ)
         end
-        push!(forwards, child.Vₘ ~ getproperty(parent, tosymbol(childvm, escape=false)))
+        push!(forwards, branch.Vₘ ~ getproperty(trunk, tosymbol(branchvm, escape=false)))
         if issymmetric(jxn)
-            parentvm = MembranePotential(; name = Symbol(:V, nameof(parent)))
-            push!(get_axial_conductance(child), (axial, parentvm))
-            #TODO: resolve arbitrary states generically
-            if hasproperty(getproperty(child, nameof(axial)), :Vₘ)
-                push!(forwards, parent.Vₘ ~ getproperty(child, nameof(axial)).Vₘ)
+            trunkvm = MembranePotential(; name = Symbol(:V, nameof(trunk)))
+            push!(get_axial_conductance(branch), (axial, trunkvm))
+            #TODO: resolve arbitrary states generically, not just hardcoded Vₘ
+            if hasproperty(getproperty(branch, nameof(axial)), :Vₘ)
+                push!(forwards, trunk.Vₘ ~ getproperty(branch, nameof(axial)).Vₘ)
             end
-            push!(forwards, parent.Vₘ ~ getproperty(child, tosymbol(parentvm, escape=false)))
+            push!(forwards, trunk.Vₘ ~ getproperty(branch, tosymbol(trunkvm, escape=false)))
         end
     end
 

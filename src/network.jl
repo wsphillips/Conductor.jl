@@ -23,6 +23,10 @@ end
 $(TYPEDSIGNATURES)
 
 Basic constructor for a directed `Synapse` (edge) between two compartments.
+
+Specified as a pair of compartments:
+
+`presynaptic::CompartmentSystem => postsynaptic::CompartmentSystem`.
 """
 function Synapse(pre_to_post::Pair, conductance, reversal)
     return Synapse(pre_to_post.first, pre_to_post.second, conductance, reversal) 
