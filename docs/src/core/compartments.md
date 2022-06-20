@@ -1,13 +1,12 @@
 # Compartments
 
-## CompartmentSystem
+## Single Compartments
 
-A single `CompartmentSystem` is sufficient to model a simple neuron--either as an
-isopotential sphere- or cylindrical-shaped neuron, or as a "point" neuron with no morphological geometry. At
-minimum, a `CompartmentSystem` will contain information about its instrinsic membrane
-currents and ionic gradients (i.e. equilbrium potentials). We define these by directly
-providing vectors of `ConductanceSystem` and `EquilibriumPotential` to the
-`CompartmentSystem`:
+A `CompartmentSystem` is sufficient to model a simple neuron--either as an isopotential
+spherical neuron, or as a "point" neuron with no morphological geometry. At minimum, a
+`CompartmentSystem` will contain information about its instrinsic membrane currents and
+ionic gradients (i.e. equilbrium potentials). We define these by directly providing vectors
+of `ConductanceSystem` and `EquilibriumPotential` to the `CompartmentSystem`:
 
 ```@example compartment_example
 using Conductor, Unitful, ModelingToolkit, IfElse
@@ -47,11 +46,11 @@ neuron # hide
     the need for an external dependency. 
 
 In the case above, the `CompartmentSystem` constructor assumes a dimensionless `geometry =
-Point()`. The maximum magnitudes of the ion channel conductances, ``\\overline{g}``, have
+Point()`. The maximum magnitudes of the ion channel conductances, ``\overline{g}``, have
 units of `SpecificConductance` (mS/cm²) that scale with the surface area of the compartment.
 However, when the geometry is a `Point()`, the `CompartmentSystem` ignores surface area
-scaling (internally, the area is fixed to 1.0). We can instead provide our own `<:Geometry`
-object to describe the shape and size of the compartment:
+scaling (internally, the area is fixed to 1.0). We can instead provide a `<:Geometry` object
+to describe the shape and size of the compartment:
 
 ```@example compartment_example
 import Unitful: µm
@@ -99,18 +98,16 @@ solution = solve(sim, Rosenbrock23())
 plot(solution; vars=[Vₘ])
 ```
 
-## MultiCompartmentSystem
+## Multiple Compartments
 
-Neurons with multiple compartments are explicitly constructed through the use of `Junction`,
-which denotes an connection (edge) between two compartments (nodes). By default, a
-`Junction` is assumed to be symmetrical--the axial conductance from
-compartment A to B is the same as from compartment B to A. If conductance between
-compartments is asymmetric, two `Junction` objects must be defined--one for conductance in
-each direction.
+Neurons with multiple compartments are explicitly constructed by defining a list of
+junctions, which are provided to `MultiCompartmentSystem`. A `Junction` denotes a connection (edge) between two compartments (nodes). By
+default, a `Junction` is assumed to be symmetrical--the axial conductance from compartment A
+to B is the same value as from compartment B to A. However, if the conductance between
+compartments is asymmetric, two `Junction` objects must be defined--one `Junction` for the
+conductance in each direction.
 
-
-
-
+For example usage, see the [`pinskyrinzel.jl`](https://github.com/wsphillips/Conductor.jl/blob/main/demo/pinskyrinzel.jl) demo.
 
 ```@docs
 CompartmentSystem

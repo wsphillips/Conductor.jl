@@ -1,4 +1,4 @@
-# Gates
+# [Gates](@id gates)
 ## Overview
 Gates are the most basic building block for describing dynamics in Conductor.jl. A gate
 integrates zero or more inputs into a single unitless weighting value. If desired, we can

@@ -1,4 +1,4 @@
-# ConductanceSystem
+# [ConductanceSystem](@id conductance)
 
 A `ConductanceSystem` describes the state- and time-dependence of a conductance (i.e.
 classically _g_, the inverse of resistance; typically measured in Siemens). It can be used
