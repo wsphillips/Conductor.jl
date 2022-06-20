@@ -4,4 +4,5 @@
 CompartmentSystem
 Junction
 MultiCompartmentSystem
+MultiCompartment
 ```
