@@ -70,10 +70,7 @@ using OrdinaryDiffEq, Plots
 sim = Simulation(neuron, time = 300ms)
 solution = solve(sim, Rosenbrock23())
 plot(solution; vars=[Vₘ])
-savefig("silentneuron_plot.svg"); nothing # hide
 ```
-![](silentneuron_plot.svg)
-
 The neuron isn't spontaneously active. To make the neuron produce spikes, we can write an
 equation for an electrode current and provide it to `CompartmentSystem`: 
 
@@ -100,9 +97,7 @@ Putting it all together, our neuron simulation now produces a train of action po
 sim = Simulation(neuron_stim, time = 300ms)
 solution = solve(sim, Rosenbrock23())
 plot(solution; vars=[Vₘ])
-savefig("spikingneuron_plot.svg"); nothing # hide
 ```
-![](spikingneuron_plot.svg)
 
 ## MultiCompartmentSystem
 
