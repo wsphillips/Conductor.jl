@@ -37,7 +37,7 @@ objects.
 struct MyNewGate <: Conductor.GateVarForm end
 
 function Conductor.get_eqs(g::Gate{MyNewGate}, comp::CompartmentSystem)
-    ...
+    # a function that returns a vector of equations defining gate dynamics
 end
 ```
 """
@@ -65,10 +65,15 @@ A gate has a single symbolic `output` and stores properties (passed as a variabl
 list of keyword arguments). Gate properties are accessible via `get` and `getproperty`.
 
 # Example
-```julia-repl
+```jldoctest; setup=:(using Conductor,ModelingToolkit; struct MyGateType<:Conductor.GateVarForm end)
 julia> @variables t X(t)
+2-element Vector{Num}:
+    t
+ X(t)
+
 julia> g = Gate{MyGateType}(X, prop1 = "foo", prop2 = 62)
 Gate{MyGateType}(X(t), Dict{Symbol, Any}(:prop2 => 62, :prop1 => "foo"))
+
 julia> (g.prop1, g.prop2)
 ("foo", 62)
 ```
