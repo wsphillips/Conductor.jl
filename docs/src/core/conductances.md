@@ -10,7 +10,7 @@ individual gate and ``\overline{g}``.
 
 To model sodium conductance in a Hodgkin-Huxley model:
 
-```julia
+```@example
 using Conductor, IfElse, Unitful
 import Unitful: mV, mS, cm
 
@@ -25,14 +25,9 @@ nav_kinetics = [
          1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)), name = :h)]
 
 @named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2) 
+@assert length(equations(NaV)) == 3; # hide
 
 equations(NaV) # includes: g(t) ~ gbar*(m(t)^3)*h(t)
-```
-
-...which is equivalent to:
-
-```math
-g(t) = \overline{g}m^3h
 ```
 
 ```@docs
