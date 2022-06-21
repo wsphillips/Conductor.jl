@@ -1,4 +1,4 @@
-# Compartments
+# [Compartments](@id compartments)
 
 ## Single Compartments
 

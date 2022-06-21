@@ -1,6 +1,6 @@
 # Networks
 
-## [Synapse](@id synpases)
+## [Synapse](@id synapses)
 ```@docs
 Synapse
 ```

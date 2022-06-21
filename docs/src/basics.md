@@ -13,7 +13,7 @@ comprised of one or more gates. Conductances combine the outputs of gates, produ
 scalar quantity that can represent the permeability of ion channels, synaptic channels, and
 axial conductances between morphologically connected compartments.
 
-Each conductance is associated with a [`CompartmentSystem`](@ref compartment). The
+Each conductance is associated with a [`CompartmentSystem`](@ref compartments). The
 properties of the parent compartment (for example, equilibrium potentials, membrane capacitance,
 and geometry), influence the magnitude of intracellular current produced by conductances.
 
