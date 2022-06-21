@@ -47,7 +47,9 @@ jobs:
       #      doctest(Conductor)'
 
       - name: Build and Deploy Docs
-        run: julia --project=docs docs/make.jl
+        run: |
+          export GKSwstype=nul
+          julia --project=docs docs/make.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
