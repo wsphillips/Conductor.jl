@@ -11,7 +11,7 @@ individual gate and ``\overline{g}``.
 To model sodium conductance in a Hodgkin-Huxley model:
 
 ```@example
-using Conductor, IfElse, Unitful
+using Conductor, ModelingToolkit, IfElse, Unitful
 import Unitful: mV, mS, cm
 
 Vₘ = MembranePotential()
