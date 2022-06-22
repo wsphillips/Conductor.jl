@@ -103,8 +103,8 @@ journal articles using forward, ``\alpha``, and reverse, ``\beta``, reaction rat
 
 ```math
 \begin{aligned}
-\alpha(V_{m})=0.1(V_{m}+40)/1-e^{-(V_{m}+40)/10}
-\beta(V_{m})=4e^{-(V_{m}+65)/18}
+\alpha(V_{m}) &= 0.1(V_{m}+40)/1-e^{-(V_{m}+40)/10} \\
+\beta(V_{m}) &= 4e^{-(V_{m}+65)/18}
 \end{aligned}
 ```
 To reproduce the math, we'll define a `Gate` and indicate the format of our equations with a
@@ -161,12 +161,63 @@ holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
 Finally, we construct our two neurons, providing the holding current stimulus to `neuron1`,
 which will be our presynaptic neuron.
 
+```@example gate_example
+channels = [NaV, Kdr, leak];
+@named neuron1 = Compartment(Vₘ, channels, reversals;
+                             geometry = Cylinder(radius = 25µm, height = 400µm),
+                             stimuli = [holding_current])
+
+@named neuron2 = Compartment(Vₘ, channels, reversals;
+                             geometry = Cylinder(radius = 25µm, height = 400µm))
+``` 
+
+For our neurons to talk to each other, we'll need a synaptic conductance between them. This
+time we'll use a model that presented in a different form in the literature:
+
+```math
+    \begin{aligned}
+    s_{\infty} &= \frac{1}{1 + e^{-35 - V/5}} \\
+    \tau_{s}   &= \frac{1 - s_{\infty}}{1/40}
+    \end{aligned}
+```
+
+We will start by declaring an `ExtrinsicPotential`, which represents a voltage coming from
+an outside source (for example, a presynaptic neuron). 
+
 ```@example gate_example; continued=true
-# Synaptic model
 Vₓ = ExtrinsicPotential()
+```
+Next we define a `Gate` and indicate that our kinetic equations have the form
+`SteadyStateTau`. 
+
+```@example gate_example; continued=true
 syn∞ = 1/(1 + exp((-35 - Vₓ)/5))
 τsyn = (1 - syn∞)/(1/40)
 syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
+```
+We'll then build a `SynapticChannel` and define an equilibrium potential.
+
+```@example gate_example
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
+```
+
+Given our two neurons and a synaptic model, we can construct a two-neuron circuit by
+defining a `Synapse` edge between the neurons and then constructing a
+`NeuronalNetworkSystem`:
+
+```@example gate_example
+net = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
+```
+
+Now we're ready to run our simulation.
+
+```@example gate_example
+total_time = 250
+sim = Simulation(net, time = total_time*ms)
+
+solution = solve(sim, Rosenbrock23())
+
+# Plot at 5kHz sampling
+plot(solution; plotdensity=Int(total_time*5), vars=[neuron1.Vₘ, neuron2.Vₘ])
 ```
