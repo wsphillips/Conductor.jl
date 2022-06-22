@@ -19,18 +19,18 @@ struct ConductanceSystem <: AbstractConductanceSystem
     iv::Num
     "Conductance, ``g``, of the system."
     output::Num
-    "Maximum conductance, ``\\overline{g}``"
+    "Maximum conductance, ``\\overline{g}``."
     gbar::Num
     "Permeability of the conductance." 
     ion::IonSpecies
     aggregate::Bool # temp until better solution
-    "Gating variables"
+    "Gating variables."
     gate_vars::Vector{AbstractGatingVariable}
-    "Extrinsic sources of state (e.g. presynaptic compartments)"
+    "Extrinsic sources of state (e.g. presynaptic compartments)."
     subscriptions::Set{AbstractCompartmentSystem}
     """
     Additional systems to extend dynamics. Extensions are composed with the parent system
-    during conversion to `ODESystem`
+    during conversion to `ODESystem`.
     """
     extensions::Vector{ODESystem}
     defaults::Dict

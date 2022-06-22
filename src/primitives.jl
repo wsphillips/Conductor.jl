@@ -3,8 +3,8 @@
 @derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4
 @derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
 
-@doc "Conductance per unit area" SpecificConductance 
-@doc "Capacitance per unit area" SpecificCapacitance
+@doc "Conductance per unit area." SpecificConductance 
+@doc "Capacitance per unit area." SpecificCapacitance
 
 """
 Faraday's Constant
@@ -155,7 +155,7 @@ An intra/extracellular concentration of ions.
 # Arguments
 - `location::PrimitiveLocation = Inside`: location (`Inside` or `Outside`) w.r.t. the parent
   compartment (intracellular or extracellular).
-- `dynamic::Bool = false`: when false, the concentration will be a static parameter
+- `dynamic::Bool = false`: when false, the concentration will be a static parameter.
 - `name::Symbol = Conductor.PERIODIC_SYMBOL[ion]`: the symbol to use for the symbolic
   variable. By default, a lookup table is used to find the ion's symbol on the periodic
   table of elements.
@@ -202,7 +202,7 @@ An ionic membrane current.
   matched ion species) flowing into the parent compartment. For example, an aggregate 
   `IonCurrent` for Calcium will be the sum of all other Calcium-permeable currents.
 - `dynamic::Bool = true`: when `dynamic == false` the `IonCurrent` will be a static 
-  parameter value
+  parameter value.
 - `name::Symbol = Symbol("I", Conductor.PERIODIC_SYMBOL[ion])`: the symbol to use for the 
   symbolic variable. By default, a lookup table is used to find the ion's symbol on the 
   periodic table of elements.
@@ -250,7 +250,7 @@ An equilibrium (a.k.a. reversal) potential.
 
 # Arguments
 - `dynamic::Bool = false`: a dynamic `EquilbriumPotential` is assumed to vary with time
-  (e.g. derived from the Nernst equation)
+  (e.g. derived from the Nernst equation).
 - `name::Symbol = Symbol("I", Conductor.PERIODIC_SYMBOL[ion])`: the symbol to use for the 
   symbolic variable. By default, a lookup table is used to find the ion's symbol on the 
   periodic table of elements.

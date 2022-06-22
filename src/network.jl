@@ -9,13 +9,13 @@ A synapse (edge) between two neurons in a network.
 $(FIELDS)
 """
 struct Synapse <: AbstractSynapse
-    "Presynaptic neuron/subcompartment"
+    "Presynaptic neuron/subcompartment."
     source::CompartmentSystem
-    "Postsynaptic neuron/subcompartment"
+    "Postsynaptic neuron/subcompartment."
     target::CompartmentSystem
-    "Synaptic conductance model of the synapse"
+    "Synaptic conductance model of the synapse."
     conductance::AbstractConductanceSystem
-    "Synaptic equilibrium/reversal potential"
+    "Synaptic equilibrium/reversal potential."
     reversal::Num
 end
 
@@ -51,9 +51,9 @@ A network of neurons with synaptic connections.
 $(TYPEDFIELDS)
 """
 struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
-    "Independent variable. Default to time, ``t``."
+    "Independent variable. Defaults to time, ``t``."
     iv::Num
-    "Vector of synapses (edges) between neurons in the network"
+    "Vector of synapses (edges) between neurons in the network."
     synapses::Vector{AbstractSynapse}
     """
     Additional systems to extend dynamics. Extensions are composed with the parent system

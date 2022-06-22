@@ -62,7 +62,7 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     synaptic_reversals::Set{Num}
     "Axial (intercompartmental) conductances."
     axial_conductance::Set{Tuple{AbstractConductanceSystem,Num}}
-    "Experimental stimuli (e.g. current injection)."
+    "Experimental stimuli (for example, current injection)."
     stimuli::Vector{Equation}
     """
     Additional systems to extend dynamics. Extensions are composed with the parent system

@@ -15,13 +15,12 @@ axial conductances between morphologically connected compartments.
 
 Each conductance is associated with a [`CompartmentSystem`](@ref compartments). The
 properties of the parent compartment (for example, equilibrium potentials, membrane capacitance,
-and geometry), influence the magnitude of intracellular current produced by conductances.
+and geometry) influence the magnitude of intracellular current produced by conductances.
 
-Finally, connections between neurons can be explicitly defined with [`Synapse`](@ref
-synapses), which
-defines a directed edge from a presynaptic compartment to a postsynaptic compartment. A
-[`NeuronalNetworkSystem`](@ref networks) constructs and manages the equations that govern synaptic
-conductances between neurons.
+Finally, connections between neurons can be explicitly defined with [`Synapse`](@ref synapses),
+which defines a directed edge from a presynaptic compartment to a postsynaptic compartment.
+A [`NeuronalNetworkSystem`](@ref networks) constructs and manages the equations that govern
+synaptic conductances between neurons.
 
 ## Simple Two Neuron Simulation
 
@@ -90,14 +89,12 @@ using Conductor, IfElse, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
 ```
-
 We start by defining a primitive variable for voltage, `Vₘ`, which we'll use to write
 equations describing the kinetics of some Hodgkin-Huxley gating particles.
 
 ```@example gate_example; continued = true
 Vₘ = MembranePotential(-65mV)
 ```
-
 Often the voltage- and time-dependent dynamics of ion channels are described in books and
 journal articles using forward, ``\alpha``, and reverse, ``\beta``, reaction rates:
 
@@ -110,7 +107,7 @@ journal articles using forward, ``\alpha``, and reverse, ``\beta``, reaction rat
 To reproduce the math, we'll define a `Gate` and indicate the format of our equations with a
 trait, `AlphaBeta`. We'll also use an optional keyword argument, `p`, which sets the
 exponent of the resulting gating variable (for example, `p = 3` to set ``m^{3}`` as found in
-Hodgkin-Huxley style Sodium channels). 
+Hodgkin-Huxley-style Sodium channels). 
 
 ```@example gate_example; continued = true
 # Fast Sodium channel kinetics
@@ -133,11 +130,12 @@ kdr_kinetics = [
          p = 4, name = :n)]
 ```
 !!! note
-    There's a discontinuity in the original equations, so we use `ifelse` to avoid a
+    There's a discontinuity in the original equations, so we use `IfElse.ifelse` to avoid a
     divide-by-zero error.
 
 Now that we've defined the gating variables, we can construct some ion channels and define a
-set of matching equilibrium potentials for sodium, potassium, and non-specific leak current. 
+set of matching primitives representing equilibrium potentials for sodium, potassium, and
+non-specific leak current. 
 
 ```@example gate_example; continued = true
 @named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2)
@@ -145,9 +143,8 @@ set of matching equilibrium potentials for sodium, potassium, and non-specific l
 @named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 ```
-
-We also need to model current injection to stimulate spiking. We'll declare an extra current
-and use the resulting symbolic to write an equation describing what the value of the
+We also need to model current injection to stimulate spiking. We'll declare a new primitive
+current and use the resulting symbolic to write an equation describing what the value of the
 electrode current should be.
 
 ```@example gate_example; continued = true
@@ -170,24 +167,24 @@ channels = [NaV, Kdr, leak];
 @named neuron2 = Compartment(Vₘ, channels, reversals;
                              geometry = Cylinder(radius = 25µm, height = 400µm))
 ``` 
-
-For our neurons to talk to each other, we'll need a synaptic conductance between them. This
-time we'll use a model that presented in a different form in the literature:
+For our neurons to talk to each other, we'll need a model for a synaptic conductance. This
+time we'll use a model that's presented in a different form in the literature. A model of a
+glutamatergic excitatory synapse adapted from
+[Prinz et al 2004](https://www.nature.com/articles/nn1352):
 
 ```math
     \begin{aligned}
-    s_{\infty} &= \frac{1}{1 + e^{-35 - V/5}} \\
-    \tau_{s}   &= \frac{1 - s_{\infty}}{1/40}
+    s_{\infty}(V_{pre} &= \frac{1}{1 + e^{-35 - V_{pre}/5}} \\
+    \tau_{s}   &= \frac{1 - s_{\infty}(V_{pre}}{1/40}
     \end{aligned}
 ```
-
-We will start by declaring an `ExtrinsicPotential`, which represents a voltage coming from
-an outside source (for example, a presynaptic neuron). 
+We will start by declaring a primitive, `ExtrinsicPotential`, which represents a voltage
+coming from an outside source (in this case, a presynaptic neuron). 
 
 ```@example gate_example; continued=true
 Vₓ = ExtrinsicPotential()
 ```
-Next we define a `Gate` and indicate that our kinetic equations have the form
+Next, we define a `Gate` and indicate that our kinetic equations have the form
 `SteadyStateTau`. 
 
 ```@example gate_example; continued=true
@@ -197,27 +194,21 @@ syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
 ```
 We'll then build a `SynapticChannel` and define an equilibrium potential.
 
-```@example gate_example
+```@example gate_example; continued=true
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 ```
+Given our two neurons and a synaptic channel, we can model a miniature circuit by defining
+a `Synapse` edge between the neurons and then constructing a `NeuronalNetworkSystem`:
 
-Given our two neurons and a synaptic model, we can construct a two-neuron circuit by
-defining a `Synapse` edge between the neurons and then constructing a
-`NeuronalNetworkSystem`:
-
-```@example gate_example
+```@example gate_example; continued=true
 net = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
 ```
-
 Now we're ready to run our simulation.
 
 ```@example gate_example
 total_time = 250
 sim = Simulation(net, time = total_time*ms)
-
 solution = solve(sim, Rosenbrock23())
-
-# Plot at 5kHz sampling
 plot(solution; plotdensity=Int(total_time*5), vars=[neuron1.Vₘ, neuron2.Vₘ])
 ```
