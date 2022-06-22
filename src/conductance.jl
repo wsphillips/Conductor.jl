@@ -7,14 +7,31 @@ function subscribe!(chan::AbstractConductanceSystem, comp::AbstractCompartmentSy
     push!(subscriptions(chan), comp)
 end
 
+"""
+$(TYPEDEF)
+
+A model of conductance.
+
+$(FIELDS)
+"""
 struct ConductanceSystem <: AbstractConductanceSystem
+    "Independent variabe. Defaults to time, ``t``."
     iv::Num
-    output::Num # 'g' by default 
-    gbar::Num # max conductance parameter
-    ion::IonSpecies # ion permeability
+    "Conductance, ``g``, of the system."
+    output::Num
+    "Maximum conductance, ``\\overline{g}``."
+    gbar::Num
+    "Permeability of the conductance." 
+    ion::IonSpecies
     aggregate::Bool # temp until better solution
+    "Gating variables."
     gate_vars::Vector{AbstractGatingVariable}
+    "Extrinsic sources of state (e.g. presynaptic compartments)."
     subscriptions::Set{AbstractCompartmentSystem}
+    """
+    Additional systems to extend dynamics. Extensions are composed with the parent system
+    during conversion to `ODESystem`.
+    """
     extensions::Vector{ODESystem}
     defaults::Dict
     name::Symbol
@@ -36,6 +53,18 @@ const Conductance = ConductanceSystem
 
 permeability(x::ConductanceSystem) = getfield(x, :ion)
 
+"""
+    ConductanceSystem(g, ion, gate_vars; <keyword arguments>)
+
+Main constructor for `ConductanceSystem`.
+
+# Arguments
+- `gbar::Num`: Maximum conductance, ``\\overline{g}``.
+- `aggregate::Bool`: determines whether the Conductance model should aggregate extrinsic
+  sources of state instead of integrating them independently. Defaults to `false`.
+- `defaults::Dict`: Default values for states and parameters.
+- `name::Symbol`: Name of the system.
+"""
 function ConductanceSystem(g::Num, ion::IonSpecies,
                            gate_vars::Vector{<:AbstractGatingVariable}; gbar::Num,
                            aggregate = false, extensions::Vector{ODESystem} = ODESystem[],
@@ -51,6 +80,7 @@ function ConductanceSystem(g::Num, ion::IonSpecies,
                              extensions, defaults, name, eqs, systems, observed)
 end
 
+# Internal API: lazy generation of `ConductanceSystem` equations/components
 function build_toplevel!(dvs, ps, eqs, defs, comp_sys::ConductanceSystem)
     
     inputs = Set{Num}()
@@ -92,27 +122,27 @@ end
 
 get_inputs(x::ConductanceSystem) = build_toplevel(x)[5]
 
-function get_eqs(x::AbstractConductanceSystem)
+function MTK.get_eqs(x::AbstractConductanceSystem)
     empty!(getfield(x, :eqs))
     union!(getfield(x, :eqs), build_toplevel(x)[3])
     return getfield(x, :eqs)
 end
 
-function get_states(x::AbstractConductanceSystem)
+function MTK.get_states(x::AbstractConductanceSystem)
     collect(build_toplevel(x)[1])
 end
 
 MTK.has_ps(x::ConductanceSystem) = true
 
-function get_ps(x::AbstractConductanceSystem)
+function MTK.get_ps(x::AbstractConductanceSystem)
     collect(build_toplevel(x)[2])
 end
 
-function defaults(x::AbstractConductanceSystem)
+function MTK.defaults(x::AbstractConductanceSystem)
     build_toplevel(x)[4]
 end
 
-function get_systems(x::AbstractConductanceSystem)
+function MTK.get_systems(x::AbstractConductanceSystem)
     return getfield(x, :systems)
 end
 
@@ -139,6 +169,18 @@ function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
     all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end
 
+"""
+    IonChannel(ion, gate_vars; <keyword arguments>)
+
+An ionic membrane conductance.
+
+# Arguments
+- `max_g`: Default value for maximum conductance, ``\\overline{g}``.
+- `extensions::Vector{ODESystem}`: Additional systems to extend dynamics. Extensions are
+  composed with the parent system during conversion to `ODESystem`.
+- `defaults::Dict`: Default values for states and parameters.
+- `name::Symbol`: Name of the system.
+"""
 function IonChannel(ion::IonSpecies,
                     gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
                     max_g::Union{Num, SpecificConductance} = 0mS/cm^2,
@@ -167,6 +209,18 @@ function IonChannel(ion::IonSpecies,
                       extensions = extensions)
 end
 
+"""
+    AxialConductance(gate_vars; <keyword arguments>)
+
+A non-specific conductance between morphologically contiguous compartments.
+
+# Arguments
+- `max_g`: Maximum conductance, ``\\overline{g}``.
+- `extensions::Vector{ODESystem}`: Additional systems to extend dynamics. Extensions are
+  composed with the parent system during conversion to `ODESystem`.
+- `defaults::Dict`: Default values for states and parameters.
+- `name::Symbol`: Name of the system.
+"""
 function AxialConductance(gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
                           max_g = 0mS/cm^2, extensions::Vector{ODESystem} = ODESystem[],
                           name::Symbol = Base.gensym("Axial"), defaults = Dict())
@@ -175,6 +229,20 @@ function AxialConductance(gate_vars::Vector{<:AbstractGatingVariable} = Abstract
                defaults = defaults)
 end
 
+"""
+    SynapticChannel(ion, gate_vars; <keyword arguments>)
+
+A synaptically activated conductance. Depends on extrinsic (i.e. presynaptic) state.
+
+# Arguments
+- `max_g`: Maximum conductance, ``\\overline{g}``.
+- `extensions::Vector{ODESystem}`: Additional systems to extend dynamics. Extensions are
+  composed with the parent system during conversion to `ODESystem`.
+- `aggregate::Bool`: whether the Conductance model should aggregate extrinsic sources of
+  state instead of integrating them independently. Defaults to `false`.
+- `defaults::Dict`: Default values for states and parameters.
+- `name::Symbol`: Name of the system.
+"""
 function SynapticChannel(ion::IonSpecies,
                          gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
                          max_s::Union{Num, ElectricalConductance} = 0mS,

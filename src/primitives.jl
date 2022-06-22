@@ -1,11 +1,90 @@
+# Custom Unitful.jl quantities
+@derived_dimension SpecificConductance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^3
+@derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4
+@derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
+
+@doc "Conductance per unit area." SpecificConductance 
+@doc "Capacitance per unit area." SpecificCapacitance
+
+"""
+Faraday's Constant
+
+The electric charge of one mole of electrons.
+
+Unicode ℱ can be typed by writing \\scrF then pressing tab in the Julia REPL, and in many editors.
+
+# Examples
+```julia-repl
+julia> Conductor.ℱ
+96485.33212331001 C mol^-1
+```
+"""
 const ℱ = Unitful.q*Unitful.Na # Faraday's constant
+
+"""
+The independent variable for time, ``t``.
+"""
 const t = let name = :t; only(@variables $name) end
+
+"""
+Differential with respect to time, ``t``.
+"""
 const D = Differential(t)
+
+# TODO: Make IonSpecies user extendable instead of a fixed set of enums
+@enum IonSpecies::UInt128 begin
+    NonIonic      = 1 << 0
+    Sodium        = 1 << 1
+    Potassium     = 1 << 2
+    Chloride      = 1 << 3
+    Calcium       = 1 << 4
+    Cation        = 1 << 5
+    Anion         = 1 << 6
+    Glutamatergic = 1 << 7
+    Cholinergic   = 1 << 8
+    AMPA          = 1 << 9
+    NMDA          = 1 << 10
+end
+
+ion_doc = """
+Ion species to annotate `ConductanceSystem`, `IonCurrent`, `IonConcentration`, etc. May be
+one of:
+
+"""
+
+for x in instances(IonSpecies)
+    global ion_doc *= "- "*string(x)*'\n'
+end
+
+@doc ion_doc IonSpecies
+
+const Ca = Calcium
+const Na = Sodium
+const K = Potassium
+const Cl = Chloride
+const Mixed = const Leak = NonIonic
+
+const PERIODIC_SYMBOL = IdDict(Na => :Na, K  => :K, Cl => :Cl, Ca => :Ca, Leak => :l)
 
 # Properties
 @enum PrimitiveSource Intrinsic Extrinsic
 @enum PrimitiveLocation Outside Inside
 
+"""
+    MembranePotential(V0 = -60mV; <keyword arguments>)
+
+The voltage in an arbitrary compartment.
+
+If `V0 == nothing`, the default value of the resulting variable will be left unassigned.
+
+# Arguments
+- `dynamic::Bool = true`: when false, the voltage will be a static parameter.
+- `source::PrimitiveSource = Intrinsic`: the expected origin of a voltage state. `Intrinsic`
+  sources are states from the parent compartment. `Extrinsic` sources come from other
+  compartments (e.g. presynaptic compartments).
+- `n::Integer = 1`: when `n > 1`, the voltage will be a symbolic array of length `n`.
+- `name::Symbol = :Vₘ`: the symbol to use for the symbolic variable
+"""
 struct MembranePotential
     function MembranePotential(V0 = -60mV; dynamic = true,
                                source::PrimitiveSource = Intrinsic, n::Integer = 1,
@@ -39,45 +118,27 @@ struct MembranePotential
     end
 end
 
-function ExtrinsicPotential(;V0 = nothing, n = 1, dynamic = true,
-                            source::PrimitiveSource = Extrinsic, name::Symbol = :Vₓ)
-    return MembranePotential(V0; dynamic = dynamic, source = source, n = n, name = name)
-end
-
-isvoltage(x) = hasmetadata(value(x), MembranePotential)
+# Internal API: Trait queries for MembranePotential
+isvoltage(x)   = hasmetadata(value(x), MembranePotential)
 isintrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
                  getmetadata(value(x), PrimitiveSource) == Intrinsic : false
 isextrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
                  getmetadata(value(x), PrimitiveSource) == Extrinsic : false
 
-# Custom Unitful.jl quantities
-@derived_dimension SpecificConductance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^3 # conductance per unit area
-@derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4 # capacitance per unit area
-@derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
+"""
+    ExtrinsicPotential(; n = 1, name::Symbol = :Vₓ)
 
-# Ion species
-# TODO: Make user extendable
-@enum IonSpecies::UInt128 begin
-    NonIonic    = 1 << 0
-    Sodium      = 1 << 1
-    Potassium   = 1 << 2
-    Chloride    = 1 << 3
-    Calcium     = 1 << 4
-    Cation      = 1 << 5
-    Anion      = 1 << 6
-    Glutamatergic = 1 << 7
-    Cholinergic = 1 << 8
-    AMPA        = 1 << 9
-    NMDA        = 1 << 10
+A voltage derived from an external source (i.e. not the parent compartment).
+
+Equivalent to: `MembranePotential(nothing; dynamic=true, source=Extrinsic, n=n, name=name)`
+
+# Arguments
+- `n::Integer = 1`: when `n > 1`, the voltage will be a symbolic array of length `n`.
+- `name::Symbol = :Vₓ`: the symbol to use for the symbolic variable
+"""
+function ExtrinsicPotential(; n = 1, name::Symbol = :Vₓ)
+    return MembranePotential(nothing; dynamic = true, source = Extrinsic, n = n, name = name)
 end
-
-const Ca = Calcium
-const Na = Sodium
-const K = Potassium
-const Cl = Chloride
-const Mixed = const Leak = NonIonic
-
-const PERIODIC_SYMBOL = IdDict(Na => :Na, K  => :K, Cl => :Cl, Ca => :Ca, Leak => :l)
 
 struct IonConcentration
     ion::IonSpecies
@@ -86,6 +147,19 @@ end
 
 const Concentration = IonConcentration
 
+"""
+    IonConcentration(ion::IonSpecies, val = nothing; <keyword arguments>)
+
+An intra/extracellular concentration of ions.
+
+# Arguments
+- `location::PrimitiveLocation = Inside`: location (`Inside` or `Outside`) w.r.t. the parent
+  compartment (intracellular or extracellular).
+- `dynamic::Bool = false`: when false, the concentration will be a static parameter.
+- `name::Symbol = Conductor.PERIODIC_SYMBOL[ion]`: the symbol to use for the symbolic
+  variable. By default, a lookup table is used to find the ion's symbol on the periodic
+  table of elements.
+"""
 function IonConcentration(ion::IonSpecies, val = nothing;
                           location::PrimitiveLocation = Inside, dynamic::Bool = false,
                           name::Symbol = PERIODIC_SYMBOL[ion])
@@ -109,6 +183,7 @@ function IonConcentration(ion::IonSpecies, val = nothing;
     return var
 end
 
+# Internal API: Concentration trait queries
 isconc(x) = hasmetadata(value(x), IonConcentration)
 getconc(x) = isconc(x) ? getmetadata(value(x), IonConcentration) : nothing
 
@@ -117,6 +192,21 @@ struct IonCurrent
     agg::Bool
 end
 
+"""
+    IonCurrent(ion::IonSpecies, val = nothing; <keyword arguments>)
+
+An ionic membrane current.
+
+# Arguments
+- `aggregate::Bool = false`: aggregate currents are the sum of all conductances (with 
+  matched ion species) flowing into the parent compartment. For example, an aggregate 
+  `IonCurrent` for Calcium will be the sum of all other Calcium-permeable currents.
+- `dynamic::Bool = true`: when `dynamic == false` the `IonCurrent` will be a static 
+  parameter value.
+- `name::Symbol = Symbol("I", Conductor.PERIODIC_SYMBOL[ion])`: the symbol to use for the 
+  symbolic variable. By default, a lookup table is used to find the ion's symbol on the 
+  periodic table of elements.
+"""
 function IonCurrent(ion::IonSpecies, val = nothing; aggregate::Bool = false,
                     dynamic::Bool = true, name::Symbol = Symbol("I", PERIODIC_SYMBOL[ion]))
 
@@ -139,6 +229,7 @@ function IonCurrent(ion::IonSpecies, val = nothing; aggregate::Bool = false,
     return var
 end
 
+# Internal API: Current trait queries
 iscurrent(x) = hasmetadata(value(x), IonCurrent)
 iscurrent(x::IonCurrent) = true
 getcurrent(x) = iscurrent(x) ? getmetadata(value(x), IonCurrent) : nothing
@@ -152,7 +243,19 @@ end
 
 const Equilibrium = EquilibriumPotential
 
-function EquilibriumPotential(ion::IonSpecies, val; dynamic = false,
+"""
+    EquilibriumPotential(ion::IonSpecies, val; <keyword arguments>)
+
+An equilibrium (a.k.a. reversal) potential.
+
+# Arguments
+- `dynamic::Bool = false`: a dynamic `EquilbriumPotential` is assumed to vary with time
+  (e.g. derived from the Nernst equation).
+- `name::Symbol = Symbol("I", Conductor.PERIODIC_SYMBOL[ion])`: the symbol to use for the 
+  symbolic variable. By default, a lookup table is used to find the ion's symbol on the 
+  periodic table of elements.
+"""
+function EquilibriumPotential(ion::IonSpecies, val; dynamic::Bool = false,
                               name::Symbol = PERIODIC_SYMBOL[ion])
     sym = Symbol("E", name)
     var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
@@ -173,6 +276,7 @@ function EquilibriumPotential(ion::IonSpecies, val; dynamic = false,
     return var
 end
 
+# Internal API: EquilibriumPotential trait queries
 isreversal(x) = hasmetadata(value(x), EquilibriumPotential)
 getreversal(x) = isreversal(x) ? getmetadata(value(x), EquilibriumPotential) : nothing
 getion(x::EquilibriumPotential) = getfield(x, :ion)

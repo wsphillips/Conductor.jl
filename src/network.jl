@@ -1,15 +1,35 @@
 
 abstract type AbstractSynapse end # <: AbstractEdge{T} end
 
+"""
+$(TYPEDEF)
+
+A synapse (edge) between two neurons in a network.
+
+$(FIELDS)
+"""
 struct Synapse <: AbstractSynapse
+    "Presynaptic neuron/subcompartment."
     source::CompartmentSystem
+    "Postsynaptic neuron/subcompartment."
     target::CompartmentSystem
+    "Synaptic conductance model of the synapse."
     conductance::AbstractConductanceSystem
+    "Synaptic equilibrium/reversal potential."
     reversal::Num
 end
 
-function Synapse(x::Pair, cond, rev)
-    return Synapse(x.first, x.second, cond, rev) 
+"""
+$(TYPEDSIGNATURES)
+
+Basic constructor for a directed `Synapse` (edge) between two compartments.
+
+Specified as a pair of compartments:
+
+`presynaptic::CompartmentSystem => postsynaptic::CompartmentSystem`.
+"""
+function Synapse(pre_to_post::Pair, conductance, reversal)
+    return Synapse(pre_to_post.first, pre_to_post.second, conductance, reversal) 
 end
 
 function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem})
@@ -23,9 +43,22 @@ postsynaptic(x::Synapse) = getfield(x, :target)
 class(x::Synapse) = getfield(x, :conductance)
 reversal(x::Synapse) = getfield(x, :reversal)
 
+"""
+$(TYPEDEF)
+
+A network of neurons with synaptic connections.
+
+$(TYPEDFIELDS)
+"""
 struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
+    "Independent variable. Defaults to time, ``t``."
     iv::Num
+    "Vector of synapses (edges) between neurons in the network."
     synapses::Vector{AbstractSynapse}
+    """
+    Additional systems to extend dynamics. Extensions are composed with the parent system
+    during conversion to `ODESystem`.
+    """
     extensions::Vector{AbstractTimeDependentSystem}
     name::Symbol
     eqs::Vector{Equation}
@@ -40,6 +73,12 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     end
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+Basic constructor for a `NeuronalNetworkSystem`.
+
+"""
 function NeuronalNetworkSystem(synapses::Vector{Synapse},
                                extensions::Vector{AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
                                name::Symbol = Base.gensym(:Network))

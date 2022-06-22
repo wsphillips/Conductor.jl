@@ -36,23 +36,45 @@ end
 area(::Point) = 1.0
 area(x::Unitless) = x.value
 
+"""
+$(TYPEDEF)
+
+A neuronal compartment.
+
+$(TYPEDFIELDS)
+"""
 struct CompartmentSystem <: AbstractCompartmentSystem
+    "Independent variabe. Defaults to time, ``t``."
     iv::Num
-    voltage::Num # symbol that represents membrane voltage
+    "Voltage potential."
+    voltage::Num
+    "Membrane capacitance."
     capacitance::Num
+    "Morphological geometry of the compartment."
     geometry::Geometry
+    "Ionic conductances."
     chans::Set{AbstractConductanceSystem}
+    "Equilibrium potentials belonging to ionic membrane conductances."
     channel_reversals::Set{Num}
+    "Synaptic conductances."
     synapses::Set{AbstractConductanceSystem}
+    "Equilibrium potentials belonging to synaptic conductances."
     synaptic_reversals::Set{Num}
+    "Axial (intercompartmental) conductances."
     axial_conductance::Set{Tuple{AbstractConductanceSystem,Num}}
+    "Experimental stimuli (for example, current injection)."
     stimuli::Vector{Equation}
+    """
+    Additional systems to extend dynamics. Extensions are composed with the parent system
+    during conversion to `ODESystem`.
+    """
     extensions::Vector{ODESystem}
     defaults::Dict
     name::Symbol
     eqs::Vector{Equation}
     systems::Vector{AbstractTimeDependentSystem}
     observed::Vector{Equation}
+    "Refers to the parent system when the compartment is a subcompartment in a `MultiCompartmentSystem`."
     parent::Ref{AbstractCompartmentSystem}
     function CompartmentSystem(iv, voltage, capacitance, geometry, chans, channel_reversals,
                                synapses, synaptic_reversals, axial_conductance, stimuli,
@@ -69,6 +91,18 @@ end
 
 const Compartment = CompartmentSystem
 
+"""
+    CompartmentSystem(Vₘ, channels, reversals; <keyword arguments>)
+
+# Arguments
+- `capacitance::SpecificCapacitance`: The capacitance of the compartment given in Farads 
+  per unit area (e.g. µF/cm^2).
+- `geometry::Geometry`: Morphological geometry of the compartment.
+- `extensions::Vector{ODESystem}`: Additional systems to extend dynamics. Extensions are
+  composed with the parent system during conversion to `ODESystem`.
+- `stimuli::Vector{Equation}`: 
+- `name::Symbol`: Name of the system.
+"""
 function CompartmentSystem(
     Vₘ::Num,
     channels,
@@ -210,29 +244,29 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
 end
 
 # collect eqs including from extension + currents + reversals + Vₘ
-function get_eqs(x::AbstractCompartmentSystem; rebuild = false)
+function MTK.get_eqs(x::AbstractCompartmentSystem; rebuild = false)
     empty!(getfield(x, :eqs))
     union!(getfield(x, :eqs), build_toplevel(x)[3])
     return getfield(x, :eqs)
 end
 
-function get_states(x::AbstractCompartmentSystem)
+function MTK.get_states(x::AbstractCompartmentSystem)
     collect(build_toplevel(x)[1])
 end
 
 MTK.has_ps(x::CompartmentSystem) = true
 
 # collect parameters from extension + currents + capacitance + area + reversals
-function get_ps(x::AbstractCompartmentSystem)
+function MTK.get_ps(x::AbstractCompartmentSystem)
     collect(build_toplevel(x)[2])
 end
 
-function defaults(x::AbstractCompartmentSystem)
+function MTK.defaults(x::AbstractCompartmentSystem)
     build_toplevel(x)[4]
 end
 
 # collect channels + synapses + input systems
-function get_systems(x::AbstractCompartmentSystem; rebuild = false)
+function MTK.get_systems(x::AbstractCompartmentSystem; rebuild = false)
     empty!(getfield(x, :systems))
     union!(getfield(x, :systems), getfield(x, :chans), getfield(x, :synapses),
            first.(getfield(x, :axial_conductance)))

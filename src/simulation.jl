@@ -1,3 +1,11 @@
+"""
+$(TYPEDSIGNATURES)
+
+Compile and run a simulation of a single `neuron` or `network` of neurons for a specified
+duration, `time`.
+
+If `return_system == true`, returns a simplified `ODESystem` instead.
+"""
 function Simulation(neuron::AbstractCompartmentSystem; time::Time, return_system = false)
     odesys = convert(ODESystem, neuron)
     t_val = ustrip(Float64, ms, time)
