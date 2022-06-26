@@ -89,31 +89,22 @@ struct MembranePotential
     function MembranePotential(V0 = -60mV; dynamic = true,
                                source::PrimitiveSource = Intrinsic, n::Integer = 1,
                                name::Symbol = :Vₘ)
-        if isnothing(V0)
-            if n == one(n) 
-                ret = dynamic ? only(@variables $name(t)) :
-                                only(@parameters $name)
-            elseif n > one(n)
-                ret = dynamic ? only(@variables $name[1:n](t)) :
-                                only(@parameters $name[1:n])
-            else
-                throw("'n' must be greater than or equal to 1")
-            end
+        iv = dynamic ? t : nothing
+        if n == one(n) 
+            ret = genvar(name,
+                         iv = iv,
+                         default = isnothing(V0) ? nothing : ustrip(Float64, mV, V0))
+        elseif n > one(n)
+            ret = [genvar(namegen(name),
+                          iv = iv,
+                          default = isnothing(V0) ? nothing : ustrip(Float64, mV, V0))
+                   for _ in 1:n]
         else
-            V0_val = ustrip(Float64, mV, V0) #FIXME: assumes V0 <: Voltage
-            if n == one(n)
-                ret = dynamic ? only(@variables $name(t) = V0_val) :
-                                only(@parameters $name = V0_val)
-            elseif n > one(n)
-                ret = dynamic ? only(@variables $name[1:n](t) = V0_val) :
-                                only(@parameters $name[1:n] = V0_val)
-            else
-                throw("'n' must be greater than or equal to 1")
-            end
+            throw("'n' must be greater than or equal to 1")
         end
-    
-        ret = set_symarray_metadata(ret, PrimitiveSource, source)
-        ret = set_symarray_metadata(ret, MembranePotential, true)
+   
+        ret = setmetadata.(ret, PrimitiveSource, source)
+        ret = setmetadata.(ret, MembranePotential, true)
         return ret
     end
 end

@@ -144,6 +144,6 @@ end
 function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
     states, params, eqs, defs, compartments = build_toplevel(mcsys)
     all_systems = map(x -> convert(ODESystem, x), compartments)
-    odesys = ODESystem(eqs, t, states, params; defaults = defs, name = nameof(mcsys))
-    return compose(odesys, all_systems)
+    odesys = ODESystem(eqs, t, states, params; defaults = defs, name = nameof(mcsys), systems = all_systems)
+    return odesys
 end

@@ -53,6 +53,7 @@ const SimpleGate = SteadyState
 
 struct Gate{T<:GateVarForm} <: AbstractGatingVariable
     output::Num
+    eqs::Vector{Equation}
     props::Dict{Symbol,Any}
 end
 
@@ -177,7 +178,7 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     @named Vₓ = ExtrinsicPotential(n = length(subscriptions(chan))) 
     # Derived from Pinsky & Rinzel 1994 - Equation 4 
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
-    return[D(out) .~ sum(ModelingToolkit.scalarize(Vₓ .>= thold_val) .- (out/sat))]
+    return[D(out) ~ sum((Vₓ .>= thold_val) .- (out/sat))]
 end
 
 """

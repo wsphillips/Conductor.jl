@@ -32,10 +32,12 @@ function Synapse(pre_to_post::Pair, conductance, reversal)
     return Synapse(pre_to_post.first, pre_to_post.second, conductance, reversal) 
 end
 
+namegen(name) = Symbol(filter(x -> x !== '#', String(Base.gensym(name))))
+
 function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem})
     rootname = ModelingToolkit.getname(x)
     new = deepcopy(x)
-    return ModelingToolkit.rename(new, Base.gensym(rootname))
+    return ModelingToolkit.rename(new, namegen(rootname))
 end
 
 presynaptic(x::Synapse) = getfield(x, :source)
@@ -145,10 +147,13 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
     for comp in all_compartments
         push!(neurons, hasparent(comp) ? parent(comp) : comp)
     end
-
+    #println("There are $(length(neurons)) neurons counted from the synapses.")
     # Reset all synaptic information
+    foreach(reset_synapses!, all_compartments)
     foreach(reset_synapses!, neurons)
-   
+    
+    neurons = deepcopy.(neurons)
+    postneurons = deepcopy.(postneurons)
     # For each post synaptic neuron
     for pn in postneurons
         incoming_edges = filter(x -> isequal(postsynaptic(x), pn), synapses)
@@ -172,9 +177,18 @@ function build_toplevel!(dvs, ps, eqs, defs, network_sys::NeuronalNetworkSystem)
             end
             if !isempty(subscriptions(cl_copy)) && isaggregate(cl_copy)
                 push!(get_synapses(pn), cl_copy)
-                for (i, pre) in enumerate(presynaptic.(inc_edges_of_cl))
-                    post_v = getproperty(pn, nameof(cl_copy)).Vₓ[i]
-                    pre_v = pre.Vₘ
+
+                if length(inc_edges_of_cl) > 1
+                    vxs = filter(x -> isvoltage(x) && isextrinsic(x), states(getproperty(pn, nameof(cl_copy))))
+                    for (vx, pre) in zip(vxs, presynaptic.(inc_edges_of_cl))
+                        post_v = renamespace(getproperty(pn, nameof(cl_copy)), vx)
+                        pre_v = pre.Vₘ
+                        push!(voltage_fwds, pre_v ~ post_v)
+                        push!(defs, post_v => pre_v)
+                    end
+                else
+                    post_v = getproperty(pn, nameof(cl_copy)).Vₓ
+                    pre_v = only(presynaptic.(inc_edges_of_cl)).Vₘ
                     push!(voltage_fwds, pre_v ~ post_v)
                     push!(defs, post_v => pre_v)
                 end

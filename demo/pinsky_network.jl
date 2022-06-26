@@ -1,5 +1,5 @@
 
-cd("/home/wsphil/git/Conductor.jl/demo")
+cd("/home/wikphi/git/Conductor.jl/demo")
 include(joinpath(@__DIR__, "traub_kinetics.jl"))
 
 import Unitful: µF, pA, µA, nA, µS
@@ -77,18 +77,31 @@ import Conductor: NMDA, AMPA, HeavisideSum
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 
-neuronpopulation = [Conductor.replicate(mcneuron) for n in 1:10];
+neuronpopulation = [Conductor.replicate(mcneuron) for n in 1:100];
 
-allsynapses = Synapse[]
+allsynapses = Set{Synapse}()
 
-for neuron in neurons
-    for _ in 1:2
+for neuron in neuronpopulation
+
+    ampa_synapses = Set{Synapse}()
+    nmda_synapses = Set{Synapse}()
+    while length(nmda_synapses) < 20  
         syn1 = Synapse(rand(neuronpopulation).soma => neuron.dendrite, NMDAChan, ENMDA)
+        push!(nmda_synapses, syn1)
+    end 
+
+    while length(ampa_synapses) < 20
         syn2 = Synapse(rand(neuronpopulation).soma => neuron.dendrite, AMPAChan, EAMPA)
-        push!(allsynapses, syn1)
-        push!(allsynapses, syn2)
+        push!(ampa_synapses, syn2)
     end
+    union!(allsynapses, ampa_synapses, nmda_synapses)
 end
 
-net = NeuronalNetworkSystem(allsynapses)
+
+net = NeuronalNetworkSystem(collect(allsynapses))
+prob = Simulation(net, time = 5000ms)
+using OrdinaryDiffEq
+sol = solve(prob, RadauIIA5())
+using Plots
+plot(sol)
 
