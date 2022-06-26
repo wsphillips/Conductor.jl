@@ -80,10 +80,11 @@ EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 
 @time neuronpopulation = [Conductor.replicate(mcneuron) for n in 1:100];
 
-allsynapses = Set{Synapse}()
 
 # This will go much faster using something like SimpleDiGraph--currently way too much
-# allocation
+# allocation; baseline @time = 124.382992 seconds (1.09 G allocations: 43.285 GiB, 4.90% gc time)
+
+allsynapses = Set{Synapse}()
 @time begin
 for neuron in neuronpopulation
 
@@ -102,6 +103,20 @@ for neuron in neuronpopulation
 end
 end
 allsynapses = collect(allsynapses);
+
+using Graphs
+
+allsynapses = Vector{Synapse}(undef, 4000)
+@time begin
+nmda_g = random_regular_digraph(100, 20, dir=:in)
+ampa_g = random_regular_digraph(100, 20, dir=:in)
+for (i, e) in enumerate(edges(nmda_g))
+    allsynapses[i] = Synapse(neuronpopulation[src(e)].soma => neuronpopulation[dst(e)].dendrite, NMDAChan, ENMDA)
+end
+for (i, e) in enumerate(edges(ampa_g))
+    allsynapses[2000 + i] = Synapse(neuronpopulation[src(e)].soma => neuronpopulation[dst(e)].dendrite, AMPAChan, EAMPA)
+end
+end
 
 # this is only fast because the cost is amortized
 @time net = NeuronalNetworkSystem(allsynapses);
