@@ -1,5 +1,6 @@
 
-cd("/home/wikphi/git/Conductor.jl/demo")
+cd("Conductor.jl/demo")
+
 include(joinpath(@__DIR__, "traub_kinetics.jl"))
 
 import Unitful: µF, pA, µA, nA, µS
@@ -77,10 +78,13 @@ import Conductor: NMDA, AMPA, HeavisideSum
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 
-neuronpopulation = [Conductor.replicate(mcneuron) for n in 1:100];
+@time neuronpopulation = [Conductor.replicate(mcneuron) for n in 1:100];
 
 allsynapses = Set{Synapse}()
 
+# This will go much faster using something like SimpleDiGraph--currently way too much
+# allocation
+@time begin
 for neuron in neuronpopulation
 
     ampa_synapses = Set{Synapse}()
@@ -94,13 +98,20 @@ for neuron in neuronpopulation
         syn2 = Synapse(rand(neuronpopulation).soma => neuron.dendrite, AMPAChan, EAMPA)
         push!(ampa_synapses, syn2)
     end
-    union!(allsynapses, ampa_synapses, nmda_synapses)
+    union!(allsynapses, ampa_synapses, nmda_synapses);
 end
+end
+allsynapses = collect(allsynapses);
 
+# this is only fast because the cost is amortized
+@time net = NeuronalNetworkSystem(allsynapses);
 
-net = NeuronalNetworkSystem(collect(allsynapses))
+# the steps include a slow conversion: convert(ODESystem, net)
+# structural_simplify is only a minor cost (~12 seconds for 100 neurons with 4000 synapses)
 prob = Simulation(net, time = 5000ms)
 using OrdinaryDiffEq
+# on the first run, over 40% of the time is single thread compilation time. Without
+# compilation, the solution is about 200 seconds for 5 seconds of tspan
 sol = solve(prob, RadauIIA5())
 using Plots
 plot(sol)

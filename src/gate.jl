@@ -53,7 +53,6 @@ const SimpleGate = SteadyState
 
 struct Gate{T<:GateVarForm} <: AbstractGatingVariable
     output::Num
-    eqs::Vector{Equation}
     props::Dict{Symbol,Any}
 end
 
