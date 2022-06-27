@@ -6,7 +6,7 @@ include(joinpath(@__DIR__, "traub_kinetics.jl"))
 using OrdinaryDiffEq, LinearAlgebra, Plots
 import Unitful: µF, pA, µA, nA, µS
 # NB: Set to number of cores, not threads. Esp. important on 12th gen Intel & Apple M1/2
-LinearAlgebra.BLAS.set_num_threads(6)
+LinearAlgebra.BLAS.set_num_threads(8)
 
 @parameters ϕ = 0.13 β = 0.075 p = 0.5
 
@@ -82,7 +82,25 @@ ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 
 # Need to introduce 10% gca variance as per Pinsky/Rinzel
-@time neuronpopulation = [Conductor.replicate(mcneuron) for n in 1:10];
+neuronpopulation = Vector{MultiCompartmentSystem}(undef, 100)
+
+# introduce calcium channel conductance variation
+for i in eachindex(neuronpopulation)
+    @named dendrite = Compartment(Vₘ,
+                                 [KAHP(0.8mS/cm^2),
+                                  CaS(rand(9.0:0.1:10.0)mS/cm^2),
+                                  KCa(15mS/cm^2),
+                                  leak(0.1mS/cm^2)],
+                                 reversals[2:4],
+                                 geometry = Unitless(0.5),
+                                 capacitance = capacitance,
+                                 extensions = [calcium_conversion])
+    
+    soma2dendrite = deepcopy(Junction(soma => dendrite, gc_soma, symmetric = false));
+    dendrite2soma = deepcopy(Junction(dendrite => soma, gc_dendrite, symmetric = false));
+    neuronpopulation[i] = MultiCompartment([soma2dendrite, dendrite2soma]; name = Conductor.namegen(:mcneuron))
+   
+end
 
 using Graphs
 allsynapses = Vector{Synapse}(undef, 4000)

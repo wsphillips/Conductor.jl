@@ -15,8 +15,17 @@ A model of conductance.
 $(FIELDS)
 """
 struct ConductanceSystem <: AbstractConductanceSystem
+    # MTK fields
+    eqs::Vector{Equation}
     "Independent variabe. Defaults to time, ``t``."
     iv::Num
+    states::Set{Num}
+    ps::Set{Num}
+    observed::Vector{Equation}
+    name::Symbol
+    systems::Vector{AbstractTimeDependentSystem}
+    defaults::Dict
+    # Conductor fields
     "Conductance, ``g``, of the system."
     output::Num
     "Maximum conductance, ``\\overline{g}``."
@@ -33,19 +42,15 @@ struct ConductanceSystem <: AbstractConductanceSystem
     during conversion to `ODESystem`.
     """
     extensions::Vector{ODESystem}
-    defaults::Dict
-    name::Symbol
-    eqs::Vector{Equation}
-    systems::Vector{AbstractTimeDependentSystem}
-    observed::Vector{Equation}
-    function ConductanceSystem(iv, output, gbar, ion, aggregate, gate_vars, subscriptions,
-                               extensions, defaults, name, eqs, systems, observed;
+    inputs::Set{Num}
+    function ConductanceSystem(eqs, iv, states, ps, observed, name, systems, defaults,
+            output, gbar, ion, aggregate, gate_vars, subscriptions, extensions, inputs;
                                checks = false)
         if checks
         #placeholder
         end
-        new(iv, output, gbar, ion, aggregate, gate_vars, subscriptions, extensions,
-            defaults, name, eqs, systems, observed)
+        new(eqs, iv, states, ps, observed, name, systems, defaults, output, gbar, ion,
+            aggregate, gate_vars, subscriptions, extensions, inputs)
     end
 end
 
@@ -65,35 +70,38 @@ Main constructor for `ConductanceSystem`.
 - `defaults::Dict`: Default values for states and parameters.
 - `name::Symbol`: Name of the system.
 """
-function ConductanceSystem(g::Num, ion::IonSpecies,
-                           gate_vars::Vector{<:AbstractGatingVariable}; gbar::Num,
-                           aggregate = false, extensions::Vector{ODESystem} = ODESystem[],
-                           defaults = Dict(), name::Symbol = Base.gensym("Conductance"))
+function ConductanceSystem(g::Num,
+                           ion::IonSpecies,
+                           gate_vars::Vector{<:AbstractGatingVariable};
+                           gbar::Num,
+                           aggregate = false,
+                           subscriptions = Set{AbstractCompartmentSystem}(),
+                           extensions::Vector{ODESystem} = ODESystem[],
+                           defaults = Dict(),
+                           name::Symbol = Base.gensym("Conductance"))
 
     gbar = setmetadata(gbar, ConductorMaxConductance, true)
+
+    # Fields that will be generated
     eqs = Equation[]
     systems = AbstractTimeDependentSystem[]
     observed = Equation[]
-    subscriptions = Set{AbstractCompartmentSystem}()
-
-    return ConductanceSystem(t, g, gbar, ion, aggregate, gate_vars, subscriptions,
-                             extensions, defaults, name, eqs, systems, observed)
-end
-
-# Internal API: lazy generation of `ConductanceSystem` equations/components
-function build_toplevel!(dvs, ps, eqs, defs, comp_sys::ConductanceSystem)
-    
     inputs = Set{Num}()
+    dvs = Set{Num}()
+    ps = Set{Num}()
+   
+    # incomplete initialization
+    cond_sys = ConductanceSystem(eqs, t, dvs, ps, observed, name, systems, defaults, g,
+                                 gbar, ion, aggregate, gate_vars, subscriptions, extensions,
+                                 inputs)
+
     gate_var_outputs = Set{Num}()
     embed_defaults = Dict()
-    
-    gbar = getfield(comp_sys, :gbar) # needs getter?
+   
     isparameter(gbar) && push!(ps, gbar)
-    g = get_output(comp_sys) 
-    gate_vars = getfield(comp_sys, :gate_vars) # needs getter?
 
     for var in gate_vars
-        vareqs = get_eqs(var, comp_sys)
+        vareqs = get_eqs(var, cond_sys)
         o = output(var)
         push!(isparameter(o) ? ps : gate_var_outputs, o)
         foreach(x -> get_variables!(inputs, x), vareqs)
@@ -114,42 +122,87 @@ function build_toplevel!(dvs, ps, eqs, defs, comp_sys::ConductanceSystem)
     # Remove parameters + generated states
     setdiff!(inputs, ps, gate_var_outputs)
     union!(dvs, inputs, Set(g), gate_var_outputs)
+    merge!(embed_defaults, defaults) 
 
-    merge!(defs, merge(embed_defaults, getfield(comp_sys, :defaults))) 
-
-    return dvs, ps, eqs, defs, inputs
+    cond_sys = ConductanceSystem(eqs, t, dvs, ps, observed, name, systems, defaults, g,
+                                 gbar, ion, aggregate, gate_vars, subscriptions, extensions,
+                                 inputs)
+    return cond_sys
 end
 
-get_inputs(x::ConductanceSystem) = build_toplevel(x)[5]
+# Internal API: lazy generation of `ConductanceSystem` equations/components
+#function build_toplevel!(dvs, ps, eqs, defs, cond_sys::ConductanceSystem)
+#    
+#    inputs = Set{Num}()
+#    gate_var_outputs = Set{Num}()
+#    embed_defaults = Dict()
+#    
+#    gbar = getfield(cond_sys, :gbar) # needs getter?
+#    g = get_output(cond_sys) 
+#    gate_vars = getfield(cond_sys, :gate_vars) # needs getter?
+#
+#    for var in gate_vars
+#        vareqs = get_eqs(var, cond_sys)
+#        o = output(var)
+#        push!(isparameter(o) ? ps : gate_var_outputs, o)
+#        foreach(x -> get_variables!(inputs, x), vareqs)
+#        union!(eqs, vareqs)
+#    end
+#
+#    for sym in inputs
+#        isparameter(sym) && push!(ps, sym)
+#        hasdefault(sym) && push!(embed_defaults, sym => getdefault(sym))
+#    end
+#    
+#    if isempty(gate_vars)
+#        push!(eqs, g ~ gbar)
+#    else
+#        push!(eqs, g ~ gbar * prod(output(x)^exponent(x) for x in gate_vars))
+#    end
+#
+#    # Remove parameters + generated states
+#    setdiff!(inputs, ps, gate_var_outputs)
+#    union!(dvs, inputs, Set(g), gate_var_outputs)
+#
+#    merge!(defs, merge(embed_defaults, getfield(cond_sys, :defaults))) 
+#
+#    return dvs, ps, eqs, defs, inputs
+#end
 
-function MTK.get_eqs(x::AbstractConductanceSystem)
-    empty!(getfield(x, :eqs))
-    union!(getfield(x, :eqs), build_toplevel(x)[3])
-    return getfield(x, :eqs)
-end
+#get_inputs(x::ConductanceSystem) = build_toplevel(x)[5]
+get_inputs(x::ConductanceSystem) = getfield(x, :inputs)
 
-function MTK.get_states(x::AbstractConductanceSystem)
-    collect(build_toplevel(x)[1])
-end
-
-MTK.has_ps(x::ConductanceSystem) = true
-
-function MTK.get_ps(x::AbstractConductanceSystem)
-    collect(build_toplevel(x)[2])
-end
-
-function MTK.defaults(x::AbstractConductanceSystem)
-    build_toplevel(x)[4]
-end
-
-function MTK.get_systems(x::AbstractConductanceSystem)
-    return getfield(x, :systems)
-end
+#function MTK.get_eqs(x::AbstractConductanceSystem)
+#    empty!(getfield(x, :eqs))
+#    union!(getfield(x, :eqs), build_toplevel(x)[3])
+#    return getfield(x, :eqs)
+#end
+#
+#function MTK.get_states(x::AbstractConductanceSystem)
+#    collect(build_toplevel(x)[1])
+#end
+#
+#MTK.has_ps(x::ConductanceSystem) = true
+#
+#function MTK.get_ps(x::AbstractConductanceSystem)
+#    collect(build_toplevel(x)[2])
+#end
+#
+#function MTK.defaults(x::AbstractConductanceSystem)
+#    build_toplevel(x)[4]
+#end
+#
+#function MTK.get_systems(x::AbstractConductanceSystem)
+#    return getfield(x, :systems)
+#end
 
 get_extensions(x::AbstractConductanceSystem) = getfield(x, :extensions)
 
 function Base.convert(::Type{ODESystem}, condsys::ConductanceSystem)
-    dvs, ps, eqs, defs, _ = build_toplevel(condsys)
+    dvs = states(condsys)
+    ps  = parameters(condsys)
+    eqs = equations(condsys)
+    defs = get_defaults(condsys)
     sys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(condsys))
     #return extend(sys, get_extensions(sys))
     return sys
