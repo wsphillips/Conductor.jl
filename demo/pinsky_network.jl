@@ -3,7 +3,10 @@ cd("Conductor.jl/demo")
 
 include(joinpath(@__DIR__, "traub_kinetics.jl"))
 
+using OrdinaryDiffEq, LinearAlgebra, Plots
 import Unitful: µF, pA, µA, nA, µS
+# NB: Set to number of cores, not threads. Esp. important on 12th gen Intel & Apple M1/2
+LinearAlgebra.BLAS.set_num_threads(6)
 
 @parameters ϕ = 0.13 β = 0.075 p = 0.5
 
@@ -78,35 +81,14 @@ import Conductor: NMDA, AMPA, HeavisideSum
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 
-@time neuronpopulation = [Conductor.replicate(mcneuron) for n in 1:100];
-
-
-# This will go much faster using something like SimpleDiGraph--currently way too much
-# allocation; baseline @time = 124.382992 seconds (1.09 G allocations: 43.285 GiB, 4.90% gc time)
-
-allsynapses = Set{Synapse}()
-@time begin
-for neuron in neuronpopulation
-
-    ampa_synapses = Set{Synapse}()
-    nmda_synapses = Set{Synapse}()
-    while length(nmda_synapses) < 20  
-        syn1 = Synapse(rand(neuronpopulation).soma => neuron.dendrite, NMDAChan, ENMDA)
-        push!(nmda_synapses, syn1)
-    end 
-
-    while length(ampa_synapses) < 20
-        syn2 = Synapse(rand(neuronpopulation).soma => neuron.dendrite, AMPAChan, EAMPA)
-        push!(ampa_synapses, syn2)
-    end
-    union!(allsynapses, ampa_synapses, nmda_synapses);
-end
-end
-allsynapses = collect(allsynapses);
+# Need to introduce 10% gca variance as per Pinsky/Rinzel
+@time neuronpopulation = [Conductor.replicate(mcneuron) for n in 1:10];
 
 using Graphs
-
 allsynapses = Vector{Synapse}(undef, 4000)
+
+# Generating topology with Graphs.jl is trivial.
+# The getproperty calls for soma/dendrite are far too expensive here.
 @time begin
 nmda_g = random_regular_digraph(100, 20, dir=:in)
 ampa_g = random_regular_digraph(100, 20, dir=:in)
@@ -121,13 +103,14 @@ end
 # this is only fast because the cost is amortized
 @time net = NeuronalNetworkSystem(allsynapses);
 
-# the steps include a slow conversion: convert(ODESystem, net)
-# structural_simplify is only a minor cost (~12 seconds for 100 neurons with 4000 synapses)
-prob = Simulation(net, time = 5000ms)
-using OrdinaryDiffEq
-# on the first run, over 40% of the time is single thread compilation time. Without
-# compilation, the solution is about 200 seconds for 5 seconds of tspan
-sol = solve(prob, RadauIIA5())
-using Plots
+# the steps include a way too slow conversion: convert(ODESystem, net)
+# relatively, call to structural_simplify is cheap
+
+simp = Simulation(net, time = 5000ms, return_system=true)
+prob = ODAEProblem(simp, [], (0,5000.));
+# on the first run, over 40% of the time is single threaded compilation time. Without
+# compilation, solving takes roughly 200 seconds (6-8 cores) for 5 seconds of tspan.
+
+@time sol = solve(prob, RadauIIA5());
 plot(sol)
 
