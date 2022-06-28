@@ -1,6 +1,5 @@
 abstract type AbstractJunction end
 
-
 """
 $(TYPEDEF)
 
@@ -104,14 +103,8 @@ function build_toplevel!(dvs, ps, eqs, defs, mcsys::MultiCompartmentSystem)
 
     junctions = get_junctions(mcsys)
     compartments = get_compartments(mcsys)
-    jxn_types = Set{ConductanceSystem}() 
-
     forwards = Set{Equation}()
 
-    for junction in junctions
-        push!(jxn_types, get_conductance(junction))
-    end
-    
     # Reset subcompartment axial connections
     foreach(x -> empty!(get_axial_conductance(x)), compartments)
     

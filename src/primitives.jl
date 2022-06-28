@@ -220,6 +220,9 @@ function IonCurrent(ion::IonSpecies, val = nothing; aggregate::Bool = false,
     return var
 end
 
+IonCurrent(cond::AbstractConductanceSystem) = 
+IonCurrent(permeability(cond); name = Symbol("I", nameof(cond)))
+
 # Internal API: Current trait queries
 iscurrent(x) = hasmetadata(value(x), IonCurrent)
 iscurrent(x::IonCurrent) = true
@@ -276,6 +279,11 @@ function getion(x)
     iscurrent(x) && return getion(getcurrent(x))
     isreversal(x) && return getion(getreversal(x))
     return nothing
+end
+
+function find_reversal(cond::AbstractConductanceSystem, reversals)
+    ion = permeability(cond)
+    return only(filter(x -> isequal(getion(x), ion), reversals))
 end
 
 #FIXME: this is a kludge

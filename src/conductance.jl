@@ -19,8 +19,8 @@ struct ConductanceSystem <: AbstractConductanceSystem
     eqs::Vector{Equation}
     "Independent variabe. Defaults to time, ``t``."
     iv::Num
-    states::Set{Num}
-    ps::Set{Num}
+    states::Vector{Num}
+    ps::Vector{Num}
     observed::Vector{Equation}
     name::Symbol
     systems::Vector{AbstractTimeDependentSystem}
@@ -36,13 +36,13 @@ struct ConductanceSystem <: AbstractConductanceSystem
     "Gating variables."
     gate_vars::Vector{AbstractGatingVariable}
     "Extrinsic sources of state (e.g. presynaptic compartments)."
-    subscriptions::Set{AbstractCompartmentSystem}
+    subscriptions::Vector{AbstractCompartmentSystem}
     """
     Additional systems to extend dynamics. Extensions are composed with the parent system
     during conversion to `ODESystem`.
     """
     extensions::Vector{ODESystem}
-    inputs::Set{Num}
+    inputs::Vector{Num}
     function ConductanceSystem(eqs, iv, states, ps, observed, name, systems, defaults,
             output, gbar, ion, aggregate, gate_vars, subscriptions, extensions, inputs;
                                checks = false)
@@ -75,7 +75,7 @@ function ConductanceSystem(g::Num,
                            gate_vars::Vector{<:AbstractGatingVariable};
                            gbar::Num,
                            aggregate = false,
-                           subscriptions = Set{AbstractCompartmentSystem}(),
+                           subscriptions = Vector{AbstractCompartmentSystem}(),
                            extensions::Vector{ODESystem} = ODESystem[],
                            defaults = Dict(),
                            name::Symbol = Base.gensym("Conductance"))
@@ -91,9 +91,9 @@ function ConductanceSystem(g::Num,
     ps = Set{Num}()
    
     # incomplete initialization
-    cond_sys = ConductanceSystem(eqs, t, dvs, ps, observed, name, systems, defaults, g,
+    cond_sys = ConductanceSystem(eqs, t, Num[], Num[], observed, name, systems, defaults, g,
                                  gbar, ion, aggregate, gate_vars, subscriptions, extensions,
-                                 inputs)
+                                 Num[])
 
     gate_var_outputs = Set{Num}()
     embed_defaults = Dict()
@@ -124,9 +124,9 @@ function ConductanceSystem(g::Num,
     union!(dvs, inputs, Set(g), gate_var_outputs)
     merge!(embed_defaults, defaults) 
 
-    cond_sys = ConductanceSystem(eqs, t, dvs, ps, observed, name, systems, defaults, g,
+    cond_sys = ConductanceSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems, embed_defaults, g,
                                  gbar, ion, aggregate, gate_vars, subscriptions, extensions,
-                                 inputs)
+                                 collect(inputs))
     return cond_sys
 end
 get_inputs(x::ConductanceSystem) = getfield(x, :inputs)

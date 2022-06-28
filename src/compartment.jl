@@ -48,8 +48,8 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     eqs::Vector{Equation}
     "Independent variabe. Defaults to time, ``t``."
     iv::Num
-    states::Set{Num}
-    ps::Set{Num}
+    states::Vector{Num}
+    ps::Vector{Num}
     observed::Vector{Equation}
     name::Symbol
     systems::Vector{AbstractTimeDependentSystem}
@@ -62,15 +62,15 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     "Morphological geometry of the compartment."
     geometry::Geometry
     "Ionic conductances."
-    chans::Set{AbstractConductanceSystem}
+    chans::Vector{AbstractConductanceSystem}
     "Equilibrium potentials belonging to ionic membrane conductances."
-    channel_reversals::Set{Num}
+    channel_reversals::Vector{Num}
     "Synaptic conductances."
-    synapses::Set{AbstractConductanceSystem}
+    synapses::Vector{AbstractConductanceSystem}
     "Equilibrium potentials belonging to synaptic conductances."
-    synaptic_reversals::Set{Num}
+    synaptic_reversals::Vector{Num}
     "Axial (intercompartmental) conductances."
-    axial_conductance::Set{Tuple{AbstractConductanceSystem,Num}}
+    axial_conductance::Vector{Tuple{AbstractConductanceSystem,Num}}
     "Experimental stimuli (for example, current injection)."
     stimuli::Vector{Equation}
     """
@@ -125,11 +125,11 @@ function CompartmentSystem(
 ) 
     
     @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
-    channels = Set(channels)
-    channel_reversals = Set(channel_reversals)
-    synaptic_channels = Set()
-    synaptic_reversals = Set()
-    axial_conductance = Set()
+    Set(channels)
+    Set(channel_reversals)
+    synaptic_channels = Set{AbstractConductanceSystem}()
+    synaptic_reversals = Set{Num}()
+    axial_conductance = Set{Tuple{AbstractConductanceSystem,Num}}()
     parent = Ref{AbstractCompartmentSystem}()
 
     return CompartmentSystem(Vₘ, cₘ, geometry, channels, channel_reversals, 
@@ -137,7 +137,7 @@ function CompartmentSystem(
                              stimuli, extensions, parent, name, defaults)
 end
 
-# takes all spec fields and generates remaining fields
+# takes all user specified fields and generates remaining fields
 function CompartmentSystem(
     Vₘ,
     cₘ,
@@ -156,78 +156,49 @@ function CompartmentSystem(
 
     # generated
     eqs = Equation[]
-    systems = AbstractSystem[]
+    systems = union(channels, synaptic_channels, first.(axial_conductance))
     observed = Equation[]
     dvs = Set{Num}()
     ps  = Set{Num}()
     currents = Set()
-    
+    defs = Dict()
 
-    aₘ = area(geometry)
+    @parameters aₘ = area(geometry)
     push!(dvs, Vₘ)
     push!(ps, aₘ)
     push!(ps, cₘ)
 
     # Check for possible dynamic reversals
     reversal_equation_vars = Set{Num}()
-
     for Erev in union(channel_reversals, synaptic_reversals)
         if isparameter(Erev)
             push!(ps, Erev)
         else
             push!(dvs, Erev)
+            # This assumes the equation for a dynamic reversal == default value
             get_variables!(reversal_equation_vars, getdefault(Erev))
             push!(eqs, Erev ~ getdefault(Erev))
         end
     end
     
-    filter!(x -> !isequal(x, t), reversal_equation_vars)
+    filter!(x -> !isequal(x, t), reversal_equation_vars) # remove iv
     foreach(x -> isparameter(x) && push!(ps, x), reversal_equation_vars)
+    
+    paired_channels = zip(channels,
+                          broadcast(chan -> find_reversal(chan, channel_reversals), channels))
+    paired_synapses = zip(synaptic_channels,
+                          broadcast(chan -> find_reversal(chan, synaptic_reversals), synaptic_channels))
+    paired_conductances = union(axial_conductance, paired_channels, paired_synapses)
 
-    # Gather channel current equations
-    for chan in channels
-        ion = permeability(chan)
-        Erev = only(filter(x -> isequal(getion(x), ion), channel_reversals))
-        I = IonCurrent(ion, name = Symbol("I", nameof(chan)))
+    for (chan, Erev) in paired_conductances
+        I = IonCurrent(chan)
         g = renamespace(chan, get_output(chan))
-        push!(eqs, I ~ g*aₘ*(Vₘ - Erev))
+        push!(eqs, I ~ g*(Vₘ - Erev)*(1*getmetadata(g, ConductorUnits) isa SpecificConductance ? aₘ : 1))
         push!(dvs, I)
         push!(currents, I)
-        merge!(defs, defaults(chan))
     end
 
-    # Gather synaptic current equations
-    for synapse in get_synapses(comp_sys)
-        ion = permeability(synapse)
-        Esyn = only(filter(x -> isequal(getion(x), ion), syn_revs))
-        I = IonCurrent(ion, name = Symbol("I", nameof(synapse)))
-        s = renamespace(synapse, get_output(synapse))
-        push!(eqs, I ~ s*(Vₘ - Esyn))
-        push!(dvs, I)
-        push!(syncurrents, I)
-        merge!(defs, defaults(synapse))
-    end
-    
-    # Gather axial current equations
-    for (ax, childvm) in get_axial_conductance(comp_sys)
-        I = IonCurrent(Leak, name = Symbol("I", nameof(ax)))
-        g = renamespace(ax, get_output(ax))
-        push!(eqs, I ~ g*aₘ*(childvm - Vₘ))
-        push!(dvs, I)
-        push!(dvs, childvm)
-        push!(currents, -I)
-        merge!(defs, defaults(ax))
-    end
-
-    # Gather extension equations
-    for extension in get_extensions(comp_sys)
-        union!(eqs, equations(extension))
-        union!(ps, parameters(extension))
-        union!(dvs, states(extension))
-        merge!(defs, defaults(extension))
-    end
-    
-    for stimulus in get_stimuli(comp_sys)
+    for stimulus in stimuli
         I = only(get_variables(stimulus.lhs))
         _vars = filter!(x -> !isequal(x,t), get_variables(stimulus.rhs))
         foreach(x -> push!(isparameter(x) ? ps : dvs, x), _vars)
@@ -243,8 +214,21 @@ function CompartmentSystem(
     end
 
     # Voltage equation
-    push!(eqs, D(get_output(comp_sys)) ~ -sum(union(currents,syncurrents))/(cₘ*aₘ))
+    push!(eqs, D(Vₘ) ~ -sum(currents)/(cₘ*aₘ))
 
+    # compose extensions
+    for extension in extensions
+        union!(eqs, equations(extension))
+        union!(ps, parameters(extension))
+        union!(dvs, states(extension))
+    end
+    
+    merge!(defs, defaults)
+
+    return  CompartmentSystem(eqs, t, collect(dvs), collect(ps), observed, name, collect(systems), defs,
+                              Vₘ, cₘ, geometry, collect(channels), collect(channel_reversals),
+                              collect(synaptic_channels), collect(synaptic_reversals), collect(axial_conductance), stimuli,
+                               extensions, parent)
 end
 
 # AbstractSystem interface extensions
@@ -274,97 +258,6 @@ end
 get_synaptic_reversals(x::AbstractCompartmentSystem) = get_reversals(x)[2]
 get_channel_reversals(x::AbstractCompartmentSystem) = get_reversals(x)[1]
 
-function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
-
-    currents = Set{Num}()
-    syncurrents = Set{Num}() # not necessary
-    aₘ = area(comp_sys)
-    cₘ = capacitance(comp_sys)
-    Vₘ = get_output(comp_sys)
-    push!(dvs, Vₘ)
-    push!(ps, aₘ)
-    push!(ps, cₘ)
-    chan_revs, syn_revs = get_reversals(comp_sys) 
-
-    # Check for possible dynamic reversals
-    rev_eq_vars = []
-    for Erev in union(chan_revs, syn_revs)
-        if isparameter(Erev)
-            push!(ps, Erev)
-        else
-            push!(dvs, Erev)
-            get_variables!(rev_eq_vars, getdefault(Erev))
-            push!(eqs, Erev ~ getdefault(Erev))
-        end
-    end
-    
-    filter!(x -> !isequal(x, t), rev_eq_vars)
-    foreach(x -> isparameter(x) && push!(ps, x), rev_eq_vars)
-
-    # Gather channel current equations
-    for chan in get_channels(comp_sys)
-        ion = permeability(chan)
-        Erev = only(filter(x -> isequal(getion(x), ion), chan_revs))
-        I = IonCurrent(ion, name = Symbol("I", nameof(chan)))
-        g = renamespace(chan, get_output(chan))
-        push!(eqs, I ~ g*aₘ*(Vₘ - Erev))
-        push!(dvs, I)
-        push!(currents, I)
-        merge!(defs, defaults(chan))
-    end
-
-    # Gather synaptic current equations
-    for synapse in get_synapses(comp_sys)
-        ion = permeability(synapse)
-        Esyn = only(filter(x -> isequal(getion(x), ion), syn_revs))
-        I = IonCurrent(ion, name = Symbol("I", nameof(synapse)))
-        s = renamespace(synapse, get_output(synapse))
-        push!(eqs, I ~ s*(Vₘ - Esyn))
-        push!(dvs, I)
-        push!(syncurrents, I)
-        merge!(defs, defaults(synapse))
-    end
-    
-    # Gather axial current equations
-    for (ax, childvm) in get_axial_conductance(comp_sys)
-        I = IonCurrent(Leak, name = Symbol("I", nameof(ax)))
-        g = renamespace(ax, get_output(ax))
-        push!(eqs, I ~ g*aₘ*(childvm - Vₘ))
-        push!(dvs, I)
-        push!(dvs, childvm)
-        push!(currents, -I)
-        merge!(defs, defaults(ax))
-    end
-
-    # Gather extension equations
-    for extension in get_extensions(comp_sys)
-        union!(eqs, equations(extension))
-        union!(ps, parameters(extension))
-        union!(dvs, states(extension))
-        merge!(defs, defaults(extension))
-    end
-    
-    for stimulus in get_stimuli(comp_sys)
-        I = only(get_variables(stimulus.lhs))
-        _vars = filter!(x -> !isequal(x,t), get_variables(stimulus.rhs))
-        foreach(x -> push!(isparameter(x) ? ps : dvs, x), _vars)
-        hasdefault(I) || push!(defs, I => stimulus.rhs)
-        if isparameter(I)
-            push!(ps, I)
-            push!(currents, -I)
-        else
-            push!(eqs, stimulus)
-            push!(dvs, I)
-            push!(currents, -I)
-        end
-    end
-
-    # Voltage equation
-    push!(eqs, D(get_output(comp_sys)) ~ -sum(union(currents,syncurrents))/(cₘ*aₘ))
-
-    return dvs, ps, eqs, defs, currents, syncurrents
-end
-
 function Base.:(==)(sys1::AbstractCompartmentSystem, sys2::AbstractCompartmentSystem)
     sys1 === sys2 && return true
     iv1 = get_iv(sys1)
@@ -379,10 +272,13 @@ end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
 
-    required_states = Set{Num}()
-    dvs, ps, eqs, defs, currents, syncurrents = build_toplevel(compartment)
+    dvs = get_states(compartment)
+    ps  = get_ps(compartment)
+    eqs = get_eqs(compartment)
+    defs = get_defaults(compartment)
     syss = convert.(ODESystem, collect(get_systems(compartment)))
     
+    required_states = Set{Num}()
     # Resolve in/out: "connect" / auto forward cell states to channels
     for x in union(get_channels(compartment), get_synapses(compartment))
         for inp in get_inputs(x)
@@ -398,13 +294,13 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
    
     # TODO: also parse stimuli and extensions for required states
     union!(required_states, setdiff(dvs, internally_modified))
-
+    component_currents = filter(x -> iscurrent(x) && !isaggregate(x), union(dvs,ps))
     # Resolve unavailable states
     for s in required_states
         # resolvedby(s) !== compartment && continue
         # Handled based on metadata of each state (for now just one case)
         if iscurrent(s) && isaggregate(s)
-            push!(eqs, s ~ sum(filter(x -> getion(x) == getion(s), currents)))
+            push!(eqs, s ~ sum(filter(x -> getion(x) == getion(s), component_currents)))
             push!(dvs, s)
         end
         # ... other switch cases for required state handlers ...

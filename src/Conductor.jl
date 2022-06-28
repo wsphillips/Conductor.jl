@@ -1,5 +1,6 @@
 module Conductor
 using DocStringExtensions
+using OrderedCollections
 using ModelingToolkit,
       Unitful,
       Unitful.DefaultSymbols,
