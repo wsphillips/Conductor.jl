@@ -133,8 +133,8 @@ function CompartmentSystem(
     parent = Ref{AbstractCompartmentSystem}()
 
     return CompartmentSystem(Vₘ, cₘ, geometry, channels, channel_reversals, 
-name, defaults, 
-                             stimuli, extensions, name)
+                             synaptic_channels, synaptic_reversals, axial_conductance, 
+                             stimuli, extensions, parent, name, defaults)
 end
 
 # takes all spec fields and generates remaining fields
@@ -153,40 +153,41 @@ function CompartmentSystem(
     name,
     defaults
     )
+
+    # generated
     eqs = Equation[]
     systems = AbstractSystem[]
     observed = Equation[]
+    dvs = Set{Num}()
+    ps  = Set{Num}()
+    currents = Set()
+    
 
-# generated
-    currents = Set{Num}()
-    syncurrents = Set{Num}()
-    aₘ = area(comp_sys)
-    cₘ = capacitance(comp_sys)
-    Vₘ = get_output(comp_sys)
+    aₘ = area(geometry)
     push!(dvs, Vₘ)
     push!(ps, aₘ)
     push!(ps, cₘ)
-    chan_revs, syn_revs = get_reversals(comp_sys) 
 
     # Check for possible dynamic reversals
-    rev_eq_vars = []
-    for Erev in union(chan_revs, syn_revs)
+    reversal_equation_vars = Set{Num}()
+
+    for Erev in union(channel_reversals, synaptic_reversals)
         if isparameter(Erev)
             push!(ps, Erev)
         else
             push!(dvs, Erev)
-            get_variables!(rev_eq_vars, getdefault(Erev))
+            get_variables!(reversal_equation_vars, getdefault(Erev))
             push!(eqs, Erev ~ getdefault(Erev))
         end
     end
     
-    filter!(x -> !isequal(x, t), rev_eq_vars)
-    foreach(x -> isparameter(x) && push!(ps, x), rev_eq_vars)
+    filter!(x -> !isequal(x, t), reversal_equation_vars)
+    foreach(x -> isparameter(x) && push!(ps, x), reversal_equation_vars)
 
     # Gather channel current equations
-    for chan in get_channels(comp_sys)
+    for chan in channels
         ion = permeability(chan)
-        Erev = only(filter(x -> isequal(getion(x), ion), chan_revs))
+        Erev = only(filter(x -> isequal(getion(x), ion), channel_reversals))
         I = IonCurrent(ion, name = Symbol("I", nameof(chan)))
         g = renamespace(chan, get_output(chan))
         push!(eqs, I ~ g*aₘ*(Vₘ - Erev))
@@ -276,7 +277,7 @@ get_channel_reversals(x::AbstractCompartmentSystem) = get_reversals(x)[1]
 function build_toplevel!(dvs, ps, eqs, defs, comp_sys::CompartmentSystem)
 
     currents = Set{Num}()
-    syncurrents = Set{Num}()
+    syncurrents = Set{Num}() # not necessary
     aₘ = area(comp_sys)
     cₘ = capacitance(comp_sys)
     Vₘ = get_output(comp_sys)
