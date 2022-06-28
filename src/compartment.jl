@@ -138,21 +138,11 @@ function CompartmentSystem(
 end
 
 # takes all user specified fields and generates remaining fields
-function CompartmentSystem(
-    Vₘ,
-    cₘ,
-    geometry,
-    channels,
-    channel_reversals,
-    synaptic_channels,
-    synaptic_reversals,
-    axial_conductance,
-    stimuli,
-    extensions,
-    parent,
-    name,
-    defaults
-    )
+function CompartmentSystem(Vₘ, cₘ, geometry,
+                           channels, channel_reversals,
+                           synaptic_channels, synaptic_reversals,
+                           axial_conductance,
+                           stimuli, extensions, parent, name, defaults)
 
     # generated
     eqs = Equation[]
