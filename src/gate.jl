@@ -78,7 +78,7 @@ julia> (g.prop1, g.prop2)
 ("foo", 62)
 ```
 """
-function Gate(form::Type{T}, output, eqs; kwargs...) where T <: GateVarForm
+function Gate{T}(form::Type{T}, output::Num, eqs::Vector{Equation}; kwargs...) where T <: GateVarForm
     return Gate{T}(form, output, eqs, kwargs)
 end
 
@@ -95,11 +95,11 @@ kinetics.
 
 See also: [`get_eqs`](@ref).
 """
-function Gate(form::Type{AlphaBeta}, α::Num, β::Num; name = Base.gensym("GateVar"), kwargs...)
+function Gate(form::Type{AlphaBeta}, α, β; name = Base.gensym("GateVar"), kwargs...)
     x∞ = α/(α + β)
     x = only(@variables $name(t) = x∞)
     eqs = [D(x) ~ α*(1 - x) - β*x]
-    return Gate(form, x, eqs; ss = x∞, kwargs...)
+    return Gate{AlphaBeta}(form, x, eqs; ss = x∞, kwargs...)
 end
 
 """
@@ -110,10 +110,10 @@ as descriptors for its kinetics.
 
 See also: [`get_eqs`](@ref).
 """
-function Gate(form::Type{SteadyStateTau}, x∞::Num, τₓ::Num; name = Base.gensym("GateVar"), kwargs...)
+function Gate(form::Type{SteadyStateTau}, x∞, τₓ; name = Base.gensym("GateVar"), kwargs...)
     x = only(@variables $name(t) = x∞)
     eqs = [D(x) ~ inv(τₓ)*(x∞ - x)]
-    return Gate(form, x, eqs; ss = x∞, kwargs...)
+    return Gate{SteadyStateTau}(form, x, eqs; ss = x∞, kwargs...)
 end
 
 function Base.convert(::Type{Gate{SimpleGate}},
@@ -127,9 +127,9 @@ $(TYPEDSIGNATURES)
 
 Accepts any symbolic expression as an explicit definition of the gate dynamics.
 """
-function Gate(form::Type{SimpleGate}, rhs::Num; default = rhs, name = Base.gensym("GateVar"), kwargs...)
+function Gate(form::Type{SimpleGate}, rhs; default = rhs, name = Base.gensym("GateVar"), kwargs...)
     x = only(@variables $name(t) = default)
-    return Gate(form, x, [x ~ rhs]; kwargs...)
+    return Gate{SimpleGate}(form, x, [x ~ rhs]; kwargs...)
 end
 
 """
@@ -139,7 +139,7 @@ A static parameter gate with initial value, `val`.
 """
 function Gate(form::Type{ParameterGate}, val; name = Base.gensym("GateVar"), kwargs...)
     x = only(@parameters $name = val)
-    return Gate(form, x, Equation[]; val = val, kwargs...)
+    return Gate{ParameterGate}(form, x, Equation[]; val = val, kwargs...)
 end
 
 """
@@ -153,7 +153,7 @@ See also: [`get_eqs`](@ref).
 function Gate(form::Type{HeavisideSum}, threshold = 0mV, saturation = 125;
               name = Base.gensym("GateVar"), kwargs...) 
     x = only(@variables $name(t) = 0.0) # synaptically activated gate inits to 0.0
-    return Gate(form, x, Equation[]; threshold = threshold, saturation = saturation,
+    return Gate{HeavisideSum}(form, x, Equation[]; threshold = threshold, saturation = saturation,
                               kwargs...)
 end 
 

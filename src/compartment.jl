@@ -123,14 +123,16 @@ function CompartmentSystem(Vₘ, cₘ, geometry,
 
     # Check for possible dynamic reversals
     reversal_equation_vars = Set{Num}()
-    for Erev in union(channel_reversals, synaptic_reversals)
+    for Erev in union(channel_reversals, synaptic_reversals, last.(axial_conductance))
         if isparameter(Erev)
             push!(ps, Erev)
         else
             push!(dvs, Erev)
-            # This assumes the equation for a dynamic reversal == default value
-            get_variables!(reversal_equation_vars, getdefault(Erev))
-            push!(eqs, Erev ~ getdefault(Erev))
+            # FIXME: hacked solution. This assumes the equation for a dynamic reversal == default value
+            if MTK.hasdefault(Erev)
+                get_variables!(reversal_equation_vars, getdefault(Erev))
+                push!(eqs, Erev ~ getdefault(Erev))
+            end
         end
     end
     
@@ -185,7 +187,7 @@ function CompartmentSystem(Vₘ, cₘ, geometry,
                               stimuli, extensions, parent)
 end
 
-#=
+
 function CompartmentSystem(sys::CompartmentSystem;
                            Vₘ = get_output(sys),
                            cₘ = capacitance(sys),
@@ -193,7 +195,7 @@ function CompartmentSystem(sys::CompartmentSystem;
                            channels = get_channels(sys),
                            channel_reversals = get_channel_reversals(sys),
                            synaptic_channels = get_synapses(sys), 
-                           synaptic_reversals = get_syanptic_reversals(sys),
+                           synaptic_reversals = get_synaptic_reversals(sys),
                            axial_conductance = get_axial_conductance(sys),
                            stimuli = get_stimuli(sys),
                            extensions = get_extensions(sys),
@@ -206,7 +208,7 @@ function CompartmentSystem(sys::CompartmentSystem;
                            axial_conductance,
                            stimuli, extensions, parent, name, defaults)
 end
-=#
+
 
 # AbstractSystem interface extensions
 get_geometry(x::AbstractCompartmentSystem) = getfield(x, :geometry)
@@ -220,7 +222,7 @@ get_synapses(x::AbstractCompartmentSystem) = getfield(x, :synapses)
 get_stimuli(x::AbstractCompartmentSystem) = getfield(x, :stimuli)
 
 hasparent(x::CompartmentSystem) = isassigned(getfield(x, :parent))
-parent(x::CompartmentSystem) = getfield(x, :parent)[]
+parent(x::CompartmentSystem) = getfield(x, :parent)
 
 function setparent!(child::CompartmentSystem, parent::AbstractCompartmentSystem)
     ref = getfield(child, :parent)

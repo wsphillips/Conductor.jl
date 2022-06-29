@@ -1,31 +1,34 @@
-abstract type AbstractJunction end
 
-"""
-$(TYPEDEF)
-
-A connection (edge) between two morphologically contiguous compartments.
-
-For example, a `Junction` between a somatic `CompartmentSystem` and a dendritic `CompartmentSystem`.
-"""
-struct Junction <: AbstractJunction
-    trunk::CompartmentSystem
-    branch::CompartmentSystem
-    conductance::ConductanceSystem
-    symmetric::Bool
+struct MultiCompartmentTopology
+    g::SimpleDiGraph{Int}
+    compartments::Vector{CompartmentSystem}
+    conductances::Dict{Graphs.SimpleEdge{Int},ConductanceSystem}
 end
 
-"""
-    $(TYPEDSIGNATURES)
-
-Basic constructor for a `Junction`. 
-
-"""
-function Junction(x::Pair, conductance::ConductanceSystem; symmetric = true)
-    return Junction(x.first, x.second, conductance, symmetric)
+function MultiCompartmentTopology(compartments::Vector{CompartmentSystem})
+    g = SimpleDiGraph(length(compartments))
+    conductances = Dict{Graphs.SimpleEdge{Int},ConductanceSystem}()
+    return MultiCompartmentTopology(g, compartments, conductances)
 end
 
-get_conductance(x::Junction) = getfield(x, :conductance)
-issymmetric(x::Junction) = getfield(x, :symmetric)
+function add_junction!(topology, trunk, branch, conductance::ConductanceSystem; symmetric = true) 
+    src = findfirst(x -> isequal(x, trunk), topology.compartments)
+    dst = findfirst(x -> isequal(x, branch), topology.compartments)
+    (src === nothing || dst === nothing) && throw("junction compartments not found in topology")
+    add_edge!(topology.g, src, dst)
+    e = Graphs.SimpleEdge(src, dst)
+    push!(topology.conductances, e => replicate(conductance))
+    if symmetric
+        add_edge!(topology.g, dst, src)
+        e = Graphs.SimpleEdge(dst, src)
+        push!(topology.conductances, e => replicate(conductance))
+    end
+    return nothing
+end
+
+function add_junction!(topology, x::Pair, conductance::ConductanceSystem; symmetric = true)
+    add_junction!(topology, x.first, x.second, conductance, symmetric)
+end
 
 """
 $(TYPEDEF)
@@ -46,8 +49,7 @@ struct MultiCompartmentSystem <: AbstractCompartmentSystem
     systems::Vector{AbstractTimeDependentSystem}
     defaults::Dict
     # Conductor fields
-    "`Junction` (edges) between subcompartments of the neuron."
-    junctions::Vector{AbstractJunction}
+    topology::MultiCompartmentTopology
     "Individual subcompartments of the neuron."
     compartments::Vector{CompartmentSystem}
     """
@@ -56,91 +58,63 @@ struct MultiCompartmentSystem <: AbstractCompartmentSystem
     """
     extensions::Vector{ODESystem}
     function MultiCompartmentSystem(eqs, iv, states, ps, observed, name, systems, defaults,
-                                    junctions, compartments, extensions; checks = false) 
+                                    topology, compartments, extensions; checks = false) 
         if checks
             #placeholder
         end
         mc = new(eqs, iv, states, ps, observed, name, systems, defaults,
-                 junctions, compartments, extensions)
+                 topology, compartments, extensions)
         foreach(x -> setparent!(x, mc), compartments)
         return mc
     end
 end
 
 const MultiCompartment = MultiCompartmentSystem
-const MULTICOMPARTMENT_CONDUCTOR_FIELDS = [:junctions, :compartments, :extensions]
+const NULL_AXIAL = Vector{Tuple{AbstractConductanceSystem,Num}}()
 
 """
 $(TYPEDSIGNATURES)
 
 Basic constructor for a `MultiCompartmentSystem`.
 """
-function MultiCompartment(junctions::Vector{<:AbstractJunction}; extensions = ODESystem[],
+function MultiCompartment(topology; extensions = ODESystem[],
                           name = Base.gensym("MultiCompartment"), defaults = Dict())
     
-    junctions = deepcopy(junctions)
-    compartments = Set{CompartmentSystem}()
-
-    for jxn in junctions
-        push!(compartments, jxn.branch)
-        push!(compartments, jxn.trunk)
+    compartments = topology.compartments
+    
+    # As a precaution, wipe any pre-existing axial currents
+    for (i, comp) in enumerate(compartments)
+        isempty(get_axial_conductance(comp)) && continue
+        compartments[i] = CompartmentSystem(comp, axial_conductance = NULL_AXIAL)
     end
 
-    compartments = collect(compartments)
-    systems = union(extensions, compartments)
     observed = Equation[]
     eqs = Set{Equation}()
-
-    # MUTATION Reset subcompartment axial connections
-    foreach(x -> empty!(get_axial_conductance(x)), compartments)
     
-    for jxn in junctions
-        axial = jxn.conductance
-        trunk = jxn.trunk
-        branch = jxn.branch
-        branchvm = MembranePotential(; name = Symbol(:V, nameof(branch))) 
-        # When this gets updated we should rebuild the compartment system
-        # perhaps overload `setproperties` for SetField.jl
-        trunk_axial = get_axial_conductance(trunk)
-        push!(get_axial_conductance(trunk), (axial, branchvm))
+    for e in edges(topology.g)
+        axial = topology.conductances[e]
+        trunk = compartments[src(e)]
+        branch = compartments[dst(e)]
+        branchvm_alias = MembranePotential(nothing; name = Symbol(:V, nameof(branch))) 
+        trunk = CompartmentSystem(trunk, axial_conductance = union(get_axial_conductance(trunk), [(axial, branchvm_alias)]))
 
-        # TODO: resolve arbitrary states generically, not just hardcoded Vₘ
-        # connect (branch compartment -> vm) to (trunk comp -> axial conductance -> vm)
         if hasproperty(getproperty(trunk, nameof(axial)), :Vₘ)
             push!(eqs, branch.Vₘ ~ getproperty(trunk, nameof(axial)).Vₘ)
         end
-
-        push!(eqs, branch.Vₘ ~ getproperty(trunk, tosymbol(branchvm, escape=false)))
-
-        if issymmetric(jxn)
-            trunkvm = MembranePotential(; name = Symbol(:V, nameof(trunk)))
-
-            ### mutation
-            push!(get_axial_conductance(branch), (axial, trunkvm))
-            ### mutation
-            #
-            #TODO: resolve arbitrary states generically, not just hardcoded Vₘ
-            if hasproperty(getproperty(branch, nameof(axial)), :Vₘ)
-                push!(eqs, trunk.Vₘ ~ getproperty(branch, nameof(axial)).Vₘ)
-            end
-            push!(eqs, trunk.Vₘ ~ getproperty(branch, tosymbol(trunkvm, escape=false)))
-        end
+        
+        push!(eqs, branch.Vₘ ~ getproperty(trunk, tosymbol(branchvm_alias, escape=false)))
+        compartments[src(e)] = trunk
     end
 
-    return MultiCompartmentSystem(eqs, t, [], [], observed, name, collect(compartments), defaults,
-                                  junctions, collect(compartments), extensions) 
+    systems = union(extensions, compartments)
+
+    return MultiCompartmentSystem(collect(eqs), t, [], [], observed, name, systems, defaults,
+                                  topology, compartments, extensions) 
 end
 
-get_junctions(x::MultiCompartmentSystem) =  getfield(x, :junctions)
-get_axial_conductance(x::AbstractCompartmentSystem) = getfield(x, :axial_conductance)
+get_axial_conductance(x::CompartmentSystem) = getfield(x, :axial_conductance)
 get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
 hasparent(x::MultiCompartmentSystem) = false
-
-function MultiCompartment(junctions, compartments, extensions, defaults, name)
-
-
-    return dvs, ps, eqs, defs, collect(compartments)
-end
 
 function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
     dvs = get_states(mcsys)
@@ -148,8 +122,7 @@ function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
     eqs = get_eqs(mcsys)
     defs = get_defaults(mcsys)
     # why not get systems?
-    compartments = get_compartments(mcsys)
-    all_systems = map(x -> convert(ODESystem, x), compartments)
-    odesys = ODESystem(eqs, t, states, params; defaults = defs, name = nameof(mcsys), systems = all_systems)
+    systems = map(x -> convert(ODESystem, x), get_systems(mcsys))
+    odesys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(mcsys), systems = systems)
     return odesys
 end

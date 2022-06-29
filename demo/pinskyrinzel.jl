@@ -16,8 +16,8 @@ capacitance = 3.0µF/cm^2
 gc_val = 2.1mS/cm^2
 
 # Pinsky modifies NaV to have instantaneous activation, so we can ignore tau
-pinsky_nav_kinetics = [convert(Gate{SteadyState}, nav_kinetics[1]), nav_kinetics[2]]
-@named NaV = IonChannel(Sodium, pinsky_nav_kinetics) 
+#pinsky_nav_kinetics = [convert(Gate{SteadyState}, nav_kinetics[1]), nav_kinetics[2]]
+#@named NaV = IonChannel(Sodium, pinsky_nav_kinetics) 
 
 # No inactivation term for calcium current in Pinsky model
 pinsky_ca_kinetics = [ca_kinetics[1]]
@@ -52,15 +52,17 @@ dendrite_holding = I_d ~ id_val
                              stimuli = [dendrite_holding])
 
 
-@named gc_soma = AxialConductance([Gate(SteadyState, inv(p), name = :ps)],
+@named gc_soma = AxialConductance([Gate(SimpleGate, inv(p), name = :ps)],
                                   max_g = gc_val)
-@named gc_dendrite = AxialConductance([Gate(SteadyState, inv(1-p), name = :pd)],
+@named gc_dendrite = AxialConductance([Gate(SimpleGate, inv(1-p), name = :pd)],
                                       max_g = gc_val)
 
-soma2dendrite = Junction(soma => dendrite, gc_soma, symmetric = false);
-dendrite2soma = Junction(dendrite => soma, gc_dendrite, symmetric = false);
+topology = Conductor.MultiCompartmentTopology([soma, dendrite]);
 
-@named mcneuron = MultiCompartment([soma2dendrite, dendrite2soma])
+Conductor.add_junction!(topology, soma,  dendrite, gc_soma, symmetric = false)
+Conductor.add_junction!(topology, dendrite,  soma, gc_dendrite, symmetric = false)
+
+@named mcneuron = MultiCompartment(topology)
 
 
 # Uncomment to explicitly use the same u0 as published
@@ -72,7 +74,7 @@ prob = Simulation(mcneuron, time=2000ms)
 
 # Note: Pinsky & Rinzel originally solved using RK4 and dt=0.05
 # sol = solve(prob, RK4(), dt=0.05, maxiters=1e9)
-sol = solve(prob, RadauIIA5(), abstol=1e-9, reltol=1e-9)
+sol = solve(prob, RadauIIA5(), abstol=1e-6, reltol=1e-6)
 plot(sol, vars=[soma.Vₘ])
 
 ###########################################################################################
