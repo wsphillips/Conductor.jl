@@ -1,41 +1,4 @@
 
-abstract type Geometry end
-
-struct Sphere <: Geometry
-    radius
-end
-
-function Sphere(; radius)
-    Sphere(radius)
-end
-
-struct Point <: Geometry end
-
-struct Unitless <: Geometry
-    value
-end
-
-struct Cylinder <: Geometry
-    radius
-    height
-    open_ends::Bool
-end
-
-function Cylinder(; radius, height, open_ends = true)
-    return Cylinder(radius, height, open_ends)
-end
-
-height(x::Geometry) = isdefined(x, :height) ? getfield(x, :height) : nothing
-radius(x::Geometry) = getfield(x, :radius)
-radius(::Union{Point,Unitless}) = 0.0
-
-area(x::Sphere) = ustrip(Float64, cm^2, 4*π*radius(x)^2)
-function area(x::Cylinder)
-    ustrip(Float64, cm^2, 2*π*radius(x)*(height(x) + (x.open_ends ? 0µm : radius(x))))
-end
-area(::Point) = 1.0
-area(x::Unitless) = x.value
-
 """
 $(TYPEDEF)
 
@@ -215,11 +178,35 @@ function CompartmentSystem(Vₘ, cₘ, geometry,
     
     merge!(defs, defaults)
 
-    return  CompartmentSystem(eqs, t, collect(dvs), collect(ps), observed, name, collect(systems), defs,
-                              Vₘ, cₘ, geometry, collect(channels), collect(channel_reversals),
-                              collect(synaptic_channels), collect(synaptic_reversals), collect(axial_conductance), stimuli,
-                               extensions, parent)
+    return  CompartmentSystem(eqs, t, collect(dvs), collect(ps), observed, name,
+                              collect(systems), defs, Vₘ, cₘ, geometry, collect(channels),
+                              collect(channel_reversals), collect(synaptic_channels),
+                              collect(synaptic_reversals), collect(axial_conductance),
+                              stimuli, extensions, parent)
 end
+
+#=
+function CompartmentSystem(sys::CompartmentSystem;
+                           Vₘ = get_output(sys),
+                           cₘ = capacitance(sys),
+                           geometry = get_geometry(sys),
+                           channels = get_channels(sys),
+                           channel_reversals = get_channel_reversals(sys),
+                           synaptic_channels = get_synapses(sys), 
+                           synaptic_reversals = get_syanptic_reversals(sys),
+                           axial_conductance = get_axial_conductance(sys),
+                           stimuli = get_stimuli(sys),
+                           extensions = get_extensions(sys),
+                           parent = parent(sys),
+                           name = nameof(sys),
+                           defaults = get_defaults(sys))
+    CompartmentSystem(Vₘ, cₘ, geometry,
+                           channels, channel_reversals,
+                           synaptic_channels, synaptic_reversals,
+                           axial_conductance,
+                           stimuli, extensions, parent, name, defaults)
+end
+=#
 
 # AbstractSystem interface extensions
 get_geometry(x::AbstractCompartmentSystem) = getfield(x, :geometry)

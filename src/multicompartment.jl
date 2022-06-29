@@ -68,6 +68,7 @@ struct MultiCompartmentSystem <: AbstractCompartmentSystem
 end
 
 const MultiCompartment = MultiCompartmentSystem
+const MULTICOMPARTMENT_CONDUCTOR_FIELDS = [:junctions, :compartments, :extensions]
 
 """
 $(TYPEDSIGNATURES)
@@ -75,44 +76,35 @@ $(TYPEDSIGNATURES)
 Basic constructor for a `MultiCompartmentSystem`.
 """
 function MultiCompartment(junctions::Vector{<:AbstractJunction}; extensions = ODESystem[],
-        name = Base.gensym("MultiCompartment"), defaults = Dict())
-
+                          name = Base.gensym("MultiCompartment"), defaults = Dict())
+    
+    junctions = deepcopy(junctions)
     compartments = Set{CompartmentSystem}()
 
     for jxn in junctions
         push!(compartments, jxn.branch)
         push!(compartments, jxn.trunk)
     end
-    
-    return MultiCompartment(junctions, collect(compartments), extensions, eqs, systems,
-                            observed, defaults, name)
-end
 
-get_junctions(x::MultiCompartmentSystem) =  getfield(x, :junctions)
-get_axial_conductance(x::AbstractCompartmentSystem) = getfield(x, :axial_conductance)
-get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
-hasparent(x::MultiCompartmentSystem) = false
-
-function MultiCompartment(junctions, compartments, extensions, defaults, name)
-
-    systems = AbstractTimeDependentSystem[]
+    compartments = collect(compartments)
+    systems = union(extensions, compartments)
     observed = Equation[]
-
     eqs = Set{Equation}()
 
     # MUTATION Reset subcompartment axial connections
     foreach(x -> empty!(get_axial_conductance(x)), compartments)
     
     for jxn in junctions
-        axial = get_conductance(jxn)
+        axial = jxn.conductance
         trunk = jxn.trunk
         branch = jxn.branch
         branchvm = MembranePotential(; name = Symbol(:V, nameof(branch))) 
         # When this gets updated we should rebuild the compartment system
         # perhaps overload `setproperties` for SetField.jl
+        trunk_axial = get_axial_conductance(trunk)
         push!(get_axial_conductance(trunk), (axial, branchvm))
 
-        #TODO: resolve arbitrary states generically, not just hardcoded Vₘ
+        # TODO: resolve arbitrary states generically, not just hardcoded Vₘ
         # connect (branch compartment -> vm) to (trunk comp -> axial conductance -> vm)
         if hasproperty(getproperty(trunk, nameof(axial)), :Vₘ)
             push!(eqs, branch.Vₘ ~ getproperty(trunk, nameof(axial)).Vₘ)
@@ -135,6 +127,18 @@ function MultiCompartment(junctions, compartments, extensions, defaults, name)
         end
     end
 
+    return MultiCompartmentSystem(eqs, t, [], [], observed, name, collect(compartments), defaults,
+                                  junctions, collect(compartments), extensions) 
+end
+
+get_junctions(x::MultiCompartmentSystem) =  getfield(x, :junctions)
+get_axial_conductance(x::AbstractCompartmentSystem) = getfield(x, :axial_conductance)
+get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
+hasparent(x::MultiCompartmentSystem) = false
+
+function MultiCompartment(junctions, compartments, extensions, defaults, name)
+
+
     return dvs, ps, eqs, defs, collect(compartments)
 end
 
@@ -143,6 +147,7 @@ function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
     ps  = get_ps(mcsys)
     eqs = get_eqs(mcsys)
     defs = get_defaults(mcsys)
+    # why not get systems?
     compartments = get_compartments(mcsys)
     all_systems = map(x -> convert(ODESystem, x), compartments)
     odesys = ODESystem(eqs, t, states, params; defaults = defs, name = nameof(mcsys), systems = all_systems)
