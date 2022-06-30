@@ -11,11 +11,17 @@ function MultiCompartmentTopology(compartments::Vector{CompartmentSystem})
     return MultiCompartmentTopology(g, compartments, conductances)
 end
 
+nodes(topology::MultiCompartmentTopology) = getfield(topology, :compartments)
+graph(topology::MultiCompartmentTopology) = getfield(topology, :g)
+
+function find_compsys(compartment::AbstractCompartmentSystem, topology)
+    return findfirst(isequal(compartment), nodes(topology))::Int 
+end
+
 function add_junction!(topology, trunk, branch, conductance::ConductanceSystem; symmetric = true) 
-    src = findfirst(x -> isequal(x, trunk), topology.compartments)
-    dst = findfirst(x -> isequal(x, branch), topology.compartments)
-    (src === nothing || dst === nothing) && throw("junction compartments not found in topology")
-    add_edge!(topology.g, src, dst)
+    src = find_compsys(trunk, topology)
+    dst = find_compsys(branch, topology)
+    add_edge!(graph(topology), src, dst)
     e = Graphs.SimpleEdge(src, dst)
     push!(topology.conductances, e => replicate(conductance))
     if symmetric

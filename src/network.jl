@@ -45,6 +45,36 @@ postsynaptic(x::Synapse) = getfield(x, :target)
 class(x::Synapse) = getfield(x, :conductance)
 reversal(x::Synapse) = getfield(x, :reversal)
 
+struct NetworkTopology
+    multigraph::Dict{ConductanceSystem, SparseMatrixCSC{Num,Int64}}
+    neurons::Vector{AbstractCompartmentSystem}
+end
+
+nodes(topology::NetworkTopology) = getfield(topology, :neurons)
+graph(topology::NetworkTopology) = getfield(topology, :multigraph)
+
+function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
+                         synaptic_models::Vector{<:AbstractConductanceSystem})
+    n = length(neurons)
+    multigraph = Dict([x => sparse(Int64[], Int64[], Num[], n, n) for x in synaptic_models])
+    return NetworkTopology(multigraph, neurons)
+end
+
+function add_synapse!(topology, pre, post, synaptic_model)
+    src = find_compsys(pre, topology)
+    dst = find_compsys(post, topology)
+    g = graph(topology)[synaptic_model]
+    g[src, dst] = get_gbar(synaptic_model)
+end
+
+function remove_synapse!(topology, pre, post, synaptic_model)
+    src = find_compsys(pre, topology)
+    dst = find_compsys(post, topology)
+    g = graph(topology)[synaptic_model]
+    g[src,dst] = zero(Num)
+    dropzeros!(g)
+end
+
 """
 $(TYPEDEF)
 

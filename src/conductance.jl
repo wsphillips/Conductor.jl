@@ -57,7 +57,7 @@ end
 const Conductance = ConductanceSystem
 
 permeability(x::ConductanceSystem) = getfield(x, :ion)
-
+get_gbar(x::ConductanceSystem) = getfield(x, :gbar)
 """
     ConductanceSystem(g, ion, gate_vars; <keyword arguments>)
 
@@ -259,27 +259,15 @@ function SynapticChannel(ion::IonSpecies,
 end
 
 function (cond::AbstractConductanceSystem)(newgbar::Quantity)
-    
-    newcond = deepcopy(cond)
-    g = get_output(newcond)
+    g = get_output(cond)
     outunits = getmetadata(g, ConductorUnits)
-
     if dimension(outunits) !== dimension(newgbar)
         @error "Input Dimensions do not match output of ConductanceSystem"
     end
-
     gbar_val = ustrip(Float64, outunits, newgbar)
-    local gbar_sym::Num
-
-    for param in parameters(cond)
-        if getmetadata(unwrap(param), ConductorMaxConductance, false)
-            gbar_sym = wrap(param)
-            break
-        end
-    end
-
+    gbar_sym = setdefault(get_gbar(cond), gbar_val)
+    
     push!(get_defaults(newcond), gbar_sym => gbar_val)
-
     return newcond
 end
 

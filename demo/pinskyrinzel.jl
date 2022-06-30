@@ -64,7 +64,6 @@ Conductor.add_junction!(topology, dendrite,  soma, gc_dendrite, symmetric = fals
 
 @named mcneuron = MultiCompartment(topology)
 
-
 # Uncomment to explicitly use the same u0 as published
 # prob = ODAEProblem(simp, [-4.6, 0.999, 0.001, 0.2, -4.5, 0.01, 0.009, .007], (0., 2000), [])
 
@@ -74,7 +73,7 @@ prob = Simulation(mcneuron, time=2000ms)
 
 # Note: Pinsky & Rinzel originally solved using RK4 and dt=0.05
 # sol = solve(prob, RK4(), dt=0.05, maxiters=1e9)
-sol = solve(prob, RadauIIA5(), abstol=1e-6, reltol=1e-6)
+sol = solve(prob, RadauIIA5(), abstol=1e-3, reltol=1e-3)
 plot(sol, vars=[soma.Vₘ])
 
 ###########################################################################################

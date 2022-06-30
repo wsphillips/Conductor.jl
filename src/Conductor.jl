@@ -64,6 +64,8 @@ export Gate, SimpleGate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue, 
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent,
        IonConcentration, Concentration, ExtrinsicPotential, Instrinsic, Extrinsic
 
+export MultiCompartmentTopology, NetworkTopology
+
 export AuxConversion, D
 export Simulation
 export @named
