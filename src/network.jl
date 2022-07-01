@@ -83,25 +83,30 @@ A network of neurons with synaptic connections.
 $(TYPEDFIELDS)
 """
 struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
-    "Independent variable. Defaults to time, ``t``."
+    # MTK fields
+    eqs::Vector{Equation}
+    "Independent variabe. Defaults to time, ``t``."
     iv::Num
-    "Vector of synapses (edges) between neurons in the network."
-    synapses::Vector{AbstractSynapse}
+    states::Vector{Num}
+    ps::Vector{Num}
+    observed::Vector{Equation}
+    name::Symbol
+    systems::Vector{AbstractTimeDependentSystem}
+    defaults::Dict
+    # Conductor fields
+    topology::NetworkTopology
+    reversal_map::Dict
     """
     Additional systems to extend dynamics. Extensions are composed with the parent system
     during conversion to `ODESystem`.
     """
     extensions::Vector{AbstractTimeDependentSystem}
-    name::Symbol
-    eqs::Vector{Equation}
-    systems::Vector{AbstractTimeDependentSystem}
-    observed::Vector{Equation}
-    function NeuronalNetworkSystem(iv, synapses, extensions, name, eqs, systems, observed;
-                                   checks = false)
+    function NeuronalNetworkSystem(eqs, iv, states, ps, observed, name, systems, defaults,
+                                   topology, reversal_map; checks = false)
         if checks
             # placeholder
         end
-        new(iv, synapses, extensions, name, eqs, systems, observed)
+        new(eqs, iv, states, ps, observed, name, systems, defaults, topology, reversal_map)
     end
 end
 
@@ -111,9 +116,12 @@ $(TYPEDSIGNATURES)
 Basic constructor for a `NeuronalNetworkSystem`.
 
 """
-function NeuronalNetworkSystem(synapses::Vector{Synapse},
-                               extensions::Vector{AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
-                               name::Symbol = Base.gensym(:Network))
+function NeuronalNetworkSystem(
+    topology,
+    extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
+    name::Symbol = Base.gensym(:Network)
+)
+
     eqs = Equation[]
     systems = AbstractTimeDependentSystem[]
     observed = Equation[]
