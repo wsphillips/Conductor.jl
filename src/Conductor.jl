@@ -2,6 +2,7 @@ module Conductor
 using DocStringExtensions
 using OrderedCollections
 using Graphs
+using SparseArrays
 using ModelingToolkit,
       Unitful,
       Unitful.DefaultSymbols,

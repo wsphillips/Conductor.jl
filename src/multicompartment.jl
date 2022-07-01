@@ -120,6 +120,15 @@ end
 
 get_axial_conductance(x::CompartmentSystem) = getfield(x, :axial_conductance)
 get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
+get_compartments(x::CompartmentSystem) = x
+function compartments(x::AbstractCompartmentSystem; namespace = true)
+    compartment_systems = get_compartments(x) 
+    if namespace && length(compartment_systems) > 1
+        return [getproperty(x, nameof(n)) for n in compartment_systems]
+    end
+    return compartment_systems
+end
+
 hasparent(x::MultiCompartmentSystem) = false
 
 function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)

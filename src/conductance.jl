@@ -267,7 +267,7 @@ function (cond::AbstractConductanceSystem)(newgbar::Quantity)
     gbar_val = ustrip(Float64, outunits, newgbar)
     gbar_sym = setdefault(get_gbar(cond), gbar_val)
     
-    push!(get_defaults(newcond), gbar_sym => gbar_val)
+    newcond = @set cond.defaults = Dict(get_defaults(cond)..., gbar_sym => gbar_val)
     return newcond
 end
 
