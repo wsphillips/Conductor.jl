@@ -59,7 +59,7 @@ function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartment
     compartments = CompartmentSystem[]
 
     for neuron in neurons
-          
+         # FIXME!!! need list of compartments for graph and index mapping to reconstruct neurons 
     end
     @assert length(vertices(g)) == length(neurons)
     multigraph = Dict(synaptic_model => adjacency_matrix(g)*default_weight)
@@ -185,6 +185,8 @@ function NeuronalNetworkSystem(
         end
     end
     union!(eqs, voltage_fwds)
+    # FIXME: must go back and re-run MultiCompartment constructors since component
+    # compartments will be new/updated
     return NeuronalNetworkSystem(eqs, t, states, ps, observed, name, systems, defaults,
                                    topology, reversal_map; checks = false)
 end
