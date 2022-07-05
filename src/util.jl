@@ -2,6 +2,14 @@
 using IfElse
 import Symbolics: unwrap, symtype, getindex_posthook
 
+namegen(name) = Symbol(filter(x -> x !== '#', String(Base.gensym(name))))
+
+function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem})
+    rootname = ModelingToolkit.getname(x)
+    new = deepcopy(x)
+    return ModelingToolkit.rename(new, namegen(rootname))
+end
+
 function genvar(name; iv = nothing, default = nothing)
     x = name
     if isnothing(default)

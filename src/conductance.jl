@@ -3,8 +3,8 @@ get_output(x::AbstractConductanceSystem) = getfield(x, :output)
 subscriptions(x::AbstractConductanceSystem) = getfield(x, :subscriptions)
 isaggregate(x::AbstractConductanceSystem) = getfield(x, :aggregate)
 
-function subscribe!(chan::AbstractConductanceSystem, comp::AbstractCompartmentSystem)
-    push!(subscriptions(chan), comp)
+function subscribe!(chan::AbstractConductanceSystem, comp)
+    union!(subscriptions(chan), comp)
 end
 
 """
@@ -124,14 +124,14 @@ function ConductanceSystem(g::Num,
     union!(dvs, inputs, Set(g), gate_var_outputs)
     merge!(embed_defaults, defaults) 
 
-    cond_sys = ConductanceSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems, embed_defaults, g,
-                                 gbar, ion, aggregate, gate_vars, subscriptions, extensions,
-                                 collect(inputs))
+    cond_sys = ConductanceSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
+                                 embed_defaults, g, gbar, ion, aggregate, gate_vars,
+                                 subscriptions, extensions, collect(inputs))
     return cond_sys
 end
+
 get_inputs(x::ConductanceSystem) = getfield(x, :inputs)
 get_extensions(x::AbstractConductanceSystem) = getfield(x, :extensions)
-#MTK.has_ps(x::ConductanceSystem) = true
 
 function Base.convert(::Type{ODESystem}, condsys::ConductanceSystem)
     dvs = states(condsys)
@@ -258,6 +258,12 @@ function SynapticChannel(ion::IonSpecies,
                       aggregate = aggregate, extensions = extensions)
 end
 
+function (cond::AbstractConductanceSystem)(newgbar::Num)
+    hasdefault(newgbar) || throw("Symbolic has no default value")
+    gbar_val = getdefault(newgbar)
+    return cond(gbar_val)
+end
+
 function (cond::AbstractConductanceSystem)(newgbar::Quantity)
     g = get_output(cond)
     outunits = getmetadata(g, ConductorUnits)
@@ -265,8 +271,11 @@ function (cond::AbstractConductanceSystem)(newgbar::Quantity)
         @error "Input Dimensions do not match output of ConductanceSystem"
     end
     gbar_val = ustrip(Float64, outunits, newgbar)
+    return cond(gbar_val)
+end
+
+function (cond::AbstractConductanceSystem)(gbar_val::Real)
     gbar_sym = setdefault(get_gbar(cond), gbar_val)
-    
     newcond = @set cond.defaults = Dict(get_defaults(cond)..., gbar_sym => gbar_val)
     return newcond
 end

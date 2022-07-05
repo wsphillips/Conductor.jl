@@ -32,14 +32,6 @@ function Synapse(pre_to_post::Pair, conductance, reversal)
     return Synapse(pre_to_post.first, pre_to_post.second, conductance, reversal) 
 end
 
-namegen(name) = Symbol(filter(x -> x !== '#', String(Base.gensym(name))))
-
-function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem})
-    rootname = ModelingToolkit.getname(x)
-    new = deepcopy(x)
-    return ModelingToolkit.rename(new, namegen(rootname))
-end
-
 presynaptic(x::Synapse) = getfield(x, :source)
 postsynaptic(x::Synapse) = getfield(x, :target)
 class(x::Synapse) = getfield(x, :conductance)
@@ -53,6 +45,7 @@ end
 vertices(topology::NetworkTopology) = getfield(topology, :neurons)
 graph(topology::NetworkTopology) = getfield(topology, :multigraph)
 
+# create an topology with no connections
 function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
                          synaptic_models::Vector{<:AbstractConductanceSystem})
     n = length(neurons)
@@ -60,6 +53,7 @@ function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
     return NetworkTopology(multigraph, neurons)
 end
 
+# create a pre-specified topology (from a graph template)
 function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartmentSystem},
         synaptic_model::AbstractConductanceSystem, default_weight = get_gbar(synaptic_model))
     compartments = CompartmentSystem[]
@@ -142,89 +136,61 @@ function NeuronalNetworkSystem(
     ps  = Set{}()
     observed = Equation[]
     systems = Vector{AbstractTimeDependentSystem}()
-    
     voltage_fwds = Set{Equation}()
-    
     multigraph = graph(topology)
+    compartments = vertices(topology)
 
-  #  for synaptic_class in keys(multigraph)
-  #      
-  #      # fetch the adjacency matrix
-  #      g = multigraph[synaptic_class]
-  #      rows = rowvals(g)
-  #      vals = nonzeros(g)
-  #      for i in axes(g, 2)
-  #          post_compartment =             
-  #          pre_compartments = 
-
-    preneurons  = Set()
-    postneurons = Set()
-    neurons = Set()
-    synaptic_channel_classes = Set()
-
-    # Bin the fields
-    for synapse in synapses
-        push!(preneurons, presynaptic(synapse))
-        push!(postneurons, postsynaptic(synapse))
-        push!(synaptic_channel_classes, class(synapse))
-    end
-    
-    all_compartments = union(preneurons, postneurons)
-    
-    neurons = deepcopy.(neurons)
-    postneurons = deepcopy.(postneurons)
-    # For each post synaptic neuron
-    for pn in postneurons
-        incoming_edges = filter(x -> isequal(postsynaptic(x), pn), synapses)
-        for cl in synaptic_channel_classes
-            # filter to incoming synapses of the same type per postsynaptic compartment
-            inc_edges_of_cl = filter(x -> isequal(class(x), cl), incoming_edges)
-            cl_copy = deepcopy(cl) 
-            for syn in inc_edges_of_cl
-                if !isaggregate(cl_copy)
-                    cl_copy = replicate(class(syn))
+    for synaptic_class in keys(multigraph)
+        g = multigraph[synaptic_class]
+        rows = rowvals(g) # row numbers for each stored value
+        vals = nonzeros(g) # stored values
+        for i in axes(g, 2) # for each set of presynaptic neurons per postsynaptic neuron
+            post_compartment = compartments[i]
+            pre_compartments = compartments[rows[nzrange(g, i)]]
+            pre_compartments = pre_compartments isa Vector ? pre_compartments :
+                                                             [pre_compartments]
+            weights = vals[nzrange(g,i)]
+            new_revs = union(get_synaptic_reversals(post_compartment),
+                             reversal_map[synaptic_class])
+            post_compartment = CompartmentSystem(post_compartment,
+                                                 synaptic_reversals = new_revs)
+            if isaggregate(synaptic_class)
+                synaptic_class = ConductanceSystem(synaptic_class,
+                                                   subscriptions = pre_compartments) 
+                post_compartment = CompartmentSystem(post_compartment,
+                                                     synapses = [synaptic_class])
+                Vxs = filter(x -> isvoltage(x) && isextrinsic(x),
+                             namespace_variables(post_compartment.synaptic_class))
+                for (Vx, pre) in zip(Vxs, pre_compartments)
+                    push!(voltage_fwds, pre.Vₘ ~ Vx)
+                    push!(defs, Vx => pre.Vₘ)
                 end
-                subscribe!(cl_copy, presynaptic(syn))
-                push!(get_synaptic_reversals(pn), reversal(syn))
-                if !isaggregate(cl_copy)
-                    push!(get_synapses(pn), cl_copy)
-                    post_v = getproperty(pn, nameof(cl_copy)).Vₓ
-                    pre_v = presynaptic(syn).Vₘ
-                    push!(voltage_fwds, pre_v ~ post_v)
-                    push!(defs, post_v => pre_v)
+            else
+                class_copies = [] # clone the synapse model for each presynaptic compartment
+                for (x,y) in zip(pre_compartments, weights)
+                    class_copy = ConductanceSystem(synaptic_class, subscriptions = [x],
+                                                   name = namegen(nameof(synaptic_class)),
+                                                   defaults = Dict(y => getdefault(y)))
+                    push!(class_copies, class_copy)
+                end
+                post_compartment = CompartmentSystem(post_compartment,
+                                                     synapses = class_copies)
+                for (class_copy, pre) in zip(class_copies, pre_compartments)
+                    Vx = post_compartment.class_copy.Vₓ
+                    push!(voltage_fwds, pre.Vₘ ~ Vx)
+                    push!(defs, Vx => pre.Vₘ)
                 end
             end
-            if !isempty(subscriptions(cl_copy)) && isaggregate(cl_copy)
-                push!(get_synapses(pn), cl_copy)
-
-                if length(inc_edges_of_cl) > 1
-                    vxs = filter(x -> isvoltage(x) && isextrinsic(x), states(getproperty(pn, nameof(cl_copy))))
-                    for (vx, pre) in zip(vxs, presynaptic.(inc_edges_of_cl))
-                        post_v = renamespace(getproperty(pn, nameof(cl_copy)), vx)
-                        pre_v = pre.Vₘ
-                        push!(voltage_fwds, pre_v ~ post_v)
-                        push!(defs, post_v => pre_v)
-                    end
-                else
-                    post_v = getproperty(pn, nameof(cl_copy)).Vₓ
-                    pre_v = only(presynaptic.(inc_edges_of_cl)).Vₘ
-                    push!(voltage_fwds, pre_v ~ post_v)
-                    push!(defs, post_v => pre_v)
-                end
-            end
+            compartments[i] = post_compartment
         end
     end
-
     union!(eqs, voltage_fwds)
-
-
-
-    return NeuronalNetworkSystem(eqs, iv, states, ps, observed, name, systems, defaults,
+    return NeuronalNetworkSystem(eqs, t, states, ps, observed, name, systems, defaults,
                                    topology, reversal_map; checks = false)
 end
 
 get_extensions(x::AbstractNeuronalNetworkSystem) = getfield(x, :extensions)
-get_synapses(x::AbstractNeuronalNetworkSystem) = getfield(x, :synapses)
+get_topology(x::AbstractNeuronalNetworkSystem) = getfield(x, :topology)
 
 function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     states, params, eqs, defs, allneurons = build_toplevel(nnsys)
