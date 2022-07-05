@@ -15,7 +15,7 @@ nodes(topology::MultiCompartmentTopology) = getfield(topology, :compartments)
 graph(topology::MultiCompartmentTopology) = getfield(topology, :g)
 
 function find_compsys(compartment::AbstractCompartmentSystem, topology)
-    return findfirst(isequal(compartment), nodes(topology))::Int 
+    return findfirst(isequal(compartment), vertices(topology))::Int 
 end
 
 function add_junction!(topology, trunk, branch, conductance::ConductanceSystem; symmetric = true) 
@@ -118,9 +118,19 @@ function MultiCompartment(topology; extensions = ODESystem[],
                                   topology, compartments, extensions) 
 end
 
+function MultiCompartmentSystem(x::MultiCompartmentSystem; topology = get_topology(x),
+                                extensions = get_extensions(x), name = nameof(x),
+                                defaults = get_defaults(x))
+    MultiCompartmentSystem(topology;
+                           extensions = extensions, name = name, defaults = defaults)
+end
+
+get_topology(x::MultiCompartmentSystem) = getfield(x, :topology)
+get_compartments(x::MultiCompartmentTopology) = getfield(x, :compartments)
 get_axial_conductance(x::CompartmentSystem) = getfield(x, :axial_conductance)
 get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
-get_compartments(x::CompartmentSystem) = x
+get_compartments(x::CompartmentSystem) = [x]
+
 function compartments(x::AbstractCompartmentSystem; namespace = true)
     compartment_systems = get_compartments(x) 
     if namespace && length(compartment_systems) > 1

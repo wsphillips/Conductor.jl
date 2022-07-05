@@ -45,7 +45,11 @@ syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
-net = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
+topology = NetworkTopology([neuron1, neuron2], [Glut]);
+
+Conductor.add_synapse!(topology, neuron1, neuron2, Glut)
+
+@named net = NeuronalNetworkSystem(topology, Dict([Glut => EGlut]))
 
 ttot = 250
 sim = Simulation(net, time = ttot*ms, return_system = false)

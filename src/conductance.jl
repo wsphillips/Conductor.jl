@@ -58,6 +58,7 @@ const Conductance = ConductanceSystem
 
 permeability(x::ConductanceSystem) = getfield(x, :ion)
 get_gbar(x::ConductanceSystem) = getfield(x, :gbar)
+get_gate_vars(x::ConductanceSystem) = getfield(x, :gate_vars)
 """
     ConductanceSystem(g, ion, gate_vars; <keyword arguments>)
 
@@ -128,6 +129,26 @@ function ConductanceSystem(g::Num,
                                  embed_defaults, g, gbar, ion, aggregate, gate_vars,
                                  subscriptions, extensions, collect(inputs))
     return cond_sys
+end
+
+function ConductanceSystem(x::ConductanceSystem;
+                           g = get_output(x),
+                           ion = permeability(x),
+                           gate_vars = get_gate_vars(x),
+                           gbar = get_gbar(x),
+                           aggregate = isaggregate(x),
+                           subscriptions = subscriptions(x),
+                           extensions = get_extensions(x), 
+                           defaults = get_defaults(x),
+                           name = nameof(x))
+
+    ConductanceSystem(g, ion, gate_vars;
+                      gbar = gbar,
+                      aggregate = aggregate,
+                      subscriptions = subscriptions,
+                      extensions = extensions,
+                      defaults = defaults,
+                      name = name)
 end
 
 get_inputs(x::ConductanceSystem) = getfield(x, :inputs)
@@ -239,7 +260,7 @@ function SynapticChannel(ion::IonSpecies,
 
     if max_s isa ElectricalConductance
         sbar_val = ustrip(Float64, mS, max_s)
-        @parameters sbar
+        @parameters sbar = sbar_val
         push!(defaults, sbar => sbar_val)
     else
         sbar = max_s
