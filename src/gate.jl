@@ -83,7 +83,7 @@ function Gate{T}(form::Type{T}, output::Num, eqs::Vector{Equation}; kwargs...) w
 end
 
 # Internal API: Gate property getters
-steadystate(x::AbstractGatingVariable) = get(x, :ss)
+steadystate(x::AbstractGatingVariable) = get(x, :ss, nothing)
 Base.exponent(x::AbstractGatingVariable) = get(x, :p, 1)
 ModelingToolkit.get_eqs(x::AbstractGatingVariable, chan = nothing) = getfield(x, :eqs)
 

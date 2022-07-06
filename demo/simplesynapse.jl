@@ -48,8 +48,9 @@ EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 topology = NetworkTopology([neuron1, neuron2], [Glut]);
 
 Conductor.add_synapse!(topology, neuron1, neuron2, Glut)
+reversal_map = Dict([Glut => EGlut])
 
-@named net = NeuronalNetworkSystem(topology, Dict([Glut => EGlut]))
+@named net = NeuronalNetworkSystem(topology, reversal_map)
 
 ttot = 250
 sim = Simulation(net, time = ttot*ms, return_system = false)

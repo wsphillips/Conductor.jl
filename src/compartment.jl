@@ -177,7 +177,37 @@ function CompartmentSystem(Vₘ, cₘ, geometry,
         union!(ps, parameters(extension))
         union!(dvs, states(extension))
     end
-    
+
+### previously part of convert(ODESystem, x)
+#
+    required_states = Set{Num}()
+    # Resolve in/out: "connect" / auto forward cell states to channels
+    for x in union(channels, synaptic_channels)
+        for inp in get_inputs(x)
+            isextrinsic(inp) && continue
+            push!(required_states, inp)
+            subinp = getproperty(x, tosymbol(inp, escape=false))
+            push!(eqs, inp ~ subinp)
+        end
+    end
+ 
+    internally_modified = Set{Num}()
+    foreach(x -> get_variables!(internally_modified, x.lhs),  eqs)
+   
+    # TODO: also parse stimuli and extensions for required states
+    union!(required_states, setdiff(dvs, internally_modified))
+    component_currents = filter(x -> iscurrent(x) && !isaggregate(x), union(dvs,ps))
+    # Resolve unavailable states
+    for s in required_states
+        # resolvedby(s) !== compartment && continue
+        # Handled based on metadata of each state (for now just one case)
+        if iscurrent(s) && isaggregate(s)
+            push!(eqs, s ~ sum(filter(x -> getion(x) == getion(s), component_currents)))
+            push!(dvs, s)
+        end
+        # ... other switch cases for required state handlers ...
+    end
+   
     merge!(defs, defaults)
 
     return  CompartmentSystem(eqs, t, collect(dvs), collect(ps), observed, name,
@@ -255,35 +285,8 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
     ps  = get_ps(compartment)
     eqs = get_eqs(compartment)
     defs = get_defaults(compartment)
-    syss = convert.(ODESystem, collect(get_systems(compartment)))
+    syss = convert.(ODESystem, get_systems(compartment))
     
-    required_states = Set{Num}()
-    # Resolve in/out: "connect" / auto forward cell states to channels
-    for x in union(get_channels(compartment), get_synapses(compartment))
-        for inp in get_inputs(x)
-            isextrinsic(inp) && continue
-            push!(required_states, inp)
-            subinp = getproperty(x, tosymbol(inp, escape=false))
-            push!(eqs, inp ~ subinp)
-        end
-    end
- 
-    internally_modified = Set{Num}()
-    foreach(x -> get_variables!(internally_modified, x.lhs),  eqs)
-   
-    # TODO: also parse stimuli and extensions for required states
-    union!(required_states, setdiff(dvs, internally_modified))
-    component_currents = filter(x -> iscurrent(x) && !isaggregate(x), union(dvs,ps))
-    # Resolve unavailable states
-    for s in required_states
-        # resolvedby(s) !== compartment && continue
-        # Handled based on metadata of each state (for now just one case)
-        if iscurrent(s) && isaggregate(s)
-            push!(eqs, s ~ sum(filter(x -> getion(x) == getion(s), component_currents)))
-            push!(dvs, s)
-        end
-        # ... other switch cases for required state handlers ...
-    end
     return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs,
                      name = nameof(compartment))
 end
