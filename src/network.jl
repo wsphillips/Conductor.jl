@@ -1,7 +1,7 @@
 
 struct NetworkTopology
     multigraph::Dict{ConductanceSystem, SparseMatrixCSC{Num,Int64}}
-    neuron_map::Dict{AbstractCompartmentSystem, UnitRange{Int64}}
+    neuron_map::Dict{Any, UnitRange{Int64}}
     compartments::Vector{CompartmentSystem}
 end
 
@@ -34,7 +34,7 @@ function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartment
     return NetworkTopology(multigraph, neurons)
 end
 
-neurons(topology::NetworkTopology) = collect(keys(topology.neuron_map))
+neurons(topology::NetworkTopology) = [keys(topology.neuron_map)...]
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :multigraph)
 
@@ -107,7 +107,6 @@ function NeuronalNetworkSystem(
     dvs = Set{Num}()
     ps  = Set{Num}()
     observed = Equation[]
-    systems = Vector{AbstractTimeDependentSystem}()
     voltage_fwds = Set{Equation}()
     multigraph = graph(topology)
     compartments = vertices(topology)
@@ -168,12 +167,12 @@ function NeuronalNetworkSystem(
             @set! mctop.compartments = compartments[idx_range]
             neuron = MultiCompartmentSystem(neuron, topology = mctop)
         else
-            neuron = compartments[idx_range]
+            neuron = only(compartments[idx_range])
         end
         newmap[neuron] = idx_range
     end
     topology = NetworkTopology(topology.multigraph, newmap, compartments)
-    systems = union(extensions, neurons(topology))
+    systems::Vector{AbstractTimeDependentSystem} = union(extensions, neurons(topology))
 
     return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems, defaults,
                                    topology, reversal_map, extensions; checks = false)
