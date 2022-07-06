@@ -1,12 +1,8 @@
-
 cd("Conductor.jl/demo")
 
 include(joinpath(@__DIR__, "traub_kinetics.jl"))
 
-using OrdinaryDiffEq, LinearAlgebra, Plots
 import Unitful: µF, pA, µA, nA, µS
-# NB: Set to number of cores, not threads. Esp. important on 12th gen Intel & Apple M1/2
-LinearAlgebra.BLAS.set_num_threads(8)
 
 @parameters ϕ = 0.13 β = 0.075 p = 0.5
 
@@ -21,8 +17,8 @@ capacitance = 3.0µF/cm^2
 gc_val = 2.1mS/cm^2
 
 # Pinsky modifies NaV to have instantaneous activation, so we can ignore tau
-pinsky_nav_kinetics = [convert(Gate{SteadyState}, nav_kinetics[1]), nav_kinetics[2]]
-@named NaV = IonChannel(Sodium, pinsky_nav_kinetics) 
+#pinsky_nav_kinetics = [convert(Gate{SteadyState}, nav_kinetics[1]), nav_kinetics[2]]
+#@named NaV = IonChannel(Sodium, pinsky_nav_kinetics) 
 
 # No inactivation term for calcium current in Pinsky model
 pinsky_ca_kinetics = [ca_kinetics[1]]
@@ -53,13 +49,21 @@ dendrite_holding = I_d ~ id_val
                              reversals[2:4],
                              geometry = Unitless(0.5), # FIXME: should take p param
                              capacitance = capacitance,
-                             extensions = [calcium_conversion])
+                             extensions = [calcium_conversion],
+                             stimuli = [dendrite_holding])
 
-@named gc_soma = AxialConductance([Gate(SteadyState, inv(p), name = :ps)], max_g = gc_val)
-@named gc_dendrite = AxialConductance([Gate(SteadyState, inv(1-p), name = :pd)], max_g = gc_val)
-soma2dendrite = Junction(soma => dendrite, gc_soma, symmetric = false);
-dendrite2soma = Junction(dendrite => soma, gc_dendrite, symmetric = false);
-@named mcneuron = MultiCompartment([soma2dendrite, dendrite2soma])
+
+@named gc_soma = AxialConductance([Gate(SimpleGate, inv(p), name = :ps)],
+                                  max_g = gc_val)
+@named gc_dendrite = AxialConductance([Gate(SimpleGate, inv(1-p), name = :pd)],
+                                      max_g = gc_val)
+
+topology = Conductor.MultiCompartmentTopology([soma, dendrite]);
+
+Conductor.add_junction!(topology, soma,  dendrite, gc_soma, symmetric = false)
+Conductor.add_junction!(topology, dendrite,  soma, gc_dendrite, symmetric = false)
+
+@named mcneuron = MultiCompartment(topology)
 
 ###########################################################################################
 # Synapse models
@@ -67,15 +71,15 @@ dendrite2soma = Junction(dendrite => soma, gc_dendrite, symmetric = false);
 import Conductor: NMDA, AMPA, HeavisideSum
 
 @named NMDAChan = SynapticChannel(NMDA,
-                [Gate(SteadyState, inv(1 + 0.28*exp(-0.062(Vₘ - 60.))); name = :e),
+                [Gate(SimpleGate, inv(1 + 0.28*exp(-0.062(Vₘ - 60.))); name = :e),
                  Gate(HeavisideSum, threshold = 10mV, saturation = 150; name = :S),
-                 Gate(SteadyState, inv(1-p), name = :pnmda)],
+                 Gate(SimpleGate, inv(1-p), name = :pnmda)],
                  max_s = 0.014mS, aggregate = true)
 
 @named AMPAChan = SynapticChannel(AMPA,
                                 [Gate(HeavisideSum, threshold = 20mV, saturation = 2;
                                       name = :u),
-                                 Gate(SteadyState, inv(1-p), name = :pampa)],
+                                 Gate(SimpleGate, inv(1-p), name = :pampa)],
                                  max_s = 0.0045mS, aggregate = true)
 
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)

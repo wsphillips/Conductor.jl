@@ -11,7 +11,7 @@ function MultiCompartmentTopology(compartments::Vector{CompartmentSystem})
     return MultiCompartmentTopology(g, compartments, conductances)
 end
 
-nodes(topology::MultiCompartmentTopology) = getfield(topology, :compartments)
+vertices(topology::MultiCompartmentTopology) = getfield(topology, :compartments)
 graph(topology::MultiCompartmentTopology) = getfield(topology, :g)
 
 function find_compsys(compartment::AbstractCompartmentSystem, topology)
