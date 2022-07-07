@@ -15,7 +15,7 @@ vertices(topology::MultiCompartmentTopology) = getfield(topology, :compartments)
 graph(topology::MultiCompartmentTopology) = getfield(topology, :g)
 
 function find_compsys(compartment::AbstractCompartmentSystem, topology)
-    return findfirst(isequal(compartment), vertices(topology))::Int 
+    return findfirst(isequal(nameof(compartment)), nameof.(vertices(topology)))::Int 
 end
 
 function add_junction!(topology, trunk, branch, conductance::ConductanceSystem; symmetric = true) 

@@ -3,6 +3,7 @@ struct NetworkTopology
     multigraph::Dict{ConductanceSystem, SparseMatrixCSC{Num,Int64}}
     neuron_map::Dict{AbstractCompartmentSystem, UnitRange{Int64}}
     compartments::Vector{CompartmentSystem}
+    denamespaced::Vector{Symbol}
 end
 
 function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
@@ -10,10 +11,13 @@ function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
     neuron_map = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
     start = 1
     all_compartments = CompartmentSystem[]
+    denamespaced = Symbol[]
 
     for neuron in neurons
         comps = compartments(neuron)
         append!(all_compartments, comps)
+        denamespaced_comps = nameof.(compartments(neuron, namespace = false))
+        append!(denamespaced, denamespaced_comps)
         n_comps = length(comps)
         neuron_map[neuron] = start:(start + n_comps - 1)
         start += n_comps
@@ -22,7 +26,7 @@ function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
     n = length(all_compartments)
     multigraph = Dict([x => sparse(Int64[], Int64[], Num[], n, n) for x in synaptic_models])
 
-    return NetworkTopology(multigraph, neuron_map, all_compartments)
+    return NetworkTopology(multigraph, neuron_map, all_compartments, denamespaced)
 end
 
 function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartmentSystem},
@@ -41,6 +45,12 @@ end
 neurons(topology::NetworkTopology) = [keys(topology.neuron_map)...]
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :multigraph)
+
+#=
+function find_compsys(compartment::AbstractCompartmentSystem, topology::NetworkTopology)
+    return findfirst(isequal(nameof(compartment)), topology.namespaced)::Int 
+end
+=#
 
 function add_synapse!(topology, pre, post, synaptic_model)
     src = find_compsys(pre, topology)
@@ -117,9 +127,11 @@ function NeuronalNetworkSystem(
         rows = rowvals(g) # row numbers for each stored value
         vals = nonzeros(g) # stored values
         for i in axes(g, 2) # for each set of presynaptic neurons per postsynaptic neuron
+            pre_indexes = nzrange(g, i)
+            iszero(length(pre_indexes)) && continue
             post_compartment = compartments[i]
-            pre_compartments = compartments[rows[nzrange(g, i)]] # use view?
-            weights = vals[nzrange(g,i)] # use view?
+            pre_compartments = compartments[rows[pre_indexes]] # use view?
+            weights = vals[pre_indexes] # use view?
             new_revs = union(get_synaptic_reversals(post_compartment),
                              reversal_map[synaptic_class])
             if isaggregate(synaptic_class)
@@ -129,10 +141,10 @@ function NeuronalNetworkSystem(
                                                      synaptic_channels = [synaptic_class],
                                                      synaptic_reversals = new_revs)
                 Vxs = filter(x -> isvoltage(x) && isextrinsic(x),
-                             MTK.get_variables(getproperty(post_compartment, nameof(synaptic_class), namespace = false)))
+                             MTK.namespace_variables(getproperty(post_compartment, nameof(synaptic_class))))
                 for (Vx, pre) in zip(Vxs, pre_compartments)
-                    push!(voltage_fwds, pre.Vₘ ~ post_compartment.Vx)
-                    push!(defaults, post_compartment.Vx => pre.Vₘ)
+                    push!(voltage_fwds, pre.Vₘ ~ Vx)
+                    push!(defaults, Vx => pre.Vₘ)
                 end
             else
                 class_copies = [] # clone the synapse model for each presynaptic compartment
@@ -164,15 +176,15 @@ function NeuronalNetworkSystem(
         if neuron isa MultiCompartmentSystem
             mctop = get_topology(neuron)
             # compartments for the mc neuron can't be namespaced!
-            @set! mctop.compartments = compartments[idx_range]
+            @set! mctop.compartments = MTK.rename.(compartments[idx_range], topology.denamespaced[idx_range])
             neuron = MultiCompartmentSystem(neuron, topology = mctop)
         else
             neuron = only(compartments[idx_range])
         end
         newmap[neuron] = idx_range
     end
-    topology = NetworkTopology(topology.multigraph, newmap, compartments)
-    systems::Vector{AbstractTimeDependentSystem} = union(extensions, neurons(topology))
+    #topology = NetworkTopology(topology.multigraph, newmap, compartments)
+    systems::Vector{AbstractTimeDependentSystem} = union(extensions, collect(keys(newmap)))
 
     return NeuronalNetworkSystem(eqs, t, dvs, ps, observed, name, systems, defaults,
                                    topology, reversal_map, extensions; checks = false)

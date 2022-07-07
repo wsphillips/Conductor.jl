@@ -23,7 +23,7 @@ pinsky_nav_kinetics = [convert(Gate{SimpleGate}, nav_kinetics[1]), nav_kinetics[
 pinsky_ca_kinetics = [ca_kinetics[1]]
 @named CaS = IonChannel(Calcium, pinsky_ca_kinetics)
 
-is_val = ustrip(Float64, µA, 0.5µA)/p
+is_val = ustrip(Float64, µA, -0.5µA)/p
 @named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
 soma_holding = Iₛ ~ is_val
 
@@ -98,12 +98,12 @@ dumb_Eleak = EquilibriumPotential(Leak, 20mV)
 @named dummy = Compartment(Vₘ, [leak(1mS/cm^2)], [dumb_Eleak])
 
 ESyn = EquilibriumPotential(NMDA, 60mV, name = :syn)
-topology = NetworkTopology([dummy, mcneuron], [NMDAChan(1.0µS)]);
+topology = NetworkTopology([dummy, mcneuron], [NMDAChan(2.0µS)]);
 add_synapse!(topology, dummy, mcneuron.dendrite, NMDAChan)
 revmap = Dict([NMDAChan => ESyn])
 network = NeuronalNetworkSystem(topology, revmap)
 
 prob = Simulation(network, time=5000ms)
 sol = solve(prob, RadauIIA5(), abstol=1e-8, reltol=1e-8)
-plot(sol, plotdensity=25000, vars=[mcneuron.soma.Vₘ, mcneuron.dendrite.Vₘ], size=(1200,800))
+plot(sol, plotdensity=25000, vars=[mcneuron.soma.Vₘ], size=(1200,800))
 
