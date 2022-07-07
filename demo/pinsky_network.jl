@@ -2,6 +2,8 @@ cd("Conductor.jl/demo")
 
 include(joinpath(@__DIR__, "traub_kinetics.jl"))
 
+using LinearAlgebra, OrdinaryDiffEq
+LinearAlgebra.BLAS.set_num_threads(6)
 import Unitful: µF, pA, µA, nA, µS
 
 @parameters ϕ = 0.13 β = 0.075 p = 0.5
@@ -17,14 +19,14 @@ capacitance = 3.0µF/cm^2
 gc_val = 2.1mS/cm^2
 
 # Pinsky modifies NaV to have instantaneous activation, so we can ignore tau
-#pinsky_nav_kinetics = [convert(Gate{SteadyState}, nav_kinetics[1]), nav_kinetics[2]]
-#@named NaV = IonChannel(Sodium, pinsky_nav_kinetics) 
+pinsky_nav_kinetics = [convert(Gate{SimpleGate}, nav_kinetics[1]), nav_kinetics[2]]
+@named NaV = IonChannel(Sodium, pinsky_nav_kinetics) 
 
 # No inactivation term for calcium current in Pinsky model
 pinsky_ca_kinetics = [ca_kinetics[1]]
 @named CaS = IonChannel(Calcium, pinsky_ca_kinetics)
 
-is_val = ustrip(Float64, µA, 0.75µA)/p
+is_val = ustrip(Float64, µA, -0.5µA)/p
 @named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
 soma_holding = Iₛ ~ is_val
 
@@ -84,55 +86,38 @@ import Conductor: NMDA, AMPA, HeavisideSum
 
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
-
+revmap = Dict([NMDAChan => ENMDA, AMPAChan => EAMPA])
 # Need to introduce 10% gca variance as per Pinsky/Rinzel
-neuronpopulation = Vector{MultiCompartmentSystem}(undef, 100)
-
-# introduce calcium channel conductance variation
-for i in eachindex(neuronpopulation)
-    @named dendrite = Compartment(Vₘ,
-                                 [KAHP(0.8mS/cm^2),
-                                  CaS(rand(9.0:0.1:10.0)mS/cm^2),
-                                  KCa(15mS/cm^2),
-                                  leak(0.1mS/cm^2)],
-                                 reversals[2:4],
-                                 geometry = Unitless(0.5),
-                                 capacitance = capacitance,
-                                 extensions = [calcium_conversion])
-    
-    soma2dendrite = deepcopy(Junction(soma => dendrite, gc_soma, symmetric = false));
-    dendrite2soma = deepcopy(Junction(dendrite => soma, gc_dendrite, symmetric = false));
-    neuronpopulation[i] = MultiCompartment([soma2dendrite, dendrite2soma]; name = Conductor.namegen(:mcneuron))
-   
-end
+neuronpopulation = [Conductor.replicate(mcneuron) for _ in 1:100];
+topology = NetworkTopology(neuronpopulation, [NMDAChan, AMPAChan]);
 
 using Graphs
-allsynapses = Vector{Synapse}(undef, 4000)
-
-# Generating topology with Graphs.jl is trivial.
-# The getproperty calls for soma/dendrite are far too expensive here.
-@time begin
 nmda_g = random_regular_digraph(100, 20, dir=:in)
 ampa_g = random_regular_digraph(100, 20, dir=:in)
+
 for (i, e) in enumerate(edges(nmda_g))
-    allsynapses[i] = Synapse(neuronpopulation[src(e)].soma => neuronpopulation[dst(e)].dendrite, NMDAChan, ENMDA)
+    add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite, NMDAChan)
 end
 for (i, e) in enumerate(edges(ampa_g))
-    allsynapses[2000 + i] = Synapse(neuronpopulation[src(e)].soma => neuronpopulation[dst(e)].dendrite, AMPAChan, EAMPA)
+    add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite, AMPAChan)
 end
-end
 
-# this is only fast because the cost is amortized
-@time net = NeuronalNetworkSystem(allsynapses);
+@named net = NeuronalNetworkSystem(topology, revmap);
+simp = Simulation(net, time = 5000ms, return_system = true)
+prob = Simulation(net, time = 5000ms)
 
-# the steps include a way too slow conversion: convert(ODESystem, net)
-# relatively, call to structural_simplify is cheap
-
-simp = Simulation(net, time = 5000ms, return_system=true)
-prob = ODAEProblem(simp, [], (0,5000.));
 # on the first run, over 40% of the time is single threaded compilation time. Without
 # compilation, solving takes roughly 200 seconds (6-8 cores) for 5 seconds of tspan.
-
 @time sol = solve(prob, RadauIIA5());
-plot(sol)
+#plot(sol, vars = [x.soma.Vₘ for x in neuronpopulation])
 
+# Pinsky and Rinzel displayed their results as a plot of N neurons over 20mV
+indexof(sym,syms) = findfirst(isequal(sym),syms)
+dvs = states(simp)
+interpolated = sol(1000:0.25:4000, idxs=[indexof(x.soma.Vₘ, dvs) for x in neuronpopulation])
+abovethold = reduce(hcat, interpolated.u) .> 20.0
+final = sum(abovethold, dims=1)'
+
+using Plots
+
+plot(final)

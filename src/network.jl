@@ -31,15 +31,25 @@ end
 
 function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartmentSystem},
         synaptic_model::AbstractConductanceSystem, default_weight = get_gbar(synaptic_model))
-
-    compartments = CompartmentSystem[]
+    
+    neuron_map = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
+    start = 1
+    all_compartments = CompartmentSystem[]
+    denamespaced = Symbol[]
 
     for neuron in neurons
-         # FIXME!!! need list of compartments for graph and index mapping to reconstruct neurons 
+        comps = compartments(neuron)
+        append!(all_compartments, comps)
+        denamespaced_comps = nameof.(compartments(neuron, namespace = false))
+        append!(denamespaced, denamespaced_comps)
+        n_comps = length(comps)
+        neuron_map[neuron] = start:(start + n_comps - 1)
+        start += n_comps
     end
+    n = length(all_compartments)
     @assert length(vertices(g)) == length(neurons)
     multigraph = Dict(synaptic_model => adjacency_matrix(g)*default_weight)
-    return NetworkTopology(multigraph, neurons)
+    return NetworkTopology(multigraph, neuron_map, all_compartments, denamespaced)
 end
 
 neurons(topology::NetworkTopology) = [keys(topology.neuron_map)...]
@@ -135,13 +145,13 @@ function NeuronalNetworkSystem(
             new_revs = union(get_synaptic_reversals(post_compartment),
                              reversal_map[synaptic_class])
             if isaggregate(synaptic_class)
-                synaptic_class = ConductanceSystem(synaptic_class,
+                new_synaptic_class = ConductanceSystem(synaptic_class,
                                                    subscriptions = pre_compartments) 
                 post_compartment = CompartmentSystem(post_compartment,
-                                                     synaptic_channels = [synaptic_class],
+                                                     synaptic_channels = [new_synaptic_class],
                                                      synaptic_reversals = new_revs)
                 Vxs = filter(x -> isvoltage(x) && isextrinsic(x),
-                             MTK.namespace_variables(getproperty(post_compartment, nameof(synaptic_class))))
+                             MTK.namespace_variables(getproperty(post_compartment, nameof(new_synaptic_class))))
                 for (Vx, pre) in zip(Vxs, pre_compartments)
                     push!(voltage_fwds, pre.Vₘ ~ Vx)
                     push!(defaults, Vx => pre.Vₘ)
