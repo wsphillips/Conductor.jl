@@ -23,11 +23,11 @@ pinsky_nav_kinetics = [convert(Gate{SimpleGate}, nav_kinetics[1]), nav_kinetics[
 pinsky_ca_kinetics = [ca_kinetics[1]]
 @named CaS = IonChannel(Calcium, pinsky_ca_kinetics)
 
-is_val = ustrip(Float64, µA, -0.5µA)/p
+is_val = ustrip(Float64, µA, -0.17µA)/p
 @named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
 soma_holding = Iₛ ~ is_val
 
-id_val = ustrip(Float64, µA, -0.5µA)/(1-p)
+id_val = ustrip(Float64, µA, 0µA)/(1-p)
 @named I_d = IonCurrent(NonIonic, id_val, dynamic = false)
 dendrite_holding = I_d ~ id_val
 
