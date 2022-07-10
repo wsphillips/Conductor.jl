@@ -63,7 +63,7 @@ channels = [NaV, Kdr, leak];
 
 @named neuron2 = Compartment(Vₘ, channels, reversals;
                              geometry = Cylinder(radius = 25µm, height = 400µm))
-                                   
+
 # Synaptic model
 Vₓ = ExtrinsicPotential()
 syn∞ = 1/(1 + exp((-35 - Vₓ)/5))
@@ -72,8 +72,11 @@ syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
-net = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
+topology = NetworkTopology([neuron1, neuron2], [Glut]);
+add_synapse!(topology, neuron1, neuron2, Glut)
+reversal_map = Dict([Glut => EGlut])
 
+@named net = NeuronalNetworkSystem(topology, reversal_map)
 total_time = 250
 sim = Simulation(net, time = total_time*ms)
 
@@ -199,10 +202,14 @@ EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 ```
 Given our two neurons and a synaptic channel, we can model a miniature circuit by defining
-a `Synapse` edge between the neurons and then constructing a `NeuronalNetworkSystem`:
+a synapse between the neurons and then constructing a `NeuronalNetworkSystem`:
 
 ```@example gate_example; continued=true
-net = NeuronalNetworkSystem([Synapse(neuron1 => neuron2, Glut, EGlut)])
+topology = NetworkTopology([neuron1, neuron2], [Glut]);
+add_synapse!(topology, neuron1, neuron2, Glut)
+reversal_map = Dict([Glut => EGlut])
+
+@named net = NeuronalNetworkSystem(topology, reversal_map)
 ```
 Now we're ready to run our simulation.
 
