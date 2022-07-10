@@ -66,7 +66,7 @@ kca_kinetics = [
                        zero(Float64)),
          name = :c),
     # Calcium saturation term
-    Gate(SteadyState, min(Caᵢ/250., 1.),
+    Gate(SimpleGate, min(Caᵢ/250., 1.),
          name = :χ)]
 
 # A-type Potassium

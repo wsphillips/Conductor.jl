@@ -20,7 +20,7 @@ channels = [NaV(100mS/cm^2),
 
 @test length.([equations(neuron),
                states(neuron),
-               parameters(neuron)]) == [30,39,17]
+               parameters(neuron)]) == [39,39,17]
 
 time = 2000 
 simul_sys = Simulation(neuron, time = time*ms, return_system = true)

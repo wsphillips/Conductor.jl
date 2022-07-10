@@ -11,7 +11,7 @@ Vₘ = MembranePotential()
 @named sigmoid = Gate(SimpleGate, inv(1 + exp(-Vₘ)))
 
 # output
-Gate{SteadyState}(sigmoid(t), Dict{Symbol, Any}(:ss => 1 / (1 + exp(-Vₘ(t)))))
+Gate{SimpleGate}(SimpleGate, sigmoid(t), Symbolics.Equation[sigmoid(t) ~ 1 / (1 + exp(-Vₘ(t)))], Dict{Symbol, Any}())
 ```
 
 The dynamics of a `Gate{SimpleGate}` are just an algebraic equation:
@@ -41,7 +41,7 @@ are often described in terms of forward (``\alpha``) and reverse (``\beta``) rea
 )
 
 # output
-Gate{AlphaBeta}(h(t), Dict{Symbol, Any}(:alpha => 0.07exp(-3.25 - 0.05Vₘ(t)), :beta => 1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))), :ss => (0.07exp(-3.25 - 0.05Vₘ(t))) / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t))), :tau => 1 / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t)))))
+Gate{AlphaBeta}(AlphaBeta, h(t), Symbolics.Equation[Differential(t)(h(t)) ~ (-h(t)) / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07(1 - h(t))*exp(-3.25 - 0.05Vₘ(t))], Dict{Symbol, Any}(:ss => (0.07exp(-3.25 - 0.05Vₘ(t))) / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t)))))
 
 ```
 
@@ -51,7 +51,7 @@ Conductor.get_eqs(h, nothing)
 
 # output
 1-element Vector{Symbolics.Equation}:
- Differential(t)(h(t)) ~ ((0.07exp(-3.25 - 0.05Vₘ(t))) / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t))) - h(t))*(1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t)))
+ Differential(t)(h(t)) ~ (-h(t)) / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07(1 - h(t))*exp(-3.25 - 0.05Vₘ(t))
 ```
 ...which is the equivalent to:
 ```math

@@ -1,5 +1,7 @@
 module Conductor
 using DocStringExtensions
+using Graphs
+using SparseArrays
 using ModelingToolkit,
       Unitful,
       Unitful.DefaultSymbols,
@@ -62,6 +64,8 @@ export Gate, SimpleGate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue, 
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent,
        IonConcentration, Concentration, ExtrinsicPotential, Instrinsic, Extrinsic
 
+export MultiCompartmentTopology, NetworkTopology, add_synapse!, add_layer!
+
 export AuxConversion, D
 export Simulation
 export @named
@@ -91,6 +95,7 @@ include("util.jl")
 include("primitives.jl")
 include("gate.jl")
 include("conductance.jl")
+include("geometry.jl")
 include("compartment.jl")
 include("multicompartment.jl")
 include("network.jl")

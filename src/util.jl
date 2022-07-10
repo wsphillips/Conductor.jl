@@ -2,6 +2,23 @@
 using IfElse
 import Symbolics: unwrap, symtype, getindex_posthook
 
+namegen(name) = Symbol(filter(x -> x !== '#', String(Base.gensym(name))))
+
+function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem})
+    rootname = ModelingToolkit.getname(x)
+    new = deepcopy(x)
+    return ModelingToolkit.rename(new, namegen(rootname))
+end
+
+function genvar(name; iv = nothing, default = nothing)
+    x = name
+    if isnothing(default)
+        return only(isnothing(iv) ? @parameters($x) : @variables($x(iv)))
+    else
+        return only(isnothing(iv) ? @parameters($x=default) :  @variables($x(iv)=default))
+    end
+end
+
 function build_toplevel(system)
     dvs = Set{Num}()
     ps = Set{Num}()

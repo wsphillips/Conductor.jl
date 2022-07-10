@@ -37,7 +37,7 @@ channels = [NaV, Kdr, leak];
 reversals = Equilibria([Sodium => 50.0mV, Potassium => -77.0mV, Leak => -54.4mV])
 
 @named neuron = CompartmentSystem(Vₘ, channels, reversals)
-@assert length.((equations(neuron), states(neuron), parameters(neuron))) == (10,12,8) # hide
+@assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8) # hide
 neuron # hide
 ```
 !!! note
@@ -57,7 +57,7 @@ import Unitful: µm
 soma_shape = Sphere(radius = 20µm)
 
 @named neuron = CompartmentSystem(Vₘ, channels, reversals; geometry = soma_shape)
-@assert length.((equations(neuron), states(neuron), parameters(neuron))) == (10,12,8); # hide
+@assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8); # hide
 nothing # hide
 ```
 
@@ -87,7 +87,7 @@ electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0,
 @named neuron_stim = CompartmentSystem(Vₘ, channels, reversals;
                                        geometry = soma_shape,
                                        stimuli = [electrode_pulse])
-@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (11,13,8); # hide
+@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,8); # hide
 neuron_stim # hide
 ```
 Putting it all together, our neuron simulation now produces a train of action potentials:
@@ -100,18 +100,17 @@ plot(solution; vars=[Vₘ])
 
 ## Multiple Compartments
 
-Neurons with multiple compartments are explicitly constructed by defining a list of
-junctions, which are provided to `MultiCompartmentSystem`. A `Junction` denotes a connection (edge) between two compartments (nodes). By
-default, a `Junction` is assumed to be symmetrical--the axial conductance from compartment A
-to B is the same value as from compartment B to A. However, if the conductance between
-compartments is asymmetric, two `Junction` objects must be defined--one `Junction` for the
-conductance in each direction.
+Neurons with multiple compartments are explicitly constructed by defining a
+`MultiCompartmentTopology`, a directed graph that is provided to `MultiCompartmentSystem`.
+Individual subcompartments are connected via `add_junction!`. By default, a junction between
+compartments is assumed to be symmetrical--the axial conductance from compartment A to B is
+the same value as from compartment B to A. However, if the conductance between compartments
+is asymmetric, two junctions must be defined--one for the conductance in each direction.
 
 For example usage, see the [`pinskyrinzel.jl`](https://github.com/wsphillips/Conductor.jl/blob/main/demo/pinskyrinzel.jl) demo.
 
 ```@docs
 CompartmentSystem
-Junction
 MultiCompartmentSystem
 MultiCompartment
 ```
