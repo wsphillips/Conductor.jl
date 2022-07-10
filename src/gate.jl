@@ -71,8 +71,8 @@ julia> @variables t X(t)
     t
  X(t)
 
-julia> g = Gate(MyGateType, X, [], prop1 = "foo", prop2 = 62)
-Gate{MyGateType}(X(t), Dict{Symbol, Any}(:prop2 => 62, :prop1 => "foo"))
+julia> g = Gate{MyGateType}(MyGateType, X, Equation[], prop1 = "foo", prop2 = 62)
+Gate{MyGateType}(MyGateType, X(t), Symbolics.Equation[], Dict{Symbol, Any}(:prop2 => 62, :prop1 => "foo"))
 
 julia> (g.prop1, g.prop2)
 ("foo", 62)
