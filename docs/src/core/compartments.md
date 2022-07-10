@@ -100,18 +100,17 @@ plot(solution; vars=[Vₘ])
 
 ## Multiple Compartments
 
-Neurons with multiple compartments are explicitly constructed by defining a list of
-junctions, which are provided to `MultiCompartmentSystem`. A `Junction` denotes a connection (edge) between two compartments (nodes). By
-default, a `Junction` is assumed to be symmetrical--the axial conductance from compartment A
-to B is the same value as from compartment B to A. However, if the conductance between
-compartments is asymmetric, two `Junction` objects must be defined--one `Junction` for the
-conductance in each direction.
+Neurons with multiple compartments are explicitly constructed by defining a
+`MultiCompartmentTopology`, a directed graph that is provided to `MultiCompartmentSystem`.
+Individual subcompartments are connected via `add_junction!`. By default, a junction between
+compartments is assumed to be symmetrical--the axial conductance from compartment A to B is
+the same value as from compartment B to A. However, if the conductance between compartments
+is asymmetric, two junctions must be defined--one for the conductance in each direction.
 
 For example usage, see the [`pinskyrinzel.jl`](https://github.com/wsphillips/Conductor.jl/blob/main/demo/pinskyrinzel.jl) demo.
 
 ```@docs
 CompartmentSystem
-Junction
 MultiCompartmentSystem
 MultiCompartment
 ```
