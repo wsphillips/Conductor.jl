@@ -17,9 +17,9 @@ Each conductance is associated with a [`CompartmentSystem`](@ref compartments). 
 properties of the parent compartment (for example, equilibrium potentials, membrane capacitance,
 and geometry) influence the magnitude of intracellular current produced by conductances.
 
-Finally, connections between neurons can be explicitly defined with [`Synapse`](@ref synapses),
-which defines a directed edge from a presynaptic compartment to a postsynaptic compartment.
-A [`NeuronalNetworkSystem`](@ref networks) constructs and manages the equations that govern
+Finally, connections between neurons can be explicitly defined with a `NetworkTopology`,
+which stores a multilayer graph representation of the neuronal network. A
+[`NeuronalNetworkSystem`](@ref networks) constructs and manages the equations that govern
 synaptic conductances between neurons.
 
 ## Simple Two Neuron Simulation
