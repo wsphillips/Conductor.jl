@@ -37,7 +37,7 @@ channels = [NaV, Kdr, leak];
 reversals = Equilibria([Sodium => 50.0mV, Potassium => -77.0mV, Leak => -54.4mV])
 
 @named neuron = CompartmentSystem(Vₘ, channels, reversals)
-@assert length.((equations(neuron), states(neuron), parameters(neuron))) == (10,12,8) # hide
+@assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8) # hide
 neuron # hide
 ```
 !!! note
@@ -57,7 +57,7 @@ import Unitful: µm
 soma_shape = Sphere(radius = 20µm)
 
 @named neuron = CompartmentSystem(Vₘ, channels, reversals; geometry = soma_shape)
-@assert length.((equations(neuron), states(neuron), parameters(neuron))) == (10,12,8); # hide
+@assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8); # hide
 nothing # hide
 ```
 
@@ -87,7 +87,7 @@ electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0,
 @named neuron_stim = CompartmentSystem(Vₘ, channels, reversals;
                                        geometry = soma_shape,
                                        stimuli = [electrode_pulse])
-@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (11,13,8); # hide
+@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,8); # hide
 neuron_stim # hide
 ```
 Putting it all together, our neuron simulation now produces a train of action potentials:
