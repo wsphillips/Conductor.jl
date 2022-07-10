@@ -52,15 +52,18 @@ EGlut = Equilibrium(Cation, 0mV, name = :Glut)
                states(Glut),
                parameters(Glut)]) == [2,3,1]
 
-topology = [Synapse(neuron1 => neuron2, Glut, EGlut)];
-@named network = NeuronalNetworkSystem(topology)
+topology = NetworkTopology([neuron1, neuron2], [Glut]);
+Conductor.add_synapse!(topology, neuron1, neuron2, Glut)
+reversal_map = Dict([Glut => EGlut])
+
+@named network = NeuronalNetworkSystem(topology, reversal_map)
 
 @test length.([equations(network),
                states(network),
-               parameters(network)]) == [25,29,18]
+               parameters(network)]) == [29,29,18]
 
-t = 250.
-simul_sys = Simulation(network, time = t*ms, return_system = true)
+ttot = 250.
+simul_sys = Simulation(network, time = ttot*ms, return_system = true)
 
 @test length.([equations(simul_sys),
                states(simul_sys),
@@ -215,12 +218,12 @@ function simple_synapse!(du, u, p, t)
 end
 
 # Solve and check for invariance
-byhand_prob = ODEProblem{true}(simple_synapse!, u0, (0.,t), p)
-mtk_prob = ODAEProblem(simul_sys, [], (0., t), [])
+byhand_prob = ODEProblem{true}(simple_synapse!, u0, (0.,ttot), p)
+mtk_prob = ODAEProblem(simul_sys, [], (0., ttot), [])
 byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 
-tsteps = 0.0:0.025:t
+tsteps = 0.0:0.025:ttot
 byhand_out = Array(byhand_sol(tsteps, idxs=8))
 current_mtk_out = current_mtk_sol(tsteps)[neuron2.Vₘ]
 

@@ -143,17 +143,19 @@ function Gate(form::Type{ParameterGate}, val; name = Base.gensym("GateVar"), kwa
 end
 
 """
-    Gate(::Type{HeavisideSum}, threshold = 0mV, saturation = 125; name = Base.gensym("GateVar")) -> Gate{HeavisideSum}
+    Gate(::Type{HeavisideSum}; threshold = 0mV, decay = 150, name = Base.gensym("GateVar") [, saturation])
 
 Synaptically-activated dynamics. Sums the step-function values for presynaptic (extrinsic)
 voltages.
 
+The optional argument `saturation` sets a upper limit on the value of this gate.
+
 See also: [`get_eqs`](@ref).
 """
-function Gate(form::Type{HeavisideSum}, threshold = 0mV, saturation = 125;
+function Gate(form::Type{HeavisideSum}; threshold = 0mV, decay = 150,
               name = Base.gensym("GateVar"), kwargs...) 
     x = only(@variables $name(t) = 0.0) # synaptically activated gate inits to 0.0
-    return Gate{HeavisideSum}(form, x, Equation[]; threshold = threshold, saturation = saturation,
+    return Gate{HeavisideSum}(form, x, Equation[]; threshold = threshold, decay = decay,
                               kwargs...)
 end 
 
@@ -167,14 +169,20 @@ Returns an equation of the form:
 ``
 """
 function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
-    thold, sat = var.threshold, var.saturation
+    thold, decay = var.threshold, var.decay
     thold_val = ustrip(Float64, mV, thold)
     out = output(var)
     isempty(subscriptions(chan)) && return [D(out) ~ 0]
     @named Vₓ = ExtrinsicPotential(n = length(subscriptions(chan))) 
     # Derived from Pinsky & Rinzel 1994 - Equation 4 
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
-    return[D(out) ~ sum((Vₓ .>= thold_val) .- (out/sat))]
+    saturation = get(var, :saturation, nothing)
+    if isnothing(saturation)
+        return [D(out) ~ sum(Vₓ .>= thold_val) .- (out/decay)]
+    else
+        # out cannot continue to grow past the saturation limit
+        return [D(out) ~ (out < saturation)*sum(Vₓ .>= thold_val) .- (out/decay)]
+    end
 end
 
 #"""

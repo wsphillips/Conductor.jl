@@ -23,7 +23,7 @@ pinsky_nav_kinetics = [convert(Gate{SimpleGate}, nav_kinetics[1]), nav_kinetics[
 pinsky_ca_kinetics = [ca_kinetics[1]]
 @named CaS = IonChannel(Calcium, pinsky_ca_kinetics)
 
-is_val = ustrip(Float64, µA, -0.17µA)/p
+is_val = ustrip(Float64, µA, -0.5µA)/p
 @named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
 soma_holding = Iₛ ~ is_val
 
@@ -83,12 +83,12 @@ import Conductor: NMDA, AMPA, HeavisideSum
 
 @named NMDAChan = SynapticChannel(NMDA,
                 [Gate(SimpleGate, inv(1 + 0.28*exp(-0.062(Vₘ - 60.))); name = :e),
-                 Gate(HeavisideSum, threshold = 10mV, saturation = 150; name = :S),
+                 Gate(HeavisideSum; threshold = 10mV, decay = 150, saturation = 125, name = :S),
                  Gate(SimpleGate, inv(1-p), name = :pnmda)],
                  max_s = 0mS, aggregate = true)
 
 @named AMPAChan = SynapticChannel(AMPA,
-                                [Gate(HeavisideSum, threshold = 20mV, saturation = 2;
+                                [Gate(HeavisideSum; threshold = 20mV, decay = 2,
                                       name = :u),
                                  Gate(SimpleGate, inv(1-p), name = :pampa)],
                                  max_s = 0mS, aggregate = true)
@@ -98,12 +98,12 @@ dumb_Eleak = EquilibriumPotential(Leak, 20mV)
 @named dummy = Compartment(Vₘ, [leak(1mS/cm^2)], [dumb_Eleak])
 
 ESyn = EquilibriumPotential(NMDA, 60mV, name = :syn)
-topology = NetworkTopology([dummy, mcneuron], [NMDAChan(2.0µS)]);
+topology = NetworkTopology([dummy, mcneuron], [NMDAChan(2µS)]);
 add_synapse!(topology, dummy, mcneuron.dendrite, NMDAChan)
 revmap = Dict([NMDAChan => ESyn])
 network = NeuronalNetworkSystem(topology, revmap)
 
 prob = Simulation(network, time=5000ms)
-sol = solve(prob, RadauIIA5(), abstol=1e-8, reltol=1e-8)
+sol = solve(prob, RadauIIA5(), abstol=1e-6, reltol=1e-6)
 plot(sol, plotdensity=25000, vars=[mcneuron.soma.Vₘ], size=(1200,800))
 
