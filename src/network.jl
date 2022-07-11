@@ -75,6 +75,35 @@ function add_layer!(topology, synaptic_model, g = SimpleDiGraph(length(vertices(
     push!(graph(topology), synaptic_model => adjacency_matrix(g)*default_weight)
 end
 
+Base.eltype(nt::NetworkTopology) = AbstractCompartmentSystem
+Base.length(nt::NetworkTopology) = length(neurons(nt))
+
+function Base.iterate(nt::NetworkTopology, state=1)
+    state > length(nt) && return nothing
+    return (neurons(nt)[state], state+1)
+end
+
+function Base.iterate(rev_nt::Iterators.Reverse{NetworkTopology}, state=length(rev_nt.itr))
+    state < 1 && return nothing
+    nt = rev_nt.itr
+    return (neurons(nt)[state], state-1)
+end
+
+function Base.getindex(nt::NetworkTopology, i)
+    return neurons(nt)[i]
+end
+
+Base.firstindex(nt::NetworkTopology) = 1
+Base.lastindex(nt::NetworkTopology) = length(nt)
+
+function Base.setindex!(nt::NetworkTopology, g::SimpleDiGraph, cond::ConductanceSystem)
+    add_layer!(nt, cond, g)
+end
+
+function Base.setindex!(nt::NetworkTopology, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
+    add_synapse!(nt, pre, post, cond)
+end
+
 """
 $(TYPEDEF)
 
@@ -195,6 +224,35 @@ end
 
 get_extensions(x::AbstractNeuronalNetworkSystem) = getfield(x, :extensions)
 get_topology(x::AbstractNeuronalNetworkSystem) = getfield(x, :topology)
+
+Base.eltype(ns::NeuronalNetworkSystem) = AbstractCompartmentSystem
+Base.length(ns::NeuronalNetworkSystem) = length(neurons(get_topology(ns)))
+
+function Base.iterate(ns::NeuronalNetworkSystem, state=1)
+    state > length(ns) && return nothing
+    return (neurons(get_topology(ns))[state], state+1)
+end
+
+function Base.iterate(rev_ns::Iterators.Reverse{NetworkTopology}, state=length(rev_ns.itr))
+    state < 1 && return nothing
+    ns = rev_ns.itr
+    return (neurons(get_topology(ns))[state], state-1)
+end
+
+function Base.getindex(ns::NeuronalNetworkSystem, i)
+    return neurons(get_topology(ns))[i]
+end
+
+Base.firstindex(ns::NeuronalNetworkSystem) = 1
+Base.lastindex(ns::NeuronalNetworkSystem) = length(get_topology(ns))
+
+#function Base.setindex!(ns::NeuronalNetworkSystem, g::SimpleDiGraph, cond::ConductanceSystem)
+#    add_layer!(ns, cond, g)
+#end
+#
+#function Base.setindex!(ns::NeuronalNetworkSystem, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
+#    add_synapse!(ns, pre, post, cond)
+#end
 
 function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     dvs = get_states(nnsys)
