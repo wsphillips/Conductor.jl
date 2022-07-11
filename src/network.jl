@@ -56,12 +56,6 @@ neurons(topology::NetworkTopology) = [keys(topology.neuron_map)...]
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :multigraph)
 
-#=
-function find_compsys(compartment::AbstractCompartmentSystem, topology::NetworkTopology)
-    return findfirst(isequal(nameof(compartment)), topology.namespaced)::Int 
-end
-=#
-
 function add_synapse!(topology, pre, post, synaptic_model)
     src = find_compsys(pre, topology)
     dst = find_compsys(post, topology)
@@ -180,24 +174,23 @@ function NeuronalNetworkSystem(
     union!(eqs, voltage_fwds)
 
     newmap = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
-    # reconstruct the multicompartment neurons
+    # Construct revised neurons
     for neuron in neurons(topology)
         idx_range = topology.neuron_map[neuron]
         if neuron isa MultiCompartmentSystem
             mctop = get_topology(neuron)
-            # compartments for the mc neuron can't be namespaced!
-            @set! mctop.compartments = MTK.rename.(compartments[idx_range], topology.denamespaced[idx_range])
+            # subcompartments can't be namespaced!
+            @set! mctop.compartments = MTK.rename.(compartments[idx_range],
+                                                   topology.denamespaced[idx_range])
             neuron = MultiCompartmentSystem(neuron, topology = mctop)
         else
             neuron = only(compartments[idx_range])
         end
         newmap[neuron] = idx_range
     end
-    #topology = NetworkTopology(topology.multigraph, newmap, compartments)
     systems::Vector{AbstractTimeDependentSystem} = union(extensions, collect(keys(newmap)))
-
     return NeuronalNetworkSystem(eqs, t, dvs, ps, observed, name, systems, defaults,
-                                   topology, reversal_map, extensions; checks = false)
+                                 topology, reversal_map, extensions; checks = false)
 end
 
 get_extensions(x::AbstractNeuronalNetworkSystem) = getfield(x, :extensions)

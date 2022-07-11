@@ -7,10 +7,10 @@ import Unitful: µF, pA, µA, nA, µS
 
 @named calcium_conversion = ODESystem([D(Caᵢ) ~ -ϕ*ICa - β*Caᵢ]);
 
-reversals = Equilibria(Pair[Sodium    =>  120.0mV,
-                            Potassium =>  -15.0mV,
-                            Leak      =>    0.0mV,
-                            Calcium   =>  140.0mV]);
+reversals = Equilibria([Sodium    =>  120.0mV,
+                        Potassium =>  -15.0mV,
+                        Leak      =>    0.0mV,
+                        Calcium   =>  140.0mV]);
 
 capacitance = 3.0µF/cm^2
 gc_val = 2.1mS/cm^2

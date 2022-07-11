@@ -64,7 +64,7 @@ export Gate, SimpleGate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue, 
 export EquilibriumPotential, Equilibrium, Equilibria, MembranePotential, IonCurrent,
        IonConcentration, Concentration, ExtrinsicPotential, Instrinsic, Extrinsic
 
-export MultiCompartmentTopology, NetworkTopology, add_synapse!, add_layer!
+export MultiCompartmentTopology, NetworkTopology, Population, add_synapse!, add_layer!
 
 export AuxConversion, D
 export Simulation
@@ -100,5 +100,5 @@ include("compartment.jl")
 include("multicompartment.jl")
 include("network.jl")
 include("simulation.jl")
-
+include("populations.jl")
 end # module
