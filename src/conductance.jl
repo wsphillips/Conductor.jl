@@ -214,6 +214,8 @@ function IonChannel(ion::IonSpecies,
 
     @variables g(t)
     g = setmetadata(g, ConductorUnits, mS/cm^2)
+    gbar = setmetadata(gbar, ConductorUnits, mS/cm^2)
+
     ConductanceSystem(g, ion, gate_vars; gbar = gbar, name = name, defaults = defaults, 
                       extensions = extensions)
 end

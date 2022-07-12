@@ -233,7 +233,7 @@ function Base.iterate(ns::NeuronalNetworkSystem, state=1)
     return (neurons(get_topology(ns))[state], state+1)
 end
 
-function Base.iterate(rev_ns::Iterators.Reverse{NetworkTopology}, state=length(rev_ns.itr))
+function Base.iterate(rev_ns::Iterators.Reverse{NeuronalNetworkSystem}, state=length(rev_ns.itr))
     state < 1 && return nothing
     ns = rev_ns.itr
     return (neurons(get_topology(ns))[state], state-1)

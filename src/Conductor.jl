@@ -1,6 +1,7 @@
 module Conductor
 using DocStringExtensions
 using Graphs
+using Distributions
 using SparseArrays
 using ModelingToolkit,
       Unitful,

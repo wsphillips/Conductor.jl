@@ -4,6 +4,7 @@ authors = ["Wiktor Phillips <wsphillips@gmail.com>"]
 version = "0.0.4"
 
 [deps]
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 IfElse = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
