@@ -20,10 +20,12 @@ struct Population{T<:AbstractCompartmentSystem}
     popname::Symbol
     "Population defaults"
     defs::Vector{Dict{Num, Any}}
+    "Stimuli applied to select neurons."
+    stimuli::Vector{Vector{Equation}}
 end
 
 function Population(neuron, n; name = Symbol(""))
-    Population(neuron, n, name, [Dict{Num, Any}() for _ in 1:n])
+    Population(neuron, n, name, [Dict{Num, Any}() for _ in 1:n], [Equation[] for _ in 1:n])
 end
 
 Base.nameof(p::Population) = getfield(p, :popname)
