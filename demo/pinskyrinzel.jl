@@ -99,8 +99,8 @@ dumb_Eleak = EquilibriumPotential(Leak, 20mV)
 
 ESyn = EquilibriumPotential(NMDA, 60mV, name = :syn)
 topology = NetworkTopology([dummy, mcneuron], [NMDAChan(2µS)]);
-add_synapse!(topology, dummy, mcneuron.dendrite, NMDAChan)
-revmap = Dict([NMDAChan => ESyn])
+topology[dummy, mcneuron.dendrite] = NMDAChan
+revmap = [NMDAChan => ESyn]
 network = NeuronalNetworkSystem(topology, revmap)
 
 prob = Simulation(network, time=5000ms)

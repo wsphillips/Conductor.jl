@@ -299,7 +299,7 @@ end
 
 function (cond::AbstractConductanceSystem)(gbar_val::Real)
     gbar_sym = setdefault(get_gbar(cond), gbar_val)
-    newcond = @set cond.defaults = Dict(get_defaults(cond)..., gbar_sym => gbar_val)
+    newcond =  ConductanceSystem(cond; gbar = gbar_sym, defaults = Dict(get_defaults(cond)..., gbar_sym => gbar_val))
     return newcond
 end
 

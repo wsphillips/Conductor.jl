@@ -149,7 +149,8 @@ function NeuronalNetworkSystem(
     topology, reversal_map,
     extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
     defaults = Dict(), name::Symbol = Base.gensym(:Network))
-
+    
+    reversal_map = reversal_map isa AbstractDict ? reversal_map : Dict(reversal_map)
     eqs, dvs, ps, observed = Equation[], Num[], Num[], Equation[]
     voltage_fwds = Set{Equation}()
     multigraph = graph(topology)
@@ -183,6 +184,7 @@ function NeuronalNetworkSystem(
                 class_copies = [] # clone the synapse model for each presynaptic compartment
                 for (x,y) in zip(pre_compartments, weights)
                     class_copy = ConductanceSystem(synaptic_class, subscriptions = [x],
+                                                   gbar = y,
                                                    name = namegen(nameof(synaptic_class)),
                                                    defaults = Dict(y => getdefault(y)))
                     push!(class_copies, class_copy)

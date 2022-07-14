@@ -45,15 +45,18 @@ LP # display
 
 PY # display
 
-topology = [Synapse(ABPD => LP, Glut(30nS), EGlut),
-            Synapse(ABPD => LP, Chol(30nS), EChol),
-            Synapse(ABPD => PY, Glut(10nS), EGlut),
-            Synapse(ABPD => PY, Chol(3nS), EChol),
-            Synapse(LP   => ABPD, Glut(30nS), EGlut),
-            Synapse(LP   => PY, Glut(1nS), EGlut),
-            Synapse(PY   => LP, Glut(30nS), EGlut)];
+topology = NetworkTopology([ABPD, LP, PY], [Glut, Chol]);
+reversal_map = Dict([Glut => EGlut, Chol => EChol])
 
-network = NeuronalNetworkSystem(topology)
+topology[ABPD, LP] = Glut(30nS)
+topology[ABPD, LP] = Chol(30nS)
+topology[ABPD, PY] = Glut(10nS)
+topology[ABPD, PY] = Chol(3nS)
+topology[LP, ABPD] = Glut(30nS)
+topology[LP, PY] = Glut(1nS)
+topology[PY, LP] = Glut(30nS)
+
+network = NeuronalNetworkSystem(topology, reversal_map)
 t = 10000
 sim = Simulation(network, time = t*ms);
 solution = solve(sim, RadauIIA5(), reltol=1e-9, abstol=1e-9);
