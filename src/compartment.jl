@@ -279,6 +279,16 @@ function Base.:(==)(sys1::AbstractCompartmentSystem, sys2::AbstractCompartmentSy
     all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end
 
+Base.eltype(::CompartmentSystem) = CompartmentSystem
+Base.length(::CompartmentSystem) = 1
+Base.iterate(comp::CompartmentSystem, state=1) = state > 1 ? nothing : (comp, state+1)
+Base.iterate(rev_comp::Iterators.Reverse{CompartmentSystem}, state=1) = state < 1 ? nothing : (rev_comp, state-1)
+Base.getindex(comp::CompartmentSystem, i::Int) = i == 1 ? comp : throw(BoundsError(P, i))
+Base.firstindex(comp::CompartmentSystem) = 1
+Base.lastindex(comp::CompartmentSystem) = 1
+Base.getindex(comp::CompartmentSystem, i::Number) = comp[convert(Int, i)]
+Base.getindex(comp::CompartmentSystem, I) = [comp[i] for i in I]
+
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
 
     dvs = get_states(compartment)

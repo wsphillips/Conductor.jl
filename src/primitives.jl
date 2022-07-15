@@ -105,6 +105,7 @@ struct MembranePotential
    
         ret = setmetadata.(ret, PrimitiveSource, source)
         ret = setmetadata.(ret, MembranePotential, true)
+        ret = setmetadata.(ret, ConductorUnits, mV)
         return ret
     end
 end

@@ -56,12 +56,6 @@ neurons(topology::NetworkTopology) = [keys(topology.neuron_map)...]
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :multigraph)
 
-#=
-function find_compsys(compartment::AbstractCompartmentSystem, topology::NetworkTopology)
-    return findfirst(isequal(nameof(compartment)), topology.namespaced)::Int 
-end
-=#
-
 function add_synapse!(topology, pre, post, synaptic_model)
     src = find_compsys(pre, topology)
     dst = find_compsys(post, topology)
@@ -79,6 +73,35 @@ end
 
 function add_layer!(topology, synaptic_model, g = SimpleDiGraph(length(vertices(topology))), default_weight = get_gbar(synaptic_model))
     push!(graph(topology), synaptic_model => adjacency_matrix(g)*default_weight)
+end
+
+Base.eltype(nt::NetworkTopology) = AbstractCompartmentSystem
+Base.length(nt::NetworkTopology) = length(neurons(nt))
+
+function Base.iterate(nt::NetworkTopology, state=1)
+    state > length(nt) && return nothing
+    return (neurons(nt)[state], state+1)
+end
+
+function Base.iterate(rev_nt::Iterators.Reverse{NetworkTopology}, state=length(rev_nt.itr))
+    state < 1 && return nothing
+    nt = rev_nt.itr
+    return (neurons(nt)[state], state-1)
+end
+
+function Base.getindex(nt::NetworkTopology, i)
+    return neurons(nt)[i]
+end
+
+Base.firstindex(nt::NetworkTopology) = 1
+Base.lastindex(nt::NetworkTopology) = length(nt)
+
+function Base.setindex!(nt::NetworkTopology, g::SimpleDiGraph, cond::ConductanceSystem)
+    add_layer!(nt, cond, g)
+end
+
+function Base.setindex!(nt::NetworkTopology, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
+    add_synapse!(nt, pre, post, cond)
 end
 
 """
@@ -126,7 +149,8 @@ function NeuronalNetworkSystem(
     topology, reversal_map,
     extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
     defaults = Dict(), name::Symbol = Base.gensym(:Network))
-
+    
+    reversal_map = reversal_map isa AbstractDict ? reversal_map : Dict(reversal_map)
     eqs, dvs, ps, observed = Equation[], Num[], Num[], Equation[]
     voltage_fwds = Set{Equation}()
     multigraph = graph(topology)
@@ -160,6 +184,7 @@ function NeuronalNetworkSystem(
                 class_copies = [] # clone the synapse model for each presynaptic compartment
                 for (x,y) in zip(pre_compartments, weights)
                     class_copy = ConductanceSystem(synaptic_class, subscriptions = [x],
+                                                   gbar = y,
                                                    name = namegen(nameof(synaptic_class)),
                                                    defaults = Dict(y => getdefault(y)))
                     push!(class_copies, class_copy)
@@ -180,28 +205,56 @@ function NeuronalNetworkSystem(
     union!(eqs, voltage_fwds)
 
     newmap = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
-    # reconstruct the multicompartment neurons
+    # Construct revised neurons
     for neuron in neurons(topology)
         idx_range = topology.neuron_map[neuron]
         if neuron isa MultiCompartmentSystem
             mctop = get_topology(neuron)
-            # compartments for the mc neuron can't be namespaced!
-            @set! mctop.compartments = MTK.rename.(compartments[idx_range], topology.denamespaced[idx_range])
+            # subcompartments can't be namespaced!
+            @set! mctop.compartments = MTK.rename.(compartments[idx_range],
+                                                   topology.denamespaced[idx_range])
             neuron = MultiCompartmentSystem(neuron, topology = mctop)
         else
             neuron = only(compartments[idx_range])
         end
         newmap[neuron] = idx_range
     end
-    #topology = NetworkTopology(topology.multigraph, newmap, compartments)
     systems::Vector{AbstractTimeDependentSystem} = union(extensions, collect(keys(newmap)))
-
     return NeuronalNetworkSystem(eqs, t, dvs, ps, observed, name, systems, defaults,
-                                   topology, reversal_map, extensions; checks = false)
+                                 topology, reversal_map, extensions; checks = false)
 end
 
 get_extensions(x::AbstractNeuronalNetworkSystem) = getfield(x, :extensions)
 get_topology(x::AbstractNeuronalNetworkSystem) = getfield(x, :topology)
+
+Base.eltype(ns::NeuronalNetworkSystem) = AbstractCompartmentSystem
+Base.length(ns::NeuronalNetworkSystem) = length(neurons(get_topology(ns)))
+
+function Base.iterate(ns::NeuronalNetworkSystem, state=1)
+    state > length(ns) && return nothing
+    return (neurons(get_topology(ns))[state], state+1)
+end
+
+function Base.iterate(rev_ns::Iterators.Reverse{NeuronalNetworkSystem}, state=length(rev_ns.itr))
+    state < 1 && return nothing
+    ns = rev_ns.itr
+    return (neurons(get_topology(ns))[state], state-1)
+end
+
+function Base.getindex(ns::NeuronalNetworkSystem, i)
+    return neurons(get_topology(ns))[i]
+end
+
+Base.firstindex(ns::NeuronalNetworkSystem) = 1
+Base.lastindex(ns::NeuronalNetworkSystem) = length(get_topology(ns))
+
+#function Base.setindex!(ns::NeuronalNetworkSystem, g::SimpleDiGraph, cond::ConductanceSystem)
+#    add_layer!(ns, cond, g)
+#end
+#
+#function Base.setindex!(ns::NeuronalNetworkSystem, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
+#    add_synapse!(ns, pre, post, cond)
+#end
 
 function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     dvs = get_states(nnsys)

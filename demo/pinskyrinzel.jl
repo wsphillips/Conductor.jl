@@ -7,10 +7,10 @@ import Unitful: µF, pA, µA, nA, µS
 
 @named calcium_conversion = ODESystem([D(Caᵢ) ~ -ϕ*ICa - β*Caᵢ]);
 
-reversals = Equilibria(Pair[Sodium    =>  120.0mV,
-                            Potassium =>  -15.0mV,
-                            Leak      =>    0.0mV,
-                            Calcium   =>  140.0mV]);
+reversals = Equilibria([Sodium    =>  120.0mV,
+                        Potassium =>  -15.0mV,
+                        Leak      =>    0.0mV,
+                        Calcium   =>  140.0mV]);
 
 capacitance = 3.0µF/cm^2
 gc_val = 2.1mS/cm^2
@@ -99,8 +99,8 @@ dumb_Eleak = EquilibriumPotential(Leak, 20mV)
 
 ESyn = EquilibriumPotential(NMDA, 60mV, name = :syn)
 topology = NetworkTopology([dummy, mcneuron], [NMDAChan(2µS)]);
-add_synapse!(topology, dummy, mcneuron.dendrite, NMDAChan)
-revmap = Dict([NMDAChan => ESyn])
+topology[dummy, mcneuron.dendrite] = NMDAChan
+revmap = [NMDAChan => ESyn]
 network = NeuronalNetworkSystem(topology, revmap)
 
 prob = Simulation(network, time=5000ms)
