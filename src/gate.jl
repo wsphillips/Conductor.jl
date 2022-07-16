@@ -173,8 +173,9 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     thold_val = ustrip(Float64, mV, thold)
     out = output(var)
     isempty(subscriptions(chan)) && return [D(out) ~ 0]
+    # if tracking voltage...
     @named Vₓ = ExtrinsicPotential(n = length(subscriptions(chan))) 
-    # Derived from Pinsky & Rinzel 1994 - Equation 4 
+    # Pinsky & Rinzel 1994 - Equation 4 
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
     saturation = get(var, :saturation, nothing)
     if isnothing(saturation)
@@ -184,32 +185,6 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
         return [D(out) ~ (out < saturation)*sum(Vₓ .>= thold_val) .- (out/decay)]
     end
 end
-
-#"""
-#    get_eqs(var::Gate{<:Union{AlphaBeta, SteadySateTau}}, chan)
-#
-#Generate the voltage- and time-dependent differential equation modeling the output of a gate
-#that was specified with [α(Vₘ), β(Vₘ)] or [x∞(Vₘ), τₓ(Vₘ)].
-#
-#For `Gate{SteadyStateTau}`, the model form is:
-#
-#``
-#\\frac{dx}{dt}=\\frac{1}{\\tau_{x}(x_{\\infty}-x)}
-#``
-#
-#For `Gate{AlphaBeta}`, the model form is:
-#
-#``
-#\\frac{dx}{dt} = \\alpha_{x}(1-x)-\\beta_{x}x
-#``
-#"""
-#function ModelingToolkit.get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}}, chan)
-#    x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
-#    return [D(x) ~ inv(τₓ)*(x∞ - x)]
-#end
-
-#ModelingToolkit.get_eqs(var::Gate{SteadyState}, chan) = [output(var) ~ steadystate(var)]
-#ModelingToolkit.get_eqs(var::Gate{ConstantValue}, chan) = Equation[]
 
 ############################################################################################
 # Macros (needs updating)
