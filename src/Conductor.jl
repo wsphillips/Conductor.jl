@@ -4,6 +4,7 @@ using Graphs
 using Distributions
 using SparseArrays
 using UnPack
+import SciMLBase
 using ModelingToolkit,
       Unitful,
       Unitful.DefaultSymbols,

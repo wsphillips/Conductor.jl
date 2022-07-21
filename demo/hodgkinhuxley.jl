@@ -39,9 +39,9 @@ sim = Simulation(neuron, time = 300ms)
 
 using OrdinaryDiffEq
 
-solution = solve(sim, Rosenbrock23())
+@time solution = solve(sim, Rosenbrock23(), abstol=0.01, reltol=0.01, saveat=0.2);
 
 using Plots
 # Plot at 5kHz sampling
-plot(solution; plotdensity=Int(1500), size=(1200,800))
+plot(solution; size=(1200,800))
 
