@@ -1,3 +1,44 @@
+abstract type CompartmentForm end
+
+struct HodgkinHuxley <: CompartmentForm
+    "Voltage potential."
+    voltage::Num
+    "Membrane capacitance."
+    capacitance::Num
+    "Morphological geometry of the compartment."
+    geometry::Geometry
+    "Ionic conductances."
+    channels::Vector{AbstractConductanceSystem}
+    "Equilibrium potentials belonging to ionic membrane conductances."
+    channel_reversals::Vector{Num}
+    "Synaptic conductances."
+    synaptic_channels::Vector{AbstractConductanceSystem}
+    "Equilibrium potentials belonging to synaptic conductances."
+    synaptic_reversals::Vector{Num}
+    "Axial (intercompartmental) conductances."
+    axial_conductances::Vector{Tuple{AbstractConductanceSystem,Num}}
+    "Experimental stimuli (for example, current injection)."
+    stimuli::Vector{Equation}
+end
+
+# basic constructor
+function HodgkinHuxley(
+    Vₘ::Num,
+    channels,
+    channel_reversals;
+    capacitance = 1µF/cm^2,
+    geometry::Geometry = Point(),
+    stimuli::Vector{Equation} = Equation[])
+
+    @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
+
+    synaptic_channels = Vector{AbstractConductanceSystem}()
+    synaptic_reversals = Vector{Num}()
+    axial_conductances = Vector{Tuple{AbstractConductanceSystem,Num}}()
+   
+    HodgkinHuxley(Vₘ, cₘ, geometry, channels, channel_reversals, synaptic_channels,
+                  synaptic_reversals, axial_conductances, stimuli)
+end
 
 """
 $(TYPEDEF)
@@ -6,8 +47,8 @@ A neuronal compartment.
 
 $(TYPEDFIELDS)
 """
-struct CompartmentSystem <: AbstractCompartmentSystem
-    # MTK fields
+struct CompartmentSystem{T<:CompartmentForm} <: AbstractCompartmentSystem
+    form::T
     eqs::Vector{Equation}
     "Independent variabe. Defaults to time, ``t``."
     iv::Num
@@ -17,25 +58,6 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     name::Symbol
     systems::Vector{AbstractTimeDependentSystem}
     defaults::Dict
-    # Conductor fields
-    "Voltage potential."
-    voltage::Num
-    "Membrane capacitance."
-    capacitance::Num
-    "Morphological geometry of the compartment."
-    geometry::Geometry
-    "Ionic conductances."
-    chans::Vector{AbstractConductanceSystem}
-    "Equilibrium potentials belonging to ionic membrane conductances."
-    channel_reversals::Vector{Num}
-    "Synaptic conductances."
-    synapses::Vector{AbstractConductanceSystem}
-    "Equilibrium potentials belonging to synaptic conductances."
-    synaptic_reversals::Vector{Num}
-    "Axial (intercompartmental) conductances."
-    axial_conductance::Vector{Tuple{AbstractConductanceSystem,Num}}
-    "Experimental stimuli (for example, current injection)."
-    stimuli::Vector{Equation}
     """
     Additional systems to extend dynamics. Extensions are composed with the parent system
     during conversion to `ODESystem`.
@@ -43,21 +65,16 @@ struct CompartmentSystem <: AbstractCompartmentSystem
     extensions::Vector{ODESystem}
     "Refers to the parent system when the compartment is a subcompartment in a `MultiCompartmentSystem`."
     parent::Ref{AbstractCompartmentSystem}
-    function CompartmentSystem(eqs, iv, states, ps, observed, name, systems, defaults,
-                               voltage, capacitance, geometry, chans, channel_reversals,
-                               synapses, synaptic_reversals, axial_conductance, stimuli,
-                               extensions, parent;
-                               checks = false)
+
+    function CompartmentSystem(form::T, eqs, iv, states, ps, observed, name, systems,
+                               defaults, extensions, parent; checks = false) where {T <: CompartmentForm}
         if checks
         # placeholder
         foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"), channel_reversals)
         foreach(x -> iscurrent(x.lhs) || throw("Invalid current stimulus"), stimuli)
 
         end
-        new(eqs, iv, states, ps, observed, name, systems, defaults,
-                               voltage, capacitance, geometry, chans, channel_reversals,
-                               synapses, synaptic_reversals, axial_conductance, stimuli,
-                               extensions, parent)
+        new{T}(form, eqs, iv, states, ps, observed, name, systems, defaults, extensions, parent)
     end
 end
 
@@ -75,38 +92,23 @@ const Compartment = CompartmentSystem
 - `stimuli::Vector{Equation}`: 
 - `name::Symbol`: Name of the system.
 """
-function CompartmentSystem(
-    Vₘ::Num,
-    channels,
-    channel_reversals;
-    capacitance = 1µF/cm^2,
-    geometry::Geometry = Point(),
-    extensions::Vector{ODESystem} = ODESystem[],
-    stimuli::Vector{Equation} = Equation[],
-    defaults = Dict(),
-    name::Symbol = Base.gensym("Compartment")
-) 
+function CompartmentSystem(form::HodgkinHuxley; defaults = Dict(),
+                           extensions::Vector{ODESystem} = ODESystem[],
+                           name::Symbol = Base.gensym("Compartment")) 
     
-    @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
-    Set(channels)
-    Set(channel_reversals)
-    synaptic_channels = Set{AbstractConductanceSystem}()
-    synaptic_reversals = Set{Num}()
-    axial_conductance = Set{Tuple{AbstractConductanceSystem,Num}}()
     parent = Ref{AbstractCompartmentSystem}()
-
-    return CompartmentSystem(Vₘ, cₘ, geometry, channels, channel_reversals, 
-                             synaptic_channels, synaptic_reversals, axial_conductance, 
-                             stimuli, extensions, parent, name, defaults)
+    
+    HodgkinHuxley(Vₘ, cₘ, geometry, channels, channel_reversals, synaptic_channels,
+                  synaptic_reversals, axial_conductance, stimuli, extensions, parent)
+    return CompartmentSystem(form, name, defaults)
 end
 
 # takes all user specified fields and generates remaining fields
-function CompartmentSystem(Vₘ, cₘ, geometry,
-                           channels, channel_reversals,
-                           synaptic_channels, synaptic_reversals,
-                           axial_conductance,
-                           stimuli, extensions, parent, name, defaults)
+function CompartmentSystem(form::HodgkinHuxley, name, defaults)
 
+    @unpack Vₘ, cₘ, geometry, channels, channel_reversals,
+    synaptic_channels, synaptic_reversals, axial_conductance,
+    stimuli, extensions, parent = form
     # generated
     eqs = Equation[]
     systems = union(channels, synaptic_channels, first.(axial_conductance))
@@ -178,8 +180,6 @@ function CompartmentSystem(Vₘ, cₘ, geometry,
         union!(dvs, states(extension))
     end
 
-### previously part of convert(ODESystem, x)
-#
     required_states = Set{Num}()
     # Resolve in/out: "connect" / auto forward cell states to channels
     for x in union(channels, synaptic_channels)
@@ -218,17 +218,8 @@ function CompartmentSystem(Vₘ, cₘ, geometry,
 end
 
 
-function CompartmentSystem(sys::CompartmentSystem;
-                           Vₘ = get_output(sys),
-                           cₘ = capacitance(sys),
-                           geometry = get_geometry(sys),
-                           channels = get_channels(sys),
-                           channel_reversals = get_channel_reversals(sys),
-                           synaptic_channels = get_synapses(sys), 
-                           synaptic_reversals = get_synaptic_reversals(sys),
-                           axial_conductance = get_axial_conductance(sys),
-                           stimuli = get_stimuli(sys),
-                           extensions = get_extensions(sys),
+function SciMLBase.remake(sys::CompartmentSystem;
+        dynamics = get_dynamics(sys)                           extensions = get_extensions(sys),
                            parent = parent(sys),
                            name = nameof(sys),
                            defaults = get_defaults(sys))
@@ -241,7 +232,8 @@ end
 
 
 # AbstractSystem interface extensions
-get_geometry(x::AbstractCompartmentSystem) = getfield(x, :geometry)
+get_dynamics(x::AbstractCompartmentSystem) = getfield(x, :form)
+get_geometry(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).geometry
 area(x::AbstractCompartmentSystem) = only(@parameters aₘ = area(get_geometry(x)))
 capacitance(x::AbstractCompartmentSystem) = getfield(x, :capacitance)
 get_output(x::AbstractCompartmentSystem) = getfield(x, :voltage)

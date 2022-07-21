@@ -29,9 +29,11 @@ reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 @named Iₑ = IonCurrent(NonIonic)
 electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0, IfElse.ifelse(t < 200.0, ustrip(Float64, µA, 400pA), 0.0), 0.0)
 
-@named neuron = CompartmentSystem(Vₘ, channels, reversals;
-                                  geometry = Sphere(radius = 20µm),
-                                  stimuli = [electrode_pulse])
+dynamics = HodgkinHuxley(Vₘ, channels, reversals;
+                         geometry = Sphere(radius = 20µm),
+                         stimuli = [electrode_pulse])
+
+@named neuron = Compartment(dynamics)
 
 sim = Simulation(neuron, time = 300ms)
 
