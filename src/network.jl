@@ -171,9 +171,10 @@ function NeuronalNetworkSystem(
             if isaggregate(synaptic_class)
                 new_synaptic_class = ConductanceSystem(synaptic_class,
                                                    subscriptions = pre_compartments) 
-                post_compartment = CompartmentSystem(post_compartment,
-                                                     synaptic_channels = [new_synaptic_class],
-                                                     synaptic_reversals = new_revs)
+                post_dynamics = get_dynamics(post_compartment)
+                new_dynamics = @set post_dynamics.synaptic_channels = [new_synaptic_class]
+                @set! new_dynamics.synaptic_reversals = new_revs
+                post_compartment = SciMLBase.remake(post_compartment, dynamics = new_dynamics)
                 Vxs = filter(x -> isvoltage(x) && isextrinsic(x),
                              MTK.namespace_variables(getproperty(post_compartment, nameof(new_synaptic_class))))
                 for (Vx, pre) in zip(Vxs, pre_compartments)
@@ -189,9 +190,11 @@ function NeuronalNetworkSystem(
                                                    defaults = Dict(y => getdefault(y)))
                     push!(class_copies, class_copy)
                 end
-                post_compartment = CompartmentSystem(post_compartment,
-                                                     synaptic_channels = class_copies,
-                                                     synaptic_reversals = new_revs)
+                #####
+                post_dynamics = get_dynamics(post_compartment)
+                new_dynamics = @set post_dynamics.synaptic_channels = class_copies
+                @set! new_dynamics.synaptic_reversals = new_revs
+                post_compartment = SciMLBase.remake(post_compartment, dynamics = new_dynamics)
                 for (class_copy, pre) in zip(class_copies, pre_compartments)
                     Vx = getproperty(post_compartment, nameof(class_copy)).Vₓ
                     push!(voltage_fwds, pre.Vₘ ~ Vx)
