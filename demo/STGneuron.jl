@@ -21,13 +21,15 @@ channels = [NaV(100mS/cm^2),
             H(.02mS/cm^2),
             leak(.03mS/cm^2)]
 
-@named neuron = CompartmentSystem(Vₘ, channels, gradients; geometry = geo, extensions = [calcium_conversion]);
+dynamics = HodgkinHuxley(Vₘ, channels, gradients; geometry = geo);
+
+@named neuron = CompartmentSystem(dynamics, extensions = [calcium_conversion]);
 
 sim = Simulation(neuron, time = 2500ms)
-solution = solve(sim, Rosenbrock23());
+solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2);
 
 # Plot at 5kHz sampling
-fig = plot(solution; plotdensity=Int(2500*4), size=(1200,800), vars=[Vₘ]);
+fig = plot(solution; size=(1200,800), vars=[Vₘ]);
 gui(fig)
 
 # Uncomment and eval `png(...)` to save as PNG

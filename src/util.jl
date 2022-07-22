@@ -31,16 +31,6 @@ function heaviside(x)
     IfElse.ifelse(x > zero(x), one(x), zero(x))
 end
 
-const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
-isfunction(ex::ExprValues) = try return eval(ex) isa Function catch; return false end
-
-function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
-    if ~isfunction(ex) && isa(ex, Symbol)
-        union!(out, [ex])
-    end
-    return ex
-end
-
 # Hijacked and modified from Symbolics.jl
 function set_symarray_metadata(x, ctx, val)
     if symtype(x) <: AbstractArray
@@ -57,4 +47,16 @@ function set_symarray_metadata(x, ctx, val)
         setmetadata(x, ctx, val)
     end
 end
+
+#=
+const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
+isfunction(ex::ExprValues) = try return eval(ex) isa Function catch; return false end
+
+function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
+    if ~isfunction(ex) && isa(ex, Symbol)
+        union!(out, [ex])
+    end
+    return ex
+end
+=#
 

@@ -5,7 +5,7 @@ struct MultiCompartmentTopology
     conductances::Dict{Graphs.SimpleEdge{Int},ConductanceSystem}
 end
 
-function MultiCompartmentTopology(compartments::Vector{CompartmentSystem})
+function MultiCompartmentTopology(compartments::Vector{CompartmentSystem{T}}) where {T<:CompartmentForm}
     g = SimpleDiGraph(length(compartments))
     conductances = Dict{Graphs.SimpleEdge{Int},ConductanceSystem}()
     return MultiCompartmentTopology(g, compartments, conductances)
@@ -90,8 +90,10 @@ function MultiCompartment(topology; extensions = ODESystem[],
     
     # As a precaution, wipe any pre-existing axial currents
     for (i, comp) in enumerate(compartments)
-        isempty(get_axial_conductance(comp)) && continue
-        compartments[i] = CompartmentSystem(comp, axial_conductance = NULL_AXIAL)
+        isempty(get_axial_conductances(comp)) && continue
+        dynamics = get_dynamics(comp)
+        new_dynamics = @set dynamics.axial_conductances = NULL_AXIAL
+        compartments[i] = SciMLBase.remake(comp, dynamics = new_dynamics)
     end
 
     observed = Equation[]
@@ -102,7 +104,9 @@ function MultiCompartment(topology; extensions = ODESystem[],
         trunk = compartments[src(e)]
         branch = compartments[dst(e)]
         branchvm_alias = MembranePotential(nothing; name = Symbol(:V, nameof(branch))) 
-        trunk = CompartmentSystem(trunk, axial_conductance = union(get_axial_conductance(trunk), [(axial, branchvm_alias)]))
+        dynamics = get_dynamics(trunk)
+        new_dynamics = @set dynamics.axial_conductances = union(get_axial_conductances(trunk), [(axial, branchvm_alias)])
+        trunk = SciMLBase.remake(trunk, dynamics = new_dynamics)
 
         if hasproperty(getproperty(trunk, nameof(axial)), :Vₘ)
             push!(eqs, branch.Vₘ ~ getproperty(trunk, nameof(axial)).Vₘ)
@@ -127,7 +131,7 @@ end
 
 get_topology(x::MultiCompartmentSystem) = getfield(x, :topology)
 get_compartments(x::MultiCompartmentTopology) = getfield(x, :compartments)
-get_axial_conductance(x::CompartmentSystem) = getfield(x, :axial_conductance)
+get_axial_conductances(x::CompartmentSystem) = get_dynamics(x).axial_conductances
 get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
 get_compartments(x::CompartmentSystem) = [x]
 

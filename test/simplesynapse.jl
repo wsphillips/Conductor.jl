@@ -33,12 +33,11 @@ reversals = Equilibria([Na   =>  50.0mV, K    => -77.0mV, Leak => -54.4mV])
 @named Iₑ = IonCurrent(NonIonic)
 holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
 geo = Cylinder(radius = 25µm, height = 400µm)
-@named neuron1 = Compartment(Vₘ, channels, reversals;
-                             geometry = geo,
-                             stimuli = [holding_current])
 
-@named neuron2 = Compartment(Vₘ, channels, reversals;
-                             geometry = geo)
+dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals; geometry = geo, stimuli = [holding_current]);
+dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals; geometry = geo);
+@named neuron1 = Compartment(dynamics_1)
+@named neuron2 = Compartment(dynamics_2)
  
 # Synaptic model
 Vₓ = ExtrinsicPotential()

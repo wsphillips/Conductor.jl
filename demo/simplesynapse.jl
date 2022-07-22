@@ -29,12 +29,15 @@ reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 @named Iₑ = IonCurrent(NonIonic)
 holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
 
-@named neuron1 = Compartment(Vₘ, channels, reversals;
-                             geometry = Cylinder(radius = 25µm, height = 400µm),
-                             stimuli = [holding_current])
+dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
+                           geometry = Cylinder(radius = 25µm, height = 400µm),
+                           stimuli = [holding_current]);
+dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
+                           geometry = Cylinder(radius = 25µm, height = 400µm));
 
-@named neuron2 = Compartment(Vₘ, channels, reversals;
-                             geometry = Cylinder(radius = 25µm, height = 400µm))
+@named neuron1 = Compartment(dynamics_1)
+
+@named neuron2 = Compartment(dynamics_2)
                                    
 # Synaptic model
 Vₓ = ExtrinsicPotential()
@@ -53,8 +56,8 @@ reversal_map = Dict([Glut => EGlut])
 ttot = 250
 sim = Simulation(net, time = ttot*ms)
 
-solution = solve(sim, Rosenbrock23())
+solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
 
 # Plot at 5kHz sampling
-plot(solution; plotdensity=Int(ttot*5))
+plot(solution)
 

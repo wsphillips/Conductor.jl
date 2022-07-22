@@ -55,14 +55,18 @@ reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
 @named Iₑ = IonCurrent(NonIonic)
 holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
-
 channels = [NaV, Kdr, leak];
-@named neuron1 = Compartment(Vₘ, channels, reversals;
-                             geometry = Cylinder(radius = 25µm, height = 400µm),
-                             stimuli = [holding_current])
 
-@named neuron2 = Compartment(Vₘ, channels, reversals;
-                             geometry = Cylinder(radius = 25µm, height = 400µm))
+dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
+                         geometry = Cylinder(radius = 25µm, height = 400µm),
+                         stimuli = [holding_current])
+
+@named neuron1 = Compartment(dynamics_1)
+
+dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
+                           geometry = Cylinder(radius = 25µm, height = 400µm))
+
+@named neuron2 = Compartment(dynamics_2)
 
 # Synaptic model
 Vₓ = ExtrinsicPotential()
@@ -80,10 +84,8 @@ reversal_map = Dict([Glut => EGlut])
 total_time = 250
 sim = Simulation(net, time = total_time*ms)
 
-solution = solve(sim, Rosenbrock23())
-
-# Plot at 5kHz sampling
-plot(solution; plotdensity=Int(total_time*5), vars=[neuron1.Vₘ, neuron2.Vₘ])
+solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
+plot(solution; vars=[neuron1.Vₘ, neuron2.Vₘ])
 ```
 
 ## Step-by-step explanation
@@ -163,12 +165,16 @@ which will be our presynaptic neuron.
 
 ```@example gate_example
 channels = [NaV, Kdr, leak];
-@named neuron1 = Compartment(Vₘ, channels, reversals;
-                             geometry = Cylinder(radius = 25µm, height = 400µm),
-                             stimuli = [holding_current])
+dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
+                         geometry = Cylinder(radius = 25µm, height = 400µm),
+                         stimuli = [holding_current])
 
-@named neuron2 = Compartment(Vₘ, channels, reversals;
-                             geometry = Cylinder(radius = 25µm, height = 400µm))
+@named neuron1 = Compartment(dynamics_1)
+
+dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
+                           geometry = Cylinder(radius = 25µm, height = 400µm))
+
+@named neuron2 = Compartment(dynamics_2)
 ``` 
 For our neurons to talk to each other, we'll need a model for a synaptic conductance. This
 time we'll use a model that's presented in a different form in the literature. A model of a
@@ -216,6 +222,6 @@ Now we're ready to run our simulation.
 ```@example gate_example
 total_time = 250
 sim = Simulation(net, time = total_time*ms)
-solution = solve(sim, Rosenbrock23())
-plot(solution; plotdensity=Int(total_time*5), vars=[neuron1.Vₘ, neuron2.Vₘ])
+solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
+plot(solution; vars=[neuron1.Vₘ, neuron2.Vₘ])
 ```

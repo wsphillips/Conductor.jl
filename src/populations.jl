@@ -44,7 +44,7 @@ function Base.iterate(rP::Iterators.Reverse{Population{T}}, state=length(rP.itr)
     state < 1 && return nothing
     pop = rP.itr
     new_name = Symbol(nameof(pop), '₊', nameof(prototype(pop)), '_', state)
-    neuron = T(prototype(p); name = new_name, defaults = p.defs[state])
+    neuron = SciMLBase.remake(prototype(p); name = new_name, defaults = p.defs[state])
     return (neuron, state-1)
 end
 
