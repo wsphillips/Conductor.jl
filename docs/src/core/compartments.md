@@ -36,7 +36,9 @@ kdr_kinetics = [
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Sodium => 50.0mV, Potassium => -77.0mV, Leak => -54.4mV])
 
-@named neuron = CompartmentSystem(Vₘ, channels, reversals)
+dynamics = HodgkinHuxley(Vₘ, channels, reversals)
+
+@named neuron = CompartmentSystem(dynamics)
 @assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8) # hide
 neuron # hide
 ```
@@ -55,8 +57,8 @@ to describe the shape and size of the compartment:
 ```@example compartment_example
 import Unitful: µm
 soma_shape = Sphere(radius = 20µm)
-
-@named neuron = CompartmentSystem(Vₘ, channels, reversals; geometry = soma_shape)
+geo_dynamics = HodgkinHuxley(Vₘ, channels, reversals; geometry = soma_shape)
+@named neuron = CompartmentSystem(geo_dynamics)
 @assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8); # hide
 nothing # hide
 ```
@@ -67,7 +69,7 @@ If we try to simulate the neuron we've modeled so far, the result isn't very int
 import Unitful: ms
 using OrdinaryDiffEq, Plots
 sim = Simulation(neuron, time = 300ms)
-solution = solve(sim, Rosenbrock23())
+solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
 plot(solution; vars=[Vₘ])
 ```
 The neuron isn't spontaneously active. To make the neuron produce spikes, we can write an
@@ -83,10 +85,11 @@ electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0,
                                                    ustrip(Float64, µA, 400pA),
                                                    0.0),
                                      0.0)
+stim_dynamics = HodgkinHuxley(Vₘ, channels, reversals;
+                              geometry = soma_shape,
+                              stimuli = [electrode_pulse])
 
-@named neuron_stim = CompartmentSystem(Vₘ, channels, reversals;
-                                       geometry = soma_shape,
-                                       stimuli = [electrode_pulse])
+@named neuron_stim = CompartmentSystem(stim_dynamics)
 @assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,8); # hide
 neuron_stim # hide
 ```
@@ -94,7 +97,7 @@ Putting it all together, our neuron simulation now produces a train of action po
 
 ```@example compartment_example
 sim = Simulation(neuron_stim, time = 300ms)
-solution = solve(sim, Rosenbrock23())
+solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
 plot(solution; vars=[Vₘ])
 ```
 
