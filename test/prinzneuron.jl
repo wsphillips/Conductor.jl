@@ -16,7 +16,8 @@ channels = [NaV(100mS/cm^2),
             H(.02mS/cm^2),
             leak(.03mS/cm^2)];
 
-@named neuron = CompartmentSystem(Vₘ, channels, gradients, geometry = geo, extensions = [calcium_conversion])
+dynamics = HodgkinHuxley(Vₘ, channels, gradients; geometry = geo);
+@named neuron = CompartmentSystem(dynamics, extensions = [calcium_conversion]);
 
 @test length.([equations(neuron),
                states(neuron),

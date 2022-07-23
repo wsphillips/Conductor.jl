@@ -3,6 +3,8 @@ using DocStringExtensions
 using Graphs
 using Distributions
 using SparseArrays
+using UnPack
+import SciMLBase
 using ModelingToolkit,
       Unitful,
       Unitful.DefaultSymbols,
@@ -83,6 +85,7 @@ export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate
 
 export Sphere, Cylinder, Point, Unitless, area, radius, height
 
+export HodgkinHuxley
 
 # Metadata IDs
 struct ConductorUnits end
