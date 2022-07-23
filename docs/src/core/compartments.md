@@ -56,7 +56,8 @@ to describe the shape and size of the compartment:
 
 ```@example compartment_example
 import Unitful: µm
-geo_dynamics = HodgkinHuxley(Vₘ, channels, reversals; geometry = Sphere(radius = 20µm))
+soma_shape = Sphere(radius = 20µm)
+geo_dynamics = HodgkinHuxley(Vₘ, channels, reversals; geometry = soma_shape)
 @named neuron = CompartmentSystem(geo_dynamics)
 @assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8); # hide
 nothing # hide
