@@ -32,7 +32,7 @@ using Pkg; Pkg.activate("."); Pkg.instantiate()
 
 You should then be able to open and step through the various demo script examples.
 
-## Acknowldegements
+## Acknowledgements
 
 Conductor.jl is based on the acausal component modeling paradigm in
 [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl). The initial draft of
