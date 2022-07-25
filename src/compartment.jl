@@ -21,6 +21,13 @@ struct HodgkinHuxley <: CompartmentForm
     stimuli::Vector{Equation}
 end
 
+struct LIF <: CompartmentForm
+    tau_membrane::Num
+    tau_synaptic::Num
+    threshold::Num
+    resistance::Num
+end
+
 # basic constructor
 function HodgkinHuxley(
     Vₘ::Num,
