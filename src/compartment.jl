@@ -218,11 +218,18 @@ end
 - `stimuli::Vector{Equation}`: 
 - `name::Symbol`: Name of the system.
 """
-function CompartmentSystem(dynamics::HodgkinHuxley; defaults = Dict(),
+function CompartmentSystem(dynamics; defaults = Dict(),
                            extensions::Vector{ODESystem} = ODESystem[],
                            name::Symbol = Base.gensym("Compartment")) 
     parent = Ref{AbstractCompartmentSystem}()
     return CompartmentSystem(dynamics, defaults, extensions, name, parent)
+end
+
+function CompartmentSystem(dynamics::LIF, defaults, extensions, name, parent)
+    @unpack tau_membrane, tau_synaptic, threshold, resistance = dynamics
+    V = MembranePotential(0.0)
+    @variables S(t) I(t)
+    @parameters V_rest V_th τ_mem τ_syn
 end
 
 function CompartmentSystem(dynamics::HodgkinHuxley, defaults, extensions, name, parent)
