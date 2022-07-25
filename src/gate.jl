@@ -59,7 +59,7 @@ end
 """
 $(TYPEDEF)
 
-Low-level contructor for `Gate`.
+Low-level constructor for `Gate`.
 
 A gate has a single symbolic `output` and stores properties (passed as a variable length
 list of keyword arguments). Gate properties are accessible via `get` and `getproperty`.

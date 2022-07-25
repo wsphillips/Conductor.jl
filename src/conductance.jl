@@ -17,7 +17,7 @@ $(FIELDS)
 struct ConductanceSystem <: AbstractConductanceSystem
     # MTK fields
     eqs::Vector{Equation}
-    "Independent variabe. Defaults to time, ``t``."
+    "Independent variable. Defaults to time, ``t``."
     iv::Num
     states::Vector{Num}
     ps::Vector{Num}
