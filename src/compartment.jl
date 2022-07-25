@@ -21,13 +21,6 @@ struct HodgkinHuxley <: CompartmentForm
     stimuli::Vector{Equation}
 end
 
-struct LIF <: CompartmentForm
-    tau_membrane::Num
-    tau_synaptic::Num
-    threshold::Num
-    resistance::Num
-end
-
 # basic constructor
 function HodgkinHuxley(
     Vₘ::Num,
@@ -225,11 +218,38 @@ function CompartmentSystem(dynamics; defaults = Dict(),
     return CompartmentSystem(dynamics, defaults, extensions, name, parent)
 end
 
+struct LIF <: CompartmentForm
+    V::Num
+    τ_mem::Num
+    τ_syn::Num
+    V_th::Num
+    R::Num
+    inputs::Vector{Num}
+    stimuli::Vector{Num}
+end
+
+function LIF(voltage = 0.0; tau_membrane = 10.0, tau_synaptic = 10.0, threshold = 1.0, resistance = 1.0, stimulus = 1.0)
+    @variables V(t) = voltage
+    @parameters V_th = threshold
+    @parameters τ_mem = tau_membrane τ_syn = tau_synaptic R = resistance Iₑ = stimulus
+    inputs = Num[]
+    return LIF(V, τ_mem, τ_syn, V_th, R, inputs, [Iₑ])
+end
+
 function CompartmentSystem(dynamics::LIF, defaults, extensions, name, parent)
-    @unpack tau_membrane, tau_synaptic, threshold, resistance = dynamics
-    V = MembranePotential(0.0)
-    @variables S(t) I(t)
-    @parameters V_rest V_th τ_mem τ_syn
+    @unpack V, τ_mem, τ_syn, V_th, R, inputs, stimuli = dynamics
+    Iₑ = stimuli[1]
+    @variables I(t) = 0.0 S(t) = false
+    @parameters V_rest = MTK.getdefault(V)
+    gen = GeneratedCollections(dvs = Set((V, I, S)),
+                               ps = Set((τ_mem, τ_syn, V_th, R, V_rest, Iₑ)),
+                               eqs = [D(V) ~ (-(V-V_rest)/τ_mem) + (R*(I + Iₑ))/τ_mem,
+                                      S ~ V == V_th,
+                                      D(I) ~ -I/τ_syn + sum(inputs)])
+    @unpack eqs, dvs, ps, observed, systems, defs = gen
+    merge!(defs, defaults)
+    return CompartmentSystem(dynamics, eqs, t, collect(dvs), collect(ps), observed, name,
+                             systems, defs, extensions, parent)
 end
 
 function CompartmentSystem(dynamics::HodgkinHuxley, defaults, extensions, name, parent)
@@ -332,5 +352,20 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
     
     return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs,
                      name = nameof(compartment))
+end
+
+function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF})
+
+    dvs = get_states(compartment)
+    ps  = get_ps(compartment)
+    eqs = get_eqs(compartment)
+    defs = get_defaults(compartment)
+    syss = convert.(ODESystem, get_systems(compartment))
+    
+    root_eqs = [@nonamespace(compartment.V) ~ @nonamespace(compartment.V_th)]
+    affect = [@nonamespace(compartment.V) ~ @nonamespace(compartment.V_rest)]
+
+    return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs,
+                     name = nameof(compartment), continuous_events = root_eqs => affect)
 end
 
