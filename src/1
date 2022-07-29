@@ -69,26 +69,16 @@ function neurons(topology::NetworkTopology{NeuronalMultigraph,<:CompartmentForm}
     [keys(graph(topology).neuron_map)...]
 end
 
-neurons(topology::NetworkTopology{<:SparseMatrixCSC,<:CompartmentForm}) = vertices(topology)
+neurons(topology::NetworkTopology{SparseMatrixCSC,F}) where {F} = vertices(topology)
 
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :graph)
 
-function add_synapse!(topology, pre, post, synaptic_model::ConductanceSystem)
+function add_synapse!(topology, pre, post, synaptic_model)
     src = find_compsys(pre, topology)
     dst = find_compsys(post, topology)
     g = graph(topology)[synaptic_model]
     g[src, dst] = get_gbar(synaptic_model)
-end
-
-function add_synapse!(topology, pre::AbstractCompartmentSystem, post::AbstractCompartmentSystem, weight::Real)
-    src = find_compsys(pre, topology)
-    dst = find_compsys(post, topology)
-    graph(topology)[src, dst] = weight
-end
-
-function add_synapse!(topology, pre::Int64, post::Int64, weight::Real)
-    graph(topology)[pre, post] = weight
 end
 
 function remove_synapse!(topology, pre, post, synaptic_model)
@@ -99,7 +89,7 @@ function remove_synapse!(topology, pre, post, synaptic_model)
     dropzeros!(g)
 end
 
-function add_layer!(topology, synaptic_model::ConductanceSystem, g = SimpleDiGraph(length(vertices(topology))), default_weight = get_gbar(synaptic_model))
+function add_layer!(topology, synaptic_model, g = SimpleDiGraph(length(vertices(topology))), default_weight = get_gbar(synaptic_model))
     push!(graph(topology), synaptic_model => adjacency_matrix(g)*default_weight)
 end
 
@@ -130,10 +120,6 @@ end
 
 function Base.setindex!(nt::NetworkTopology, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
     add_synapse!(nt, pre, post, cond)
-end
-
-function Base.setindex!(nt::NetworkTopology, weight::Real, pre, post)
-    add_synapse!(nt, pre, post, weight)
 end
 
 """
