@@ -1,3 +1,4 @@
+
 struct NeuronalMultigraph
     multigraph::Dict{Any, SparseMatrixCSC{Num,Int64}}
     neuron_map::Dict{AbstractCompartmentSystem, UnitRange{Int64}}
@@ -69,8 +70,7 @@ function neurons(topology::NetworkTopology{NeuronalMultigraph,<:CompartmentForm}
     [keys(graph(topology).neuron_map)...]
 end
 
-neurons(topology::NetworkTopology{<:SparseMatrixCSC,<:CompartmentForm}) = vertices(topology)
-
+neurons(topology::NetworkTopology{T,F}) where {T,F} = vertices(topology)
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :graph)
 
@@ -148,8 +148,8 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     eqs::Vector{Equation}
     "Independent variabe. Defaults to time, ``t``."
     iv::Num
-    states::Vector{Num}
-    ps::Vector{Num}
+    states::Vector
+    ps::Vector
     observed::Vector{Equation}
     name::Symbol
     systems::Vector{AbstractTimeDependentSystem}
@@ -177,10 +177,9 @@ $(TYPEDSIGNATURES)
 Basic constructor for a `NeuronalNetworkSystem`.
 
 """
-function NeuronalNetworkSystem(
-    topology, reversal_map,
+function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reversal_map,
     extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
-    defaults = Dict(), name::Symbol = Base.gensym(:Network))
+    defaults = Dict(), name::Symbol = Base.gensym(:Network)) where T
     
     reversal_map = reversal_map isa AbstractDict ? reversal_map : Dict(reversal_map)
     eqs, dvs, ps, observed = Equation[], Num[], Num[], Equation[]
@@ -256,6 +255,30 @@ function NeuronalNetworkSystem(
     end
     systems::Vector{AbstractTimeDependentSystem} = union(extensions, collect(keys(newmap)))
     return NeuronalNetworkSystem(eqs, t, dvs, ps, observed, name, systems, defaults,
+                                 topology, reversal_map, extensions; checks = false)
+end
+import Symbolics.scalarize
+function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF}, 
+        extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
+        defaults = Dict(), name::Symbol = Base.gensym(:Network)) where T
+
+    g = graph(topology)' 
+    neurons = vertices(topology)
+    n = length(neurons)
+    @parameters W[1:n,1:n] = g 
+    @variables (S(t))[1:n] = falses(n) (S_pre(t))[1:n] = zeros(n)
+    reversal_map = Dict() 
+    gen = GeneratedCollections(eqs = collect(S_pre ~ W*S), systems = union(neurons, extensions))
+    dvs = [scalarize(S)..., scalarize(S_pre)...]
+    ps = [scalarize(W)...]
+    (; eqs, systems, observed) = gen
+
+    for (i, neuron) in enumerate(neurons)
+        push!(eqs, S[i] ~ neuron.S)
+        push!(eqs, neuron.S_pre ~ S_pre[i])
+    end
+
+    return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems, defaults,
                                  topology, reversal_map, extensions; checks = false)
 end
 
