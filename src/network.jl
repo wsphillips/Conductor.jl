@@ -10,9 +10,9 @@ struct NetworkTopology{T,F}
     compartments::Vector{CompartmentSystem{F}}
 end
 
-function NetworkTopology(neurons::Vector{CompartmentSystem{LIF}})
+function NetworkTopology(neurons::Vector{CompartmentSystem{LIF}}, graph = SimpleDiGraph(lenght(neurons)); default_weight = 1.0)
     n = length(neurons)
-    graph = sparse(Int64[], Int64[], Float64[], n, n)
+    graph = adjacency_matrix(graph)*default_weight
     NetworkTopology(graph, neurons)
 end
 
@@ -154,6 +154,8 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     name::Symbol
     systems::Vector{AbstractTimeDependentSystem}
     defaults::Dict
+    continuous_events::Vector{MTK.SymbolicContinuousCallback}
+    discrete_events::Vector{MTK.SymbolicDiscreteCallback}
     # Conductor fields
     topology::NetworkTopology
     reversal_map::Dict
@@ -163,11 +165,13 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     """
     extensions::Vector{ODESystem}
     function NeuronalNetworkSystem(eqs, iv, states, ps, observed, name, systems, defaults,
-                                   topology, reversal_map, extensions; checks = false)
+                                   continuous_events, discrete_events, topology, reversal_map,
+                                   extensions; checks = false)
         if checks
             # placeholder
         end
-        new(eqs, iv, states, ps, observed, name, systems, defaults, topology, reversal_map, extensions)
+        new(eqs, iv, states, ps, observed, name, systems, defaults, continuous_events,
+            discrete_events, topology, reversal_map, extensions)
     end
 end
 
@@ -183,6 +187,7 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
     
     reversal_map = reversal_map isa AbstractDict ? reversal_map : Dict(reversal_map)
     eqs, dvs, ps, observed = Equation[], Num[], Num[], Equation[]
+    ccbs, dcbs = MTK.SymbolicContinuousCallback[], MTK.SymbolicDicreteCallback[]
     voltage_fwds = Set{Equation}()
     multigraph = graph(topology)
     compartments = vertices(topology)
@@ -255,9 +260,11 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
     end
     systems::Vector{AbstractTimeDependentSystem} = union(extensions, collect(keys(newmap)))
     return NeuronalNetworkSystem(eqs, t, dvs, ps, observed, name, systems, defaults,
-                                 topology, reversal_map, extensions; checks = false)
+                                 ccbs, dcbs, topology, reversal_map, extensions; checks = false)
 end
+
 import Symbolics.scalarize
+
 function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF}, 
         extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
         defaults = Dict(), name::Symbol = Base.gensym(:Network)) where T
@@ -266,20 +273,27 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF},
     neurons = vertices(topology)
     n = length(neurons)
     @parameters W[1:n,1:n] = g 
-    @variables (S(t))[1:n] = falses(n) (S_pre(t))[1:n] = zeros(n)
+    @variables (S(t))[1:n] = falses(n) (Syn_inp(t))[1:n] = zeros(n)
     reversal_map = Dict() 
-    gen = GeneratedCollections(eqs = collect(S_pre ~ W*S), systems = union(neurons, extensions))
-    dvs = [scalarize(S)..., scalarize(S_pre)...]
-    ps = [scalarize(W)...]
-    (; eqs, systems, observed) = gen
+    gen = GeneratedCollections(systems = union(neurons, extensions),
+                               eqs = scalarize(Syn_inp ~ W*S),
+                               dvs = Set(vcat(scalarize(S), scalarize(Syn_inp))),
+                               ps = Set(scalarize(W)))
+    (; eqs, dvs, ps, systems, observed) = gen
+    
+    affect_eqs = Equation[]
 
     for (i, neuron) in enumerate(neurons)
         push!(eqs, S[i] ~ neuron.S)
-        push!(eqs, neuron.S_pre ~ S_pre[i])
+        push!(affect_eqs, neuron.I ~ neuron.I + Syn_inp[i])
     end
 
-    return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems, defaults,
-                                 topology, reversal_map, extensions; checks = false)
+    condition = reduce(|, scalarize(S .== true))
+    dcbs = [MTK.SymbolicDiscreteCallback(condition, affect_eqs)]
+    ccbs = MTK.SymbolicContinuousCallback[]
+    return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
+                                 defaults, ccbs, dcbs, topology, reversal_map, extensions;
+                                 checks = false)
 end
 
 get_extensions(x::AbstractNeuronalNetworkSystem) = getfield(x, :extensions)
@@ -319,8 +333,10 @@ function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     ps  = get_ps(nnsys)
     eqs = get_eqs(nnsys)
     defs = get_defaults(nnsys)
+    ccbs = get_continuous_events(nnsys)
+    dcbs = get_discrete_events(nnsys)
     syss = convert.(ODESystem, get_systems(nnsys))
-    return ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(nnsys), systems = syss)
+    return ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(nnsys), systems = syss, discrete_events = dcbs, continuous_events = ccbs)
 end
 
 

@@ -39,6 +39,8 @@ import ModelingToolkit:
     get_defaults,
     get_ps,
     get_systems,
+    get_continuous_events,
+    get_discrete_events,
     _merge,
     renamespace,
     hasdefault,

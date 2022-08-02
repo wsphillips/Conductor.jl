@@ -223,13 +223,13 @@ end
 function CompartmentSystem(dynamics::LIF, defaults, extensions, name, parent)
     (; V, τ_mem, τ_syn, V_th, R, inputs, stimuli) = dynamics
     Iₑ = stimuli[1]
-    @variables I(t) = 0.0 S(t) = false S_pre(t) = 0.0
+    @variables I(t) = 0.0 S(t) = false
     @parameters V_rest = MTK.getdefault(V)
-    gen = GeneratedCollections(dvs = Set((V, I, S, S_pre)),
+    gen = GeneratedCollections(dvs = Set((V, I, S)),
                                ps = Set((τ_mem, τ_syn, V_th, R, V_rest, Iₑ)),
                                eqs = [D(V) ~ (-(V-V_rest)/τ_mem) + (R*(I + Iₑ))/τ_mem,
                                       S ~ V >= V_th,
-                                      D(I) ~ -I/τ_syn + S_pre])
+                                      D(I) ~ -I/τ_syn])
 
     (; eqs, dvs, ps, observed, systems, defs) = gen
     merge!(defs, defaults)
