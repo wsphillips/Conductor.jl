@@ -237,7 +237,7 @@ function CompartmentSystem(dynamics::LIF, defaults, extensions, name, parent)
                              systems, defs, extensions, parent)
 end
 
-function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF})
+function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF}; with_cb = false)
 
     dvs = get_states(compartment)
     ps  = get_ps(compartment)
@@ -249,8 +249,7 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF})
     V_th = @nonamespace compartment.V_th
     V_rest = @nonamespace compartment.V_rest
 
-    cb = MTK.SymbolicDiscreteCallback(V >= V_th, [V~V_rest])
-
+    cb = with_cb ? MTK.SymbolicDiscreteCallback(V >= V_th, [V~V_rest]) : MTK.SymbolicDiscreteCallback[]
     return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs,
                      name = nameof(compartment), discrete_events = cb)
 end

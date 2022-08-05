@@ -269,26 +269,29 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF},
         extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
         defaults = Dict(), name::Symbol = Base.gensym(:Network)) where T
 
-    g = graph(topology)' 
+    g = graph(topology) 
     neurons = vertices(topology)
     n = length(neurons)
     @parameters W[1:n,1:n] = g 
-    @variables (S(t))[1:n] = falses(n) (Syn_inp(t))[1:n] = zeros(n)
+    @variables (Syn_inp(t))[1:n] = zeros(n)
     reversal_map = Dict() 
     gen = GeneratedCollections(systems = union(neurons, extensions),
-                               eqs = scalarize(Syn_inp ~ W*S),
-                               dvs = Set(vcat(scalarize(S), scalarize(Syn_inp))),
                                ps = Set(scalarize(W)))
+
     (; eqs, dvs, ps, systems, observed) = gen
     
     affect_eqs = Equation[]
+    spike_checks = [neuron.V >= neuron.V_th for neuron in neurons]
 
     for (i, neuron) in enumerate(neurons)
-        push!(eqs, S[i] ~ neuron.S)
-        push!(affect_eqs, neuron.I ~ neuron.I + Syn_inp[i])
+        push!(affect_eqs, neuron.I ~ neuron.I + sum(scalarize(W[:,i] .* spike_checks)))
+    end
+    # equations are order-dependent. We can do this more nice with a generic func affect 
+    for (i, neuron) in enumerate(neurons)
+        push!(affect_eqs, neuron.V ~ IfElse.ifelse(spike_checks[i], neuron.V_rest, neuron.V))
     end
 
-    condition = reduce(|, scalarize(S .== true))
+    condition = reduce(|, spike_checks)
     dcbs = [MTK.SymbolicDiscreteCallback(condition, affect_eqs)]
     ccbs = MTK.SymbolicContinuousCallback[]
     return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
