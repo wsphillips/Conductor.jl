@@ -286,7 +286,7 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF},
     for (i, neuron) in enumerate(neurons)
         push!(affect_eqs, neuron.I ~ neuron.I + sum(scalarize(W[:,i] .* spike_checks)))
     end
-    # equations are order-dependent. We can do this more nice with a generic func affect 
+    # equations are order-dependent. We can do this more nicely with a generic func affect 
     for (i, neuron) in enumerate(neurons)
         push!(affect_eqs, neuron.V ~ IfElse.ifelse(spike_checks[i], neuron.V_rest, neuron.V))
     end

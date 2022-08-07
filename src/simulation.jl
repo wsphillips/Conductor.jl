@@ -18,7 +18,7 @@ function Simulation(neuron::AbstractCompartmentSystem; time::Time, return_system
         return simplified
     else
         @info repr("text/plain", simplified)
-        return ODAEProblem(simplified, [], (0., t_val), [], linenumbers = false)
+        return ODAEProblem(simplified, [], (0., t_val), [])
     end
 end
 
@@ -31,7 +31,7 @@ function Simulation(neuron::CompartmentSystem{LIF}; time::Time, return_system = 
         return simplified
     else
         @info repr("text/plain", simplified)
-        return ODAEProblem(simplified, [], (0., t_val), [], linenumbers = false)
+        return ODAEProblem(simplified, [], (0., t_val), [])
     end
 end
 
