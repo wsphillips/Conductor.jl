@@ -35,10 +35,9 @@ kdr_kinetics = [
 
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Sodium => 50.0mV, Potassium => -77.0mV, Leak => -54.4mV])
-
 dynamics = HodgkinHuxley(Vₘ, channels, reversals)
-
 @named neuron = CompartmentSystem(dynamics)
+
 @assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8) # hide
 neuron # hide
 ```
