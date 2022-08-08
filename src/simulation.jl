@@ -23,10 +23,8 @@ function Simulation(neuron::AbstractCompartmentSystem; time::Time, return_system
 end
 
 function Simulation(neuron::CompartmentSystem{LIF}; time::Time, return_system = false)
-    odesys = convert(ODESystem, neuron; with_cb = true) # & ODESystem([D(@nonamespace(neuron.S_pre)) ~ 0.0],
-                                        #            t, [], []; name = :foo)
-    t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(odesys)
+    odesys = convert(ODESystem, neuron; with_cb = true)
+    simplified = structural_simplify(odesys, time)
     if return_system
         return simplified
     else
@@ -36,9 +34,7 @@ function Simulation(neuron::CompartmentSystem{LIF}; time::Time, return_system = 
 end
 
 function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false)
-    odesys = convert(ODESystem, network)
-    t_val = ustrip(Float64, ms, time)
-    simplified = structural_simplify(odesys)
+    simplified = structural_simplify(network, time)
     if return_system
         return simplified
     else
