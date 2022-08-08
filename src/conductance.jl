@@ -303,26 +303,3 @@ function (cond::AbstractConductanceSystem)(gbar_val::Real)
     return newcond
 end
 
-# Old macros -- needs updating
-#= 
-macro ionchannel(chan::Expr, ex::Expr, gbar)
-    gbar.args[1] != :gbar && throw("Please use `gbar` to define a channel conductance.")
-    name, ion, gates = _make_ionchannel(chan, ex)
-    IonChannel(eval(ion), gates; max_g = eval(gbar.args[2]), name = name)
-end
-
-macro ionchannel(chan::Expr, ex::Expr)
-    name, ion, gates = _make_ionchannel(chan, ex)
-    IonChannel(eval(ion), gates; name = name)
-end
-
-function _make_ionchannel(chan::Expr, ex::Expr)
-    ex = MacroTools.striplines(ex)
-    !@capture(chan, name_Symbol{ion_}) && throw("An ion type must be given `name{I<:Ion}`")
-    gates = Gate[]
-    for gate in ex.args
-      push!(gates, eval(gate))
-    end
-    name, ion, gates
-end
-=#

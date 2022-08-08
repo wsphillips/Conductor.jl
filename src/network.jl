@@ -254,7 +254,6 @@ Base.lastindex(ns::NeuronalNetworkSystem) = length(get_topology(ns))
 #function Base.setindex!(ns::NeuronalNetworkSystem, g::SimpleDiGraph, cond::ConductanceSystem)
 #    add_layer!(ns, cond, g)
 #end
-#
 #function Base.setindex!(ns::NeuronalNetworkSystem, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
 #    add_synapse!(ns, pre, post, cond)
 #end

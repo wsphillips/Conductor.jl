@@ -10,17 +10,6 @@ function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem}
     return ModelingToolkit.rename(new, namegen(rootname))
 end
 
-#=
-function genvar(name; iv = nothing, default = nothing)
-    x = name
-    if isnothing(default)
-        return only(isnothing(iv) ? @parameters($x) : @variables($x(iv)))
-    else
-        return only(isnothing(iv) ? @parameters($x=default) :  @variables($x(iv)=default))
-    end
-end
-=#
-
 function build_toplevel(system)
     dvs = Set{Num}()
     ps = Set{Num}()
@@ -49,16 +38,4 @@ function set_symarray_metadata(x, ctx, val)
         setmetadata(x, ctx, val)
     end
 end
-
-#=
-const ExprValues = Union{Expr,Symbol,Number}  # For use in macros
-isfunction(ex::ExprValues) = try return eval(ex) isa Function catch; return false end
-
-function extract_symbols(ex::ExprValues, out::Vector{Symbol}=[])
-    if ~isfunction(ex) && isa(ex, Symbol)
-        union!(out, [ex])
-    end
-    return ex
-end
-=#
 
