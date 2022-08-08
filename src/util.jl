@@ -10,6 +10,7 @@ function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem}
     return ModelingToolkit.rename(new, namegen(rootname))
 end
 
+#=
 function genvar(name; iv = nothing, default = nothing)
     x = name
     if isnothing(default)
@@ -18,6 +19,7 @@ function genvar(name; iv = nothing, default = nothing)
         return only(isnothing(iv) ? @parameters($x=default) :  @variables($x(iv)=default))
     end
 end
+=#
 
 function build_toplevel(system)
     dvs = Set{Num}()

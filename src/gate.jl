@@ -173,7 +173,7 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     thold_val = ustrip(Float64, mV, thold)
     out = output(var)
     isempty(subscriptions(chan)) && return [D(out) ~ 0]
-    @named Vₓ = ExtrinsicPotential(n = length(subscriptions(chan))) 
+    Vₓ = scalarize(ExtrinsicPotential(n = length(subscriptions(chan))))
     # Derived from Pinsky & Rinzel 1994 - Equation 4 
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
     saturation = get(var, :saturation, nothing)

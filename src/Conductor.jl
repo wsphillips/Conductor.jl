@@ -23,7 +23,8 @@ import Symbolics:
     value,
     tosymbol,
     VariableDefaultValue,
-    wrap, unwrap, Arr
+    wrap, unwrap, Arr,
+    scalarize
 
 import ModelingToolkit:
     toparam,
@@ -57,7 +58,12 @@ import Unitful:
     Molarity,
     ElectricalConductance
 
-import SymbolicUtils: FnType
+import SymbolicUtils:
+    FnType,
+    symtype,
+    operation,
+    arguments
+
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
