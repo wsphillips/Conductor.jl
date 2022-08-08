@@ -173,7 +173,7 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     thold_val = ustrip(Float64, mV, thold)
     out = output(var)
     isempty(subscriptions(chan)) && return [D(out) ~ 0]
-    @named Vₓ = ExtrinsicPotential(n = length(subscriptions(chan))) 
+    Vₓ = scalarize(ExtrinsicPotential(n = length(subscriptions(chan))))
     # Derived from Pinsky & Rinzel 1994 - Equation 4 
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
     saturation = get(var, :saturation, nothing)
@@ -185,70 +185,3 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     end
 end
 
-#"""
-#    get_eqs(var::Gate{<:Union{AlphaBeta, SteadySateTau}}, chan)
-#
-#Generate the voltage- and time-dependent differential equation modeling the output of a gate
-#that was specified with [α(Vₘ), β(Vₘ)] or [x∞(Vₘ), τₓ(Vₘ)].
-#
-#For `Gate{SteadyStateTau}`, the model form is:
-#
-#``
-#\\frac{dx}{dt}=\\frac{1}{\\tau_{x}(x_{\\infty}-x)}
-#``
-#
-#For `Gate{AlphaBeta}`, the model form is:
-#
-#``
-#\\frac{dx}{dt} = \\alpha_{x}(1-x)-\\beta_{x}x
-#``
-#"""
-#function ModelingToolkit.get_eqs(var::Gate{<:Union{AlphaBeta,SteadyStateTau}}, chan)
-#    x, x∞, τₓ = output(var), steadystate(var), timeconstant(var)
-#    return [D(x) ~ inv(τₓ)*(x∞ - x)]
-#end
-
-#ModelingToolkit.get_eqs(var::Gate{SteadyState}, chan) = [output(var) ~ steadystate(var)]
-#ModelingToolkit.get_eqs(var::Gate{ConstantValue}, chan) = Equation[]
-
-############################################################################################
-# Macros (needs updating)
-############################################################################################
-#=
-macro gate(ex::Expr, p::Expr = :(p=1))
-    name = Base.gensym("GateVar")
-    _make_gate_variable(name, ex, p)
-end
-
-macro gate(name::Symbol, ex::Expr, p::Expr = :(p=1))
-    _make_gate_variable(name, ex, p)
-end
-
-function _make_gate_variable(name::Symbol, ex::Expr, p::Expr = :(p=1))
-    ex = MacroTools.striplines(ex)
-    length(ex.args) !== 2 && throw("Invalid number of input equations.")
-    p.args[1] != :p && throw("Please use `p` to define a gate exponent.")
-    gate_pow = p.args[2]
-
-    rate_vars = map(eq -> eq.args[1], ex.args)
-
-    #= Find paramters in rate equations =#
-    param_list = Symbol[]
-    foreach(rate->MacroTools.postwalk(x -> extract_symbols(x, param_list), rate.args[2]), ex.args)
-    filter!(x -> x != :Vₘ, param_list)
-
-    if issetequal([:α, :β], rate_vars)  # Equation order doesn't matter
-        rate_type = AlphaBeta
-        gate_expr = :(Gate($AlphaBeta, α, β, $gate_pow; name=$(QuoteNode(name))))
-    elseif issetequal([:ss, :τ], rate_vars)  # Equation order doesn't matter
-        rate_type = SteadyStateTau
-        gate_expr = :(Gate($SteadyStateTau, ss, τ, $p.args[2]; name=$(QuoteNode(name))))
-    else
-        throw("invalid keywords")
-    end
-    pushfirst!(ex.args, :(Vₘ = MembranePotential()))
-    foreach(param -> pushfirst!(ex.args, :(@parameters $param)), param_list)  # generate parameters
-    push!(ex.args, gate_expr)
-    ex
-end
-=#
