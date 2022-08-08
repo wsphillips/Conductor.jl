@@ -36,7 +36,6 @@ dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
                            geometry = Cylinder(radius = 25µm, height = 400µm));
 
 @named neuron1 = Compartment(dynamics_1)
-
 @named neuron2 = Compartment(dynamics_2)
                                    
 # Synaptic model
@@ -52,12 +51,11 @@ topology[neuron1, neuron2] = Glut
 reversal_map = Dict([Glut => EGlut])
 
 @named net = NeuronalNetworkSystem(topology, reversal_map)
-
-ttot = 250
-sim = Simulation(net, time = ttot*ms)
+total_time = 250
+sim = Simulation(net, time = total_time*ms)
 
 solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
 
 # Plot at 5kHz sampling
-plot(solution)
+plot(solution; vars=[neuron1.Vₘ, neuron2.Vₘ])
 

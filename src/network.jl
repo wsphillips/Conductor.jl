@@ -21,7 +21,7 @@ function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
 
     neuron_map = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
     start = 1
-    all_compartments = CompartmentSystem[]
+    all_compartments = []
     denamespaced = Symbol[]
 
     for neuron in neurons
@@ -37,7 +37,7 @@ function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
     n = length(all_compartments)
     multigraph = Dict([x => sparse(Int64[], Int64[], Num[], n, n) for x in synaptic_models])
     graph = NeuronalMultigraph(multigraph, neuron_map, denamespaced)
-    return NetworkTopology(graph, all_compartments)
+    return NetworkTopology(graph, [all_compartments...])
 end
 
 function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartmentSystem},
@@ -67,13 +67,15 @@ function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartment
 end
 
 function neurons(topology::NetworkTopology{NeuronalMultigraph,<:CompartmentForm})
-    [keys(graph(topology).neuron_map)...]
+    [keys(neuron_map(topology))...]
 end
 
+denamespaced(topology::NetworkTopology{NeuronalMultigraph}) = getfield(topology,:graph).denamespaced
+neuron_map(topology::NetworkTopology{NeuronalMultigraph}) = getfield(topology,:graph).neuron_map
 neurons(topology::NetworkTopology{T,F}) where {T,F} = vertices(topology)
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :graph)
-
+graph(topology::NetworkTopology{NeuronalMultigraph}) = getfield(topology, :graph).multigraph
 function add_synapse!(topology, pre, post, synaptic_model::ConductanceSystem)
     src = find_compsys(pre, topology)
     dst = find_compsys(post, topology)
@@ -187,7 +189,7 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
     
     reversal_map = reversal_map isa AbstractDict ? reversal_map : Dict(reversal_map)
     eqs, dvs, ps, observed = Equation[], Num[], Num[], Equation[]
-    ccbs, dcbs = MTK.SymbolicContinuousCallback[], MTK.SymbolicDicreteCallback[]
+    ccbs, dcbs = MTK.SymbolicContinuousCallback[], MTK.SymbolicDiscreteCallback[]
     voltage_fwds = Set{Equation}()
     multigraph = graph(topology)
     compartments = vertices(topology)
@@ -246,12 +248,12 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
     newmap = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
     # Construct revised neurons
     for neuron in neurons(topology)
-        idx_range = topology.neuron_map[neuron]
+        idx_range = neuron_map(topology)[neuron]
         if neuron isa MultiCompartmentSystem
             mctop = get_topology(neuron)
             # subcompartments can't be namespaced!
             @set! mctop.compartments = MTK.rename.(compartments[idx_range],
-                                                   topology.denamespaced[idx_range])
+                                                   denamespaced(topology)[idx_range])
             neuron = MultiCompartmentSystem(neuron, topology = mctop)
         else
             neuron = only(compartments[idx_range])
