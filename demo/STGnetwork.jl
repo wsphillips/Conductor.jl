@@ -7,41 +7,46 @@ include(joinpath(@__DIR__, "prinz_synapses.jl"));
 
 # Figure 3e Prinz (qualitatively close to expected output)
 # AB/PD 2 
-@named ABPD = Compartment(Vₘ, [NaV(100mS/cm^2),
-                    CaT(2.5mS/cm^2),
-                    CaS(6mS/cm^2),
-                    KA(50mS/cm^2),
-                    KCa(5mS/cm^2),
-                    Kdr(100mS/cm^2),
-                    H(.01mS/cm^2),
-                    leak(0mS/cm^2)],
-                    gradients, geometry = geo, extensions = [calcium_conversion]);
+ABPD_channels = [NaV(100mS/cm^2),
+                 CaT(2.5mS/cm^2),
+                 CaS(6mS/cm^2),
+                 KA(50mS/cm^2),
+                 KCa(5mS/cm^2),
+                 Kdr(100mS/cm^2),
+                 H(.01mS/cm^2),
+                 leak(0mS/cm^2)]
+ABPD_dynamics = HodgkinHuxley(Vₘ, ABPD_channels, gradients; geometry = geo);
+
+@named ABPD = Compartment(ABPD_dynamics, extensions = [calcium_conversion]);
 
 ABPD # display
 
 # LP 4
-@named LP = Compartment(Vₘ, [NaV( 100mS/cm^2),
-                  CaT(   0mS/cm^2),
-                  CaS(   4mS/cm^2),
-                  KA(   20mS/cm^2),
-                  KCa(   0mS/cm^2),
-                  Kdr(  25mS/cm^2),
-                  H(   .05mS/cm^2),
-                  leak(.03mS/cm^2)],
-                  gradients, geometry = geo, extensions = [calcium_conversion]);
+LP_channels = [NaV( 100mS/cm^2),
+               CaT(   0mS/cm^2),
+               CaS(   4mS/cm^2),
+               KA(   20mS/cm^2),
+               KCa(   0mS/cm^2),
+               Kdr(  25mS/cm^2),
+               H(   .05mS/cm^2),
+               leak(.03mS/cm^2)]
+LP_dynamics = HodgkinHuxley(Vₘ, LP_channels, gradients; geometry = geo);
+@named LP = Compartment(LP_dynamics, extensions = [calcium_conversion]);
 
 LP # display
 
 # PY 1
-@named PY = Compartment(Vₘ, [NaV( 100mS/cm^2),
-                  CaT( 2.5mS/cm^2),
-                  CaS(   2mS/cm^2),
-                  KA(   50mS/cm^2),
-                  KCa(   0mS/cm^2),
-                  Kdr( 125mS/cm^2),
-                  H(   .05mS/cm^2),
-                  leak(.01mS/cm^2)],
-                  gradients, geometry = geo, extensions = [calcium_conversion]);
+PY_channels = [NaV( 100mS/cm^2),
+               CaT( 2.5mS/cm^2),
+               CaS(   2mS/cm^2),
+               KA(   50mS/cm^2),
+               KCa(   0mS/cm^2),
+               Kdr( 125mS/cm^2),
+               H(   .05mS/cm^2),
+               leak(.01mS/cm^2)]
+PY_dynamics = HodgkinHuxley(Vₘ, PY_channels, gradients; geometry = geo);
+
+@named PY = Compartment(LP_dynamics, extensions = [calcium_conversion]);
 
 PY # display
 
@@ -57,11 +62,11 @@ topology[LP, PY] = Glut(1nS)
 topology[PY, LP] = Glut(30nS)
 
 network = NeuronalNetworkSystem(topology, reversal_map)
-t = 10000
-sim = Simulation(network, time = t*ms);
+time = 10000
+sim = Simulation(network, time = time*ms);
 solution = solve(sim, RadauIIA5(), reltol=1e-9, abstol=1e-9);
 # Plot at 5kHz sampling
-fig = plot(solution; plotdensity=Int(t*5), size=(1200,800), vars = [ABPD.Vₘ, LP.Vₘ, PY.Vₘ])
+fig = plot(solution; plotdensity=Int(time*5), size=(1200,800), vars = [ABPD.Vₘ, LP.Vₘ, PY.Vₘ])
 fig
 
 # Uncomment and eval `png(...)` to save as PNG

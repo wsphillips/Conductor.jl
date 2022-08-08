@@ -175,7 +175,6 @@ function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
     ps  = get_ps(mcsys)
     eqs = get_eqs(mcsys)
     defs = get_defaults(mcsys)
-    # why not get systems?
     systems = map(x -> convert(ODESystem, x), get_systems(mcsys))
     odesys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(mcsys), systems = systems)
     return odesys

@@ -211,8 +211,8 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                 new_dynamics = @set post_dynamics.synaptic_channels = [new_synaptic_class]
                 @set! new_dynamics.synaptic_reversals = new_revs
                 post_compartment = SciMLBase.remake(post_compartment, dynamics = new_dynamics)
-                Vxs = filter(x -> isvoltage(x) && isextrinsic(x),
-                             MTK.namespace_variables(getproperty(post_compartment, nameof(new_synaptic_class))))
+                vars = MTK.namespace_variables(getproperty(post_compartment, nameof(new_synaptic_class)))
+                Vxs = find_voltage(vars, isextrinsic)
                 for (Vx, pre) in zip(Vxs, pre_compartments)
                     push!(voltage_fwds, pre.Vₘ ~ Vx)
                     push!(defaults, Vx => pre.Vₘ)
@@ -226,13 +226,13 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                                                    defaults = Dict(y => getdefault(y)))
                     push!(class_copies, class_copy)
                 end
-                #####
                 post_dynamics = get_dynamics(post_compartment)
                 new_dynamics = @set post_dynamics.synaptic_channels = class_copies
                 @set! new_dynamics.synaptic_reversals = new_revs
                 post_compartment = SciMLBase.remake(post_compartment, dynamics = new_dynamics)
                 for (class_copy, pre) in zip(class_copies, pre_compartments)
-                    Vx = getproperty(post_compartment, nameof(class_copy)).Vₓ
+                    vars = MTK.namespace_variables(getproperty(post_compartment, nameof(class_copy)))
+                    Vx = find_voltage(vars, isextrinsic) 
                     push!(voltage_fwds, pre.Vₘ ~ Vx)
                     push!(defaults, Vx => pre.Vₘ)
                 end
@@ -326,7 +326,6 @@ Base.lastindex(ns::NeuronalNetworkSystem) = length(get_topology(ns))
 #function Base.setindex!(ns::NeuronalNetworkSystem, g::SimpleDiGraph, cond::ConductanceSystem)
 #    add_layer!(ns, cond, g)
 #end
-#
 #function Base.setindex!(ns::NeuronalNetworkSystem, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
 #    add_synapse!(ns, pre, post, cond)
 #end

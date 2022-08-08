@@ -4,8 +4,8 @@
 
 A `CompartmentSystem` is sufficient to model a simple neuron--either as an isopotential
 spherical neuron, or as a "point" neuron with no morphological geometry. At minimum, a
-`CompartmentSystem` will contain information about its instrinsic membrane currents and
-ionic gradients (i.e. equilbrium potentials). We define these by directly providing vectors
+`CompartmentSystem` will contain information about its intrinsic membrane currents and
+ionic gradients (i.e. equilibrium potentials). We define these by directly providing vectors
 of `ConductanceSystem` and `EquilibriumPotential` to the `CompartmentSystem`:
 
 ```@example compartment_example

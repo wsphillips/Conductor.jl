@@ -89,23 +89,31 @@ struct MembranePotential
     function MembranePotential(V0 = -60mV; dynamic = true,
                                source::PrimitiveSource = Intrinsic, n::Integer = 1,
                                name::Symbol = :Vₘ)
+        V0_val = V0 isa Voltage ? ustrip(Float64, mV, V0) : V0
         iv = dynamic ? t : nothing
         if n == one(n) 
-            ret = genvar(name,
-                         iv = iv,
-                         default = isnothing(V0) ? nothing : ustrip(Float64, mV, V0))
+            if isnothing(V0)
+                ret = only(dynamic ? @variables($name(t)) : @parameters($name))
+            else
+                ret = only(dynamic ? @variables($name(t)=V0_val) : @parameters($name=V0_val))
+            end
+            ret = setmetadata(ret, PrimitiveSource, source)
+            ret = setmetadata(ret, MembranePotential, true)
+            ret = V0 isa Voltage ? setmetadata(ret, ConductorUnits, mV) : ret
         elseif n > one(n)
-            ret = [genvar(namegen(name),
-                          iv = iv,
-                          default = isnothing(V0) ? nothing : ustrip(Float64, mV, V0))
-                   for _ in 1:n]
+            if isnothing(V0)
+                ret = only(dynamic ? @variables($name(t)[1:n]) : @parameters($name[1:n]))
+            else
+                ret = only(dynamic ? @variables($name(t)[1:n] = fill(V0_val, n)) :
+                                     @parameters($name[1:n] = fill(V0_val, n)))
+            end
+            ret = set_symarray_metadata(ret, PrimitiveSource, source)
+            ret = set_symarray_metadata(ret, MembranePotential, true)
+            ret = V0 isa Voltage ? set_symarray_metadata(ret, ConductorUnits, mV) : ret
         else
             throw("'n' must be greater than or equal to 1")
         end
    
-        ret = setmetadata.(ret, PrimitiveSource, source)
-        ret = setmetadata.(ret, MembranePotential, true)
-        ret = setmetadata.(ret, ConductorUnits, mV)
         return ret
     end
 end
@@ -116,6 +124,18 @@ isintrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
                  getmetadata(value(x), PrimitiveSource) == Intrinsic : false
 isextrinsic(x) = hasmetadata(value(x), PrimitiveSource) ?
                  getmetadata(value(x), PrimitiveSource) == Extrinsic : false
+
+
+
+function find_voltage(vars, source=isintrinsic)
+    idx = findfirst(x -> isvoltage(x) && source(x), vars)
+    var = unwrap(vars[idx])
+    if operation(var) == getindex && symtype(first(arguments(var))) <: AbstractArray
+        return wrap(first(arguments(var)))
+    else
+        return wrap(var)
+    end
+end
 
 """
     ExtrinsicPotential(; n = 1, name::Symbol = :Vₓ)

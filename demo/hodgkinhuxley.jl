@@ -31,7 +31,7 @@ electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0, IfElse.ifelse(t < 200.0, ustri
 
 dynamics = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Sphere(radius = 20µm),
-                         stimuli = [electrode_pulse])
+                         stimuli = [electrode_pulse]);
 
 @named neuron = Compartment(dynamics)
 
