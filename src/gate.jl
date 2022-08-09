@@ -185,3 +185,4 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     end
 end
 
+

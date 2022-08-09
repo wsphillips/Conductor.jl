@@ -1,3 +1,18 @@
+# basic fields needed for AbstractSystem interface in MTK
+struct GeneratedCollections
+    eqs::Vector{Equation}
+    dvs::Set{Num}
+    ps::Set{Num}
+    systems::Vector{AbstractTimeDependentSystem}
+    observed::Vector{Equation}
+    defs::Dict
+end
+
+function GeneratedCollections(; eqs = Equation[], systems = AbstractTimeDependentSystem[],
+                              observed = Equation[], dvs = Set{Num}(), ps  = Set{Num}(),
+                              defs = Dict())
+    return GeneratedCollections(eqs, dvs, ps, systems, observed, defs)
+end
 
 using IfElse
 import Symbolics: unwrap, symtype, getindex_posthook

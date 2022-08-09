@@ -77,7 +77,7 @@ EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
 topology = NetworkTopology([neuron1, neuron2], [Glut]);
-add_synapse!(topology, neuron1, neuron2, Glut)
+topology[neuron1, neuron2] = Glut
 reversal_map = Dict([Glut => EGlut])
 
 @named net = NeuronalNetworkSystem(topology, reversal_map)
