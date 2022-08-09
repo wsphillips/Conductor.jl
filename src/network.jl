@@ -196,8 +196,8 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
 
     for synaptic_class in keys(multigraph)
         g = multigraph[synaptic_class]
-        rows = rowvals(g) # row numbers for each stored value
-        vals = nonzeros(g) # stored values
+        rows = rowvals(g)
+        vals = nonzeros(g)
         for i in axes(g, 2) # for each set of presynaptic neurons per postsynaptic neuron
             pre_indexes = nzrange(g, i)
             iszero(length(pre_indexes)) && continue
@@ -208,12 +208,13 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                              reversal_map[synaptic_class])
             if isaggregate(synaptic_class)
                 new_synaptic_class = ConductanceSystem(synaptic_class,
-                                                   subscriptions = pre_compartments) 
+                                                       subscriptions = pre_compartments) 
                 post_dynamics = get_dynamics(post_compartment)
                 new_dynamics = @set post_dynamics.synaptic_channels = [new_synaptic_class]
                 @set! new_dynamics.synaptic_reversals = new_revs
                 post_compartment = SciMLBase.remake(post_compartment, dynamics = new_dynamics)
-                vars = MTK.namespace_variables(getproperty(post_compartment, nameof(new_synaptic_class)))
+                vars = MTK.namespace_variables(getproperty(post_compartment,
+                                                           nameof(new_synaptic_class)))
                 Vxs = find_voltage(vars, isextrinsic)
                 for (Vx, pre) in zip(Vxs, pre_compartments)
                     push!(voltage_fwds, pre.Vₘ ~ Vx)
@@ -265,8 +266,6 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                                  ccbs, dcbs, topology, reversal_map, extensions; checks = false)
 end
 
-import Symbolics.scalarize
-
 function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF}, 
         extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
         defaults = Dict(), name::Symbol = Base.gensym(:Network)) where T
@@ -288,12 +287,12 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF},
     for (i, neuron) in enumerate(neurons)
         push!(affect_eqs, neuron.I ~ neuron.I + sum(scalarize(W[:,i] .* spike_checks)))
     end
-    # equations are order-dependent. We can do this more nicely with a generic func affect 
+    # equations _are_ order-dependent here. We can do this more nicely with a generic func affect 
     for (i, neuron) in enumerate(neurons)
         push!(affect_eqs, neuron.V ~ IfElse.ifelse(spike_checks[i], neuron.V_rest, neuron.V))
     end
 
-    condition = reduce(|, spike_checks)
+    condition = reduce(|, spike_checks) # also tried with periodic callbacks--same issue
     dcbs = [MTK.SymbolicDiscreteCallback(condition, affect_eqs)]
     ccbs = MTK.SymbolicContinuousCallback[]
     return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
@@ -342,5 +341,4 @@ function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     syss = convert.(ODESystem, get_systems(nnsys))
     return ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(nnsys), systems = syss, discrete_events = dcbs, continuous_events = ccbs)
 end
-
 
