@@ -24,12 +24,12 @@ channels = [NaV(100mS/cm^2),
 dynamics = HodgkinHuxley(Vₘ, channels, gradients; geometry = geo);
 
 @named neuron = CompartmentSystem(dynamics, extensions = [calcium_conversion]);
-
-sim = Simulation(neuron, time = 2500ms)
-solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2);
+t_total = 5000.0
+sim = Simulation(neuron, time = t_total*ms)
+solution = solve(sim, Rosenbrock23(), abstol=1e-6, reltol=1e-6, saveat=0.2);
 
 # Plot at 5kHz sampling
-fig = plot(solution; size=(1200,800), vars=[Vₘ]);
+fig = plot(solution(0.0:0.5:t_total; idxs=[Vₘ]); size=(1200,800));
 gui(fig)
 
 # Uncomment and eval `png(...)` to save as PNG

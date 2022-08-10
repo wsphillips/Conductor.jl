@@ -62,11 +62,11 @@ topology[LP, PY] = Glut(1nS)
 topology[PY, LP] = Glut(30nS)
 
 network = NeuronalNetworkSystem(topology, reversal_map)
-time = 10000
-sim = Simulation(network, time = time*ms);
+t_total = 10000
+sim = Simulation(network, time = t_total*ms);
 solution = solve(sim, RadauIIA5(), reltol=1e-5, abstol=1e-5);
 # Plot at 5kHz sampling
-fig = plot(solution; plotdensity=Int(time*5), size=(1200,800), vars = [ABPD.Vₘ, LP.Vₘ, PY.Vₘ])
+fig = plot(solution(0.0:0.2:t_total; idxs = [ABPD.Vₘ, LP.Vₘ, PY.Vₘ]), size=(1200,800))
 fig
 
 # Uncomment and eval `png(...)` to save as PNG

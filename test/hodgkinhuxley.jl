@@ -85,7 +85,7 @@ u0[3] = hinf(V0) # NaV₊h
 u0[4] = ninf(V0) # Kdr₊n 
 
 # Parameters 
-p[1]  = 0.001      # cₘ      
+p[1]  = 1.0        # cₘ      
 #p[2]  = 5.02655e-5 # aₘ      
 p[2]  = area(Sphere(radius = 20µm)) # aₘ      
 p[3]  = 50.0       # ENa     

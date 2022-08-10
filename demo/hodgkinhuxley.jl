@@ -1,5 +1,5 @@
 # Classic Hodgkin Huxley neuron with a "current pulse" stimulus
-using Conductor, IfElse, Unitful, ModelingToolkit
+using Conductor, IfElse, Unitful, ModelingToolkit, OrdinaryDiffEq, Plots
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
@@ -36,12 +36,8 @@ dynamics = HodgkinHuxley(Vₘ, channels, reversals;
 @named neuron = Compartment(dynamics)
 
 sim = Simulation(neuron, time = 300ms)
-
-using OrdinaryDiffEq
-
 solution = solve(sim, Rosenbrock23(), abstol=0.01, reltol=0.01, saveat=0.2);
 
-using Plots
 # Plot at 5kHz sampling
 plot(solution; size=(1200,800))
 

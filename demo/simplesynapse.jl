@@ -51,11 +51,11 @@ topology[neuron1, neuron2] = Glut
 reversal_map = Dict([Glut => EGlut])
 
 @named net = NeuronalNetworkSystem(topology, reversal_map)
-total_time = 250
+total_time = 250.0
 sim = Simulation(net, time = total_time*ms)
 
 solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
 
 # Plot at 5kHz sampling
-plot(solution; vars=[neuron1.Vₘ, neuron2.Vₘ])
+plot(solution(0.0:0.2:total_time, idxs = [neuron1.Vₘ, neuron2.Vₘ]))
 

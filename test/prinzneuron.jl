@@ -54,7 +54,7 @@ u0[12] = (1.0 + exp(-1.04237 - (0.0847458V0)))^-1 # Kdr₊m
 u0[13] = (1.0 + exp(13.6364 + 0.181818V0))^-1 # H₊m
 
 # Parameters
-p[1]  = 0.001 # cₘ      
+p[1]  = 1.0 # cₘ      
 p[2]  = area(geo) # aₘ      
 p[3]  = 200 # τCa     
 p[4]  = 0.05 # Ca∞     
@@ -180,7 +180,7 @@ function prinz_neuron!(du, u, p, t)
 end
 
 byhand_prob = ODEProblem{true}(prinz_neuron!, u0, (0., time), p)
-mtk_prob = ODAEProblem(simul_sys, [], (0., time), [])
+mtk_prob = ODEProblem(simul_sys, [], (0., time), [])
 byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol=1e-8, abstol=1e-8);
 current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol=1e-8, abstol=1e-8);
 
