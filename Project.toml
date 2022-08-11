@@ -1,7 +1,7 @@
 name = "Conductor"
 uuid = "d194a933-43b5-4953-818b-974a45c81e67"
 authors = ["Wiktor Phillips <wsphillips@gmail.com>"]
-version = "0.0.4"
+version = "0.0.5"
 
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
