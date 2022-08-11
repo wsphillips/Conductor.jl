@@ -27,7 +27,7 @@ is_val = ustrip(Float64, µA, -0.5µA)/p
 @named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
 soma_holding = Iₛ ~ is_val
 
-id_val = ustrip(Float64, µA, 0µA)/(1-p)
+id_val = ustrip(Float64, µA, 0.0µA)/(1-p)
 @named I_d = IonCurrent(NonIonic, id_val, dynamic = false)
 dendrite_holding = I_d ~ id_val
 
@@ -71,17 +71,15 @@ Conductor.add_junction!(topology, dendrite,  soma, gc_dendrite, symmetric = fals
 # prob = ODAEProblem(simp, [-4.6, 0.999, 0.001, 0.2, -4.5, 0.01, 0.009, .007], (0., 2000), [])
 
 using OrdinaryDiffEq, Plots
-
 prob = Simulation(mcneuron, time=5000ms)
-
 # Note: Pinsky & Rinzel originally solved using RK4 and dt=0.05
 # sol = solve(prob, RK4(), dt=0.05, maxiters=1e9)
 sol = solve(prob, RadauIIA5(), abstol=1e-3, reltol=1e-3, saveat=0.2)
-plot(sol, vars=[soma.Vₘ])
+plot(sol(0.0:0.2:5000.0, idxs=[soma.Vₘ]))
 
 ###########################################################################################
-# Synapse models
-###########################################################################################
+# Steady synaptic inputs
+############################################################################################
 import Conductor: NMDA, AMPA, HeavisideSum
 
 @named NMDAChan = SynapticChannel(NMDA,
@@ -89,12 +87,6 @@ import Conductor: NMDA, AMPA, HeavisideSum
                  Gate(HeavisideSum; threshold = 10mV, decay = 150, saturation = 125, name = :S),
                  Gate(SimpleGate, inv(1-p), name = :pnmda)],
                  max_s = 0mS, aggregate = true)
-
-@named AMPAChan = SynapticChannel(AMPA,
-                                [Gate(HeavisideSum; threshold = 20mV, decay = 2,
-                                      name = :u),
-                                 Gate(SimpleGate, inv(1-p), name = :pampa)],
-                                 max_s = 0mS, aggregate = true)
 
 # To simulate constant NMDA activation, we make a fake suprathreshold cell
 dumb_Eleak = EquilibriumPotential(Leak, 20mV)

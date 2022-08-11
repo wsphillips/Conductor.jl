@@ -20,10 +20,11 @@ gc_val = 2.1mS/cm^2
 # Pinsky modifies NaV to have instantaneous activation, so we can ignore tau
 pinsky_nav_kinetics = [convert(Gate{SimpleGate}, nav_kinetics[1]), nav_kinetics[2]]
 @named NaV = IonChannel(Sodium, pinsky_nav_kinetics) 
-
 # No inactivation term for calcium current in Pinsky model
 pinsky_ca_kinetics = [ca_kinetics[1]]
 @named CaS = IonChannel(Calcium, pinsky_ca_kinetics)
+
+# Base dynamics
 
 is_val = ustrip(Float64, µA, -0.20µA)/p
 @named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
@@ -79,21 +80,21 @@ import Conductor: NMDA, AMPA, HeavisideSum
                 [Gate(SimpleGate, inv(1 + 0.28*exp(-0.062(Vₘ - 60.))); name = :e),
                  Gate(HeavisideSum; threshold = 10mV, decay = 150, saturation = 125, name = :S),
                  Gate(SimpleGate, inv(1-p), name = :pnmda)],
-                 max_s = 0.014mS, aggregate = true)
+                 max_s = 0.028mS, aggregate = true)
 
 @named AMPAChan = SynapticChannel(AMPA,
                                 [Gate(HeavisideSum, threshold = 20mV, decay = 2;
                                       name = :u),
                                  Gate(SimpleGate, inv(1-p), name = :pampa)],
-                                 max_s = 0.0045mS, aggregate = true)
+                                 max_s = 0.009mS, aggregate = true)
 
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 revmap = Dict([NMDAChan => ENMDA, AMPAChan => EAMPA])
 
 # A single neuron was "briefly" stimulated to trigger the network
-#is_stim_val = IfElse.ifelse(t < 50.0, ustrip(Float64, µA, 2.0µA)/p, ustrip(Float64, µA, -0.2µA)/p)
-is_stim_val = ustrip(Float64, µA, 1.0µA)/p
+is_stim_val = IfElse.ifelse(150 < t < 250.0, ustrip(Float64, µA, 10.0µA)/p, ustrip(Float64, µA, -0.2µA)/p)
+#is_stim_val = ustrip(Float64, µA, 2.0µA)/p
 @named Istim = IonCurrent(NonIonic, is_stim_val)
 soma_stim = Istim ~ is_stim_val
 
@@ -124,38 +125,39 @@ using Graphs
 nmda_g = random_regular_digraph(100, 20, dir=:in)
 ampa_g = random_regular_digraph(100, 20, dir=:in)
 
+# We could allow users to supply a lambda/function to map in order to get this behavior
 for (i, e) in enumerate(edges(nmda_g))
     if src(e) == 4
-        add_synapse!(topology, neuronpopulation[src(e)].soma_stimulated, neuronpopulation[dst(e)].dendrite, NMDAChan)
+        add_synapse!(topology, neuronpopulation[src(e)].soma_stimulated,
+                     neuronpopulation[dst(e)].dendrite, NMDAChan)
     else
-        add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite, NMDAChan)
+        add_synapse!(topology, neuronpopulation[src(e)].soma,
+                     neuronpopulation[dst(e)].dendrite, NMDAChan)
     end
 end
+
 for (i, e) in enumerate(edges(ampa_g))
     if src(e) == 4
-        add_synapse!(topology, neuronpopulation[src(e)].soma_stimulated, neuronpopulation[dst(e)].dendrite, AMPAChan)
+        add_synapse!(topology, neuronpopulation[src(e)].soma_stimulated,
+                     neuronpopulation[dst(e)].dendrite, AMPAChan)
     else
-        add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite, AMPAChan)
+        add_synapse!(topology, neuronpopulation[src(e)].soma,
+                     neuronpopulation[dst(e)].dendrite, AMPAChan)
     end
 end
 
 @named net = NeuronalNetworkSystem(topology, revmap);
-simp = Simulation(net, time = 2000ms, return_system = true)
-prob = Simulation(net, time = 2000ms)
-
-# on the first run, over 40% of the time is single threaded compilation time. Without
-# compilation, solving takes roughly 200 seconds (6-8 cores) for 5 seconds of tspan.
-@time sol = solve(prob, RadauIIA5(), abstol=1e-6, reltol=1e-6, saveat=0.2);
-#plot(sol, vars = [x.soma.Vₘ for x in neuronpopulation])
+simp = Simulation(net, time = 1000.0ms, return_system = true)
+prob = Simulation(net, time = 1000.0ms)
+# this will take a while...
+@time sol = solve(prob, RadauIIA5(), abstol=1e-3, reltol=1e-3, tstops=0.0:0.2:1000.0);
 
 # Pinsky and Rinzel displayed their results as a plot of N neurons over 20mV
 indexof(sym,syms) = findfirst(isequal(sym),syms)
 dvs = states(simp)
-interpolated = sol(1:2000, idxs=[indexof(x.soma.Vₘ, dvs) for x in neuronpopulation[5:end]])
-abovethold = reduce(hcat, interpolated.u) .> 20.0
+interpolated = sol(1:0.2:1000, idxs=[indexof(x.soma.Vₘ, dvs) for x in neuronpopulation[5:end]])
+abovethold = reduce(hcat, interpolated.u) .> 10.0
 using Statistics
 final = mean(abovethold, dims=1)'
-
 using Plots
-
-plot(final)
+plot(final) # looks correct but only for less than 1 second of simulation time.
