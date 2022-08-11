@@ -30,7 +30,7 @@ function HodgkinHuxley(
     geometry::Geometry = Point(),
     stimuli::Vector{Equation} = Equation[])
 
-    @parameters cₘ = ustrip(Float64, mF/cm^2, capacitance)
+    @parameters cₘ = ustrip(Float64, µF/cm^2, capacitance)
     synaptic_channels = Vector{AbstractConductanceSystem}()
     synaptic_reversals = Vector{Num}()
     axial_conductances = Vector{Tuple{AbstractConductanceSystem,Num}}()

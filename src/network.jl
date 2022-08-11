@@ -274,7 +274,7 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF},
     neurons = vertices(topology)
     n = length(neurons)
     @parameters W[1:n,1:n] = g 
-    @variables (Syn_inp(t))[1:n] = zeros(n)
+    #@variables (Syn_inp(t))[1:n] = zeros(n)
     reversal_map = Dict() 
     gen = GeneratedCollections(systems = union(neurons, extensions),
                                ps = Set(scalarize(W)))

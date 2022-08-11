@@ -106,7 +106,7 @@ u0[12] = 0.0      # Glut1₊s
 
 # Parameters 
 # Neuron 1
-p[2]   =  0.001     # neuron1₊cₘ      
+p[2]   =  1.0       # neuron1₊cₘ      
 p[3]   =  area(geo) # neuron1₊aₘ      
 p[4]   =  50.0      # neuron1₊ENa     
 p[5]   =  -77.0     # neuron1₊EK      
@@ -116,7 +116,7 @@ p[8]   =  36.0      # neuron1₊Kdr₊gbar
 p[9]   =  0.3       # neuron1₊leak₊g  
 
 # Neuron 2
-p[10]  =  0.001     # neuron2₊cₘ      
+p[10]  =  1.0       # neuron2₊cₘ      
 p[11]  =  0.000629  # neuron2₊aₘ      
 p[12]  =  50.0      # neuron2₊ENa     
 p[13]  =  -77.0     # neuron2₊EK      
@@ -218,7 +218,7 @@ end
 
 # Solve and check for invariance
 byhand_prob = ODEProblem{true}(simple_synapse!, u0, (0.,ttot), p)
-mtk_prob = ODAEProblem(simul_sys, [], (0., ttot), [])
+mtk_prob = ODEProblem(simul_sys, [], (0., ttot), [])
 byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 
