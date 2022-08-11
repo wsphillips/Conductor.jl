@@ -221,17 +221,17 @@ function LIF(voltage = 0.0; tau_membrane = 10.0, tau_synaptic = 10.0, threshold 
 end
 
 function CompartmentSystem(dynamics::LIF, defaults, extensions, name, parent)
-    (; V, τ_mem, τ_syn, V_th, R, inputs, stimuli) = dynamics
+    (; V, τ_mem, τ_syn, V_th, R, stimuli) = dynamics
     Iₑ = stimuli[1]
     @variables I(t) = 0.0 S(t) = false
     @parameters V_rest = MTK.getdefault(V)
-    gen = GeneratedCollections(dvs = Set((V, I, S)),
+    gen = GeneratedCollections(dvs = Set((V, I)),
                                ps = Set((τ_mem, τ_syn, V_th, R, V_rest, Iₑ)),
-                               eqs = [D(V) ~ (-(V-V_rest)/τ_mem) + (R*(I + Iₑ))/τ_mem,
-                                      S ~ V >= V_th,
+                               eqs = [D(V) ~ (-(V-V_rest)/τ_mem) + (R*I + R*Iₑ)/τ_mem,
                                       D(I) ~ -I/τ_syn])
 
     (; eqs, dvs, ps, observed, systems, defs) = gen
+    push!(observed, S ~ V >= V_th)
     merge!(defs, defaults)
     return CompartmentSystem(dynamics, eqs, t, collect(dvs), collect(ps), observed, name,
                              systems, defs, extensions, parent)
@@ -243,6 +243,7 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF}; wi
     ps  = get_ps(compartment)
     eqs = get_eqs(compartment)
     defs = get_defaults(compartment)
+    obs = get_observed(compartment)
     syss = convert.(ODESystem, get_systems(compartment))
     V = @nonamespace compartment.V
     S = @nonamespace compartment.S
@@ -250,8 +251,30 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF}; wi
     V_rest = @nonamespace compartment.V_rest
 
     cb = with_cb ? MTK.SymbolicDiscreteCallback(V >= V_th, [V~V_rest]) : MTK.SymbolicDiscreteCallback[]
+    
     return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs,
-                     name = nameof(compartment), discrete_events = cb)
+                     name = nameof(compartment), discrete_events = cb,
+                    observed = obs)
+end
+
+function Base.convert(::Type{SDESystem}, compartment::CompartmentSystem{LIF}; with_cb = false)
+
+    dvs = get_states(compartment)
+    ps  = get_ps(compartment)
+    eqs = get_eqs(compartment)
+    defs = get_defaults(compartment)
+    obs = get_observed(compartment)
+    syss = convert.(ODESystem, get_systems(compartment))
+    V = @nonamespace compartment.V
+    S = @nonamespace compartment.S
+    V_th = @nonamespace compartment.V_th
+    V_rest = @nonamespace compartment.V_rest
+
+    cb = with_cb ? MTK.SymbolicDiscreteCallback(V >= V_th, [V~V_rest]) : MTK.SymbolicDiscreteCallback[]
+    
+    noise_eqs = [0.0, 1.0]
+    return SDESystem(eqs, noise_eqs, t, dvs, ps; systems = syss, defaults = defs,
+                     name = nameof(compartment), discrete_events = cb, observed = obs)
 end
 
 function CompartmentSystem(dynamics::HodgkinHuxley, defaults, extensions, name, parent)

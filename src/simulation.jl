@@ -19,7 +19,7 @@ function Simulation(neuron::AbstractCompartmentSystem; time::Time, return_system
         return simplified
     else
         @info repr("text/plain", simplified)
-        return ODEProblem(simplified, [], (0., t_val), []; jac, sparse)
+        return ODEProblem(simplified, [], (0., t_val), []) # ignore kwargs until Symbolics bugfix
     end
 end
 
@@ -31,7 +31,7 @@ function Simulation(neuron::CompartmentSystem{LIF}; time::Time, return_system = 
         return simplified
     else
         @info repr("text/plain", simplified)
-        return ODEProblem(simplified, [], (0., t_val), []; jac, sparse)
+        return ODEProblem(simplified, [], (0., t_val), []) # ignore kwargs until Symbolics bugfix
     end
 end
 
@@ -42,7 +42,7 @@ function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = 
         return simplified
     else
         @info repr("text/plain", simplified)
-        return ODEProblem(simplified, [], (0., t_val), []; jac, sparse)
+        return ODEProblem(simplified, [], (0., t_val), []) # ignore kwargs until Symbolics bugfix
     end
 end
 
