@@ -27,7 +27,7 @@ channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
 @named Iₑ = IonCurrent(NonIonic)
-electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0, IfElse.ifelse(t < 200.0, ustrip(Float64, µA, 400pA), 0.0), 0.0)
+electrode_pulse = Iₑ ~ IfElse.ifelse((t > 100.0) & (t < 200.0), ustrip(µA, 400.0pA), 0.0)
 
 dynamics = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Sphere(radius = 20µm),

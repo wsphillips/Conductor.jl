@@ -115,7 +115,7 @@ function generate_currents!(gen, dynamics::HodgkinHuxley, Vₘ, aₘ)
     for (chan, Erev) in paired_conductances
         I = IonCurrent(chan)
         g = renamespace(chan, get_output(chan))
-        push!(eqs, I ~ g*(Vₘ - Erev)*(1*getmetadata(g, ConductorUnits) isa SpecificConductance ? aₘ : 1))
+        push!(eqs, I ~ g*(Vₘ - Erev)*(1*get_unit(g) isa SpecificConductance ? aₘ : 1))
         push!(dvs, I)
         push!(currents, I)
     end

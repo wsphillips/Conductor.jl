@@ -198,24 +198,22 @@ function IonChannel(ion::IonSpecies,
                     defaults = Dict())
 
     if max_g isa SpecificConductance
-        gbar_val = ustrip(Float64, mS/cm^2, max_g)
-        @parameters gbar
-        push!(defaults, gbar => gbar_val)
-    else
+        gbar_val = ustrip(mS/cm^2, max_g)
+        @parameters gbar = gbar_val [unit=mS/cm^2]
+    else # it's a Num
         gbar = max_g
-        if hasdefault(gbar)
+        gbar_units = get_unit(gbar)
+        if 1gbar_units isa SpecificConductance && gbar_units !== mS/cm^2 && hasdefault(gbar)
+            gbar_val = ustrip(mS/cm^2, getdefault(gbar)*gbar_units)
+            gbar_units = mS/cm^2
+        elseif hasdefault(gbar)
             gbar_val = getdefault(gbar)
-            if gbar_val isa SpecificConductance
-                gbar_val = ustrip(Float64, mS/cm^2, gbar_val)
-                gbar = setdefault(gbar, gbar_val)
-            end
         end
+        gbar = setmetadata(gbar, VariableUnit, gbar_units)
+        gbar = setdefault(gbar, gbar_val)
     end
 
-    @variables g(t)
-    g = setmetadata(g, ConductorUnits, mS/cm^2)
-    gbar = setmetadata(gbar, ConductorUnits, mS/cm^2)
-
+    @variables g(t) [unit=mS/cm^2]
     ConductanceSystem(g, ion, gate_vars; gbar = gbar, name = name, defaults = defaults, 
                       extensions = extensions)
 end
