@@ -30,7 +30,7 @@ function HodgkinHuxley(
     geometry::Geometry = Point(),
     stimuli::Vector{Equation} = Equation[])
 
-    @parameters cₘ = ustrip(Float64, µF/cm^2, capacitance)
+    @parameters cₘ = ustrip(Float64, µF/cm^2, capacitance) [unit=µF/cm^2]
     synaptic_channels = Vector{AbstractConductanceSystem}()
     synaptic_reversals = Vector{Num}()
     axial_conductances = Vector{Tuple{AbstractConductanceSystem,Num}}()
@@ -280,7 +280,7 @@ end
 function CompartmentSystem(dynamics::HodgkinHuxley, defaults, extensions, name, parent)
 
     (; channels, synaptic_channels, axial_conductances, stimuli) = dynamics
-    @parameters aₘ = area(dynamics.geometry)
+    @parameters aₘ = area(dynamics.geometry) [unit=cm^2]
     Vₘ, cₘ = dynamics.voltage, dynamics.capacitance
     gen = GeneratedCollections(dvs = Set(Vₘ), ps = Set((aₘ,cₘ)),
                                systems = union(channels, synaptic_channels,

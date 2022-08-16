@@ -3,21 +3,13 @@ using Conductor, IfElse, Unitful, ModelingToolkit, OrdinaryDiffEq, Plots
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
-Vₘ = MembranePotential(-65mV) # set default V₀ = -65mV
+include("hh_rates.jl")
 
-nav_kinetics = [
-    Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
-         4.0*exp(-(Vₘ + 65.0)/18.0), p = 3, name = :m)
-    Gate(AlphaBeta,
-         0.07*exp(-(Vₘ+65.0)/20.0),
-         1.0/(1.0 + exp(-(Vₘ + 35.0)/10.0)), name = :h)]
+Vₘ = MembranePotential(-65mV)
 
-kdr_kinetics = [
-    Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
-         0.125 * exp(-(Vₘ + 65.0)/80.0),
-         p = 4, name = :n)]
+nav_kinetics = [Gate(AlphaBeta, αₘ(Vₘ), βₘ(Vₘ), p = 3, name = :m),
+                Gate(AlphaBeta, αₕ(Vₘ), βₕ(Vₘ), name = :h)]
+kdr_kinetics = [Gate(AlphaBeta, αₙ(Vₘ), βₙ(Vₘ), p = 4, name = :n)]
 
 @named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2) 
 @named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
@@ -37,7 +29,5 @@ dynamics = HodgkinHuxley(Vₘ, channels, reversals;
 
 sim = Simulation(neuron, time = 300ms)
 solution = solve(sim, Rosenbrock23(), abstol=0.01, reltol=0.01, saveat=0.2);
-
-# Plot at 5kHz sampling
 plot(solution; size=(1200,800))
 
