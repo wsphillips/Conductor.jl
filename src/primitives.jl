@@ -24,12 +24,14 @@ const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 """
 The independent variable for time, ``t``.
 """
-const t = let name = :t; only(@variables $name) end
+const t = let name = :t; only(@variables $name [unit=ms]) end
 
 """
 Differential with respect to time, ``t``.
 """
 const D = Differential(t)
+
+const STATIC_RATE = only(@parameters nil=0 [unit=ms^-1])
 
 # TODO: Make IonSpecies user extendable instead of a fixed set of enums
 @enum IonSpecies::UInt128 begin
@@ -93,19 +95,19 @@ struct MembranePotential
         V0_val = V0 isa Voltage ? ustrip(Float64, mV, V0) : V0
         if n == one(n) 
             if isnothing(V0)
-                ret = only(dynamic ? @variables($name(t)) : @parameters($name))
+                ret = only(dynamic ? @variables($name(t),[unit=mV]) : @parameters($name,[unit=mV]))
             else
-                ret = only(dynamic ? @variables($name(t)=V0_val,[unit=unit(V0)]) :
-                                     @parameters($name=V0_val,[unit=unit(V0)]))
+                ret = only(dynamic ? @variables($name(t)=V0_val,[unit=mV]) :
+                                     @parameters($name=V0_val,[unit=mV]))
             end
             ret = setmetadata(ret, PrimitiveSource, source)
             ret = setmetadata(ret, MembranePotential, true)
         elseif n > one(n)
             if isnothing(V0)
-                ret = only(dynamic ? @variables($name(t)[1:n]) : @parameters($name[1:n]))
+                ret = only(dynamic ? @variables($name(t)[1:n],[unit=mV]) : @parameters($name[1:n],[unit=mV]))
             else
-                ret = only(dynamic ? @variables($name(t)[1:n] = fill(V0_val, n),[unit=unit(V0)]) :
-                                     @parameters($name[1:n] = fill(V0_val, n),[unit=unit(V0)]))
+                ret = only(dynamic ? @variables($name(t)[1:n] = fill(V0_val, n),[unit=mV]) :
+                                     @parameters($name[1:n] = fill(V0_val, n),[unit=mV]))
             end
             ret = set_symarray_metadata(ret, PrimitiveSource, source)
             ret = set_symarray_metadata(ret, MembranePotential, true)
@@ -177,12 +179,12 @@ function IonConcentration(ion::IonSpecies, conc::Union{Nothing,Real,Molarity} = 
     sym = Symbol(name,(location == Inside ? "ᵢ" : "ₒ"))
     conc_val = conc isa Molarity ? ustrip(µM, conc) : conc 
     if isnothing(conc_val)
-        ret = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
+        ret = dynamic ? only(@variables $sym(t) [unit=µM]) : only(@parameters $sym [unit=µM]) 
     else 
-        ret = dynamic ? only(@variables($sym(t)=conc_val,[unit=unit(conc)])) :
-                        only(@parameters($sym=conc_val,[unit=unit(conc)])) 
+        ret = dynamic ? only(@variables($sym(t)=conc_val,[unit=µM])) :
+                        only(@parameters($sym=conc_val,[unit=µM])) 
     end
-    ret = setmetadata(var,  IonConcentration, IonConcentration(ion, location))
+    ret = setmetadata(ret,  IonConcentration, IonConcentration(ion, location))
     return ret
 end
 
@@ -217,10 +219,11 @@ function IonCurrent(ion::IonSpecies, curr::Union{Nothing,Real,Current} = nothing
     curr_val = curr isa Current ? ustrip(µA, curr) : curr 
 
     if isnothing(curr_val)
-        ret = dynamic ? only(@variables $name(t)) : only(@parameters $name) 
-    else 
-        ret = dynamic ? only(@variables($name(t) = curr_val,[unit=unit(curr)])) :
-                        only(@parameters($name = curr_val,[unit=unit(curr)])) 
+        ret = dynamic ? only(@variables $name(t) [unit=µA]) : only(@parameters $name [unit=µA]) 
+    else
+        curr_unit = curr isa Current ? µA : unit(curr)
+        ret = dynamic ? only(@variables($name(t) = curr_val,[unit=curr_unit])) :
+                        only(@parameters($name = curr_val,[unit=curr_unit])) 
     end
     return setmetadata(ret, IonCurrent, IonCurrent(ion, aggregate))
 end
@@ -259,10 +262,10 @@ function EquilibriumPotential(ion::IonSpecies, eqv::Union{Nothing,Real,Voltage};
     sym = Symbol("E", name)
     eqv_val = eqv isa Voltage ? ustrip(mV, eqv) : eqv 
     if isnothing(eqv_val)
-        ret = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
+        ret = dynamic ? only(@variables $sym(t) [unit=mV]) : only(@parameters $sym [unit=mV]) 
     else 
-        ret = dynamic ? only(@variables($sym(t) = eqv_val,[unit=unit(eqv)])) :
-                        only(@parameters($sym = eqv_val,[unit=unit(eqv)]))
+        ret = dynamic ? only(@variables($sym(t) = eqv_val,[unit=mV])) :
+                        only(@parameters($sym = eqv_val,[unit=mV]))
     end
     return setmetadata(ret, EquilibriumPotential, EquilibriumPotential(ion))
 end

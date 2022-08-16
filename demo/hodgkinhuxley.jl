@@ -4,7 +4,6 @@ import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
 include("hh_rates.jl")
-
 Vₘ = MembranePotential(-65mV)
 
 nav_kinetics = [Gate(AlphaBeta, αₘ(Vₘ), βₘ(Vₘ), p = 3, name = :m),
@@ -19,14 +18,16 @@ channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
 @named Iₑ = IonCurrent(NonIonic)
-electrode_pulse = Iₑ ~ IfElse.ifelse((t > 100.0) & (t < 200.0), ustrip(µA, 400.0pA), 0.0)
+@named I_rest = IonCurrent(NonIonic, 0.0µA, dynamic = false)
+@named I_step = IonCurrent(NonIonic, 400.0pA, dynamic = false)
+@parameters tstart = 100.0 [unit=ms] tstop = 200.0 [unit=ms]
+electrode_pulse = Iₑ ~ IfElse.ifelse((t > tstart) & (t < tstop), I_step, I_rest)
 
 dynamics = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Sphere(radius = 20µm),
                          stimuli = [electrode_pulse]);
 
 @named neuron = Compartment(dynamics)
-
 sim = Simulation(neuron, time = 300ms)
 solution = solve(sim, Rosenbrock23(), abstol=0.01, reltol=0.01, saveat=0.2);
 plot(solution; size=(1200,800))

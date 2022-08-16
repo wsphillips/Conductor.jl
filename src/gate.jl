@@ -98,7 +98,7 @@ See also: [`get_eqs`](@ref).
 function Gate(form::Type{AlphaBeta}, α, β; name = Base.gensym("GateVar"), kwargs...)
     x∞ = α/(α + β)
     x = only(@variables $name(t) = x∞ [unit=NoUnits])
-    eqs = [D(x) ~ α*(1 - x) - β*x]
+    eqs = [D(x) ~ (α*(1 - x) - β*x)]
     return Gate{AlphaBeta}(form, x, eqs; ss = x∞, kwargs...)
 end
 
@@ -129,7 +129,7 @@ Accepts any symbolic expression as an explicit definition of the gate dynamics.
 """
 function Gate(form::Type{SimpleGate}, rhs; default = rhs, name = Base.gensym("GateVar"), kwargs...)
     x = only(@variables $name(t) = default [unit=NoUnits])
-    return Gate{SimpleGate}(form, x, [x ~ rhs]; kwargs...)
+    return Gate{SimpleGate}(form, x, [x ~ rhs]; kwargs...) # rhs must return NoUnits
 end
 
 """
@@ -138,7 +138,7 @@ $(TYPEDSIGNATURES)
 A static parameter gate with initial value, `val`.
 """
 function Gate(form::Type{ParameterGate}, val; name = Base.gensym("GateVar"), kwargs...)
-    x = only(@parameters $name = val)
+    x = only(@parameters $name = val [unit=NoUnits])
     return Gate{ParameterGate}(form, x, Equation[]; val = val, kwargs...)
 end
 
@@ -152,14 +152,15 @@ The optional argument `saturation` sets a upper limit on the value of this gate.
 
 See also: [`get_eqs`](@ref).
 """
-function Gate(form::Type{HeavisideSum}; threshold = 0mV, decay_rate = 150,
+function Gate(form::Type{HeavisideSum}; threshold = 0mV, decay_rate = 150ms,
               name = Base.gensym("GateVar"), kwargs...) 
     x = only(@variables $name(t) = 0.0 [unit=NoUnits]) # synaptically activated gate inits to 0.0
     thold_val = ustrip(mV, threshold)
     thold_name = Symbol(name,"₊thold")
     decay_name = Symbol(name,"₊decay")
+    decay_val = ustrip(ms, decay_rate)
     thold = only(@parameters $thold_name = thold_val [unit=mV])
-    decay = only(@parameters $decay_name = decay_rate [unit=NoUnits])
+    decay = only(@parameters $decay_name = decay_val [unit=ms])
     return Gate{HeavisideSum}(form, x, Equation[]; threshold = thold, decay = decay,
                               kwargs...)
 end 
@@ -176,7 +177,7 @@ Returns an equation of the form:
 function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     thold, decay = var.threshold, var.decay
     out = output(var)
-    isempty(subscriptions(chan)) && return [D(out) ~ 0]
+    isempty(subscriptions(chan)) && return [D(out) ~ STATIC_RATE]
     Vₓ = scalarize(ExtrinsicPotential(n = length(subscriptions(chan))))
     # Derived from Pinsky & Rinzel 1994 - Equation 4 
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
@@ -189,5 +190,4 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
         return [D(out) ~ (out < sat)*sum(Vₓ .>= thold) .- (out/decay)]
     end
 end
-
 

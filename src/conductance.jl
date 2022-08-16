@@ -260,7 +260,7 @@ function SynapticChannel(ion::IonSpecies,
 
     if max_s isa ElectricalConductance
         sbar_val = ustrip(Float64, mS, max_s)
-        @parameters sbar = sbar_val
+        @parameters sbar = sbar_val [unit=mS]
         push!(defaults, sbar => sbar_val)
     else
         sbar = max_s
@@ -273,8 +273,7 @@ function SynapticChannel(ion::IonSpecies,
         end
     end
 
-    @variables s(t)
-    s = setmetadata(s, ConductorUnits, mS)
+    @variables s(t) [unit=mS]
     ConductanceSystem(s, ion, gate_vars; gbar = sbar, name = name, defaults = defaults,
                       aggregate = aggregate, extensions = extensions)
 end
@@ -287,7 +286,7 @@ end
 
 function (cond::AbstractConductanceSystem)(newgbar::Quantity)
     g = get_output(cond)
-    outunits = getmetadata(g, ConductorUnits)
+    outunits = get_unit(g)
     if dimension(outunits) !== dimension(newgbar)
         @error "Input Dimensions do not match output of ConductanceSystem"
     end
