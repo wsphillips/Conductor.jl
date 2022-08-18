@@ -98,7 +98,7 @@ See also: [`get_eqs`](@ref).
 function Gate(form::Type{AlphaBeta}, α, β; name = Base.gensym("GateVar"), kwargs...)
     x∞ = α/(α + β)
     x = only(@variables $name(t) = x∞ [unit=NoUnits])
-    eqs = [D(x) ~ (α*(1 - x) - β*x)]
+    eqs = [ModelingToolkit.coerce_units(D(x) ~ (α*(1 - x) - β*x))]
     return Gate{AlphaBeta}(form, x, eqs; ss = x∞, kwargs...)
 end
 
