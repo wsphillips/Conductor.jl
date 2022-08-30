@@ -339,6 +339,6 @@ function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     ccbs = get_continuous_events(nnsys)
     dcbs = get_discrete_events(nnsys)
     syss = convert.(ODESystem, get_systems(nnsys))
-    return ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(nnsys), systems = syss, discrete_events = dcbs, continuous_events = ccbs)
+    return ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(nnsys), systems = syss, discrete_events = dcbs, continuous_events = ccbs, checks = CheckComponents)
 end
 

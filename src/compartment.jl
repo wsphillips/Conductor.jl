@@ -115,7 +115,8 @@ function generate_currents!(gen, dynamics::HodgkinHuxley, Vₘ, aₘ)
     for (chan, Erev) in paired_conductances
         I = IonCurrent(chan)
         g = renamespace(chan, get_output(chan))
-        push!(eqs, I ~ g*(Vₘ - Erev)*(1*get_unit(g) isa SpecificConductance ? aₘ : 1))
+        eq = I ~ g*(Vₘ - Erev)*(1*get_unit(g) isa SpecificConductance ? aₘ : 1)
+        validate(eq) && push!(eqs, eq)
         push!(dvs, I)
         push!(currents, I)
     end
@@ -133,7 +134,7 @@ function process_stimuli!(currents, gen, dynamics::HodgkinHuxley)
             push!(ps, I)
             push!(currents, -I)
         else
-            push!(eqs, stimulus)
+            validate(stimulus) && push!(eqs, stimulus)
             push!(dvs, I)
             push!(currents, -I)
         end
@@ -175,7 +176,8 @@ function resolve_states!(gen, required_states)
     # Resolve unavailable states
     for s in required_states
         if iscurrent(s) && isaggregate(s)
-            push!(eqs, s ~ sum(filter(x -> getion(x) == getion(s), component_currents)))
+            eq = s ~ sum(filter(x -> getion(x) == getion(s), component_currents))
+            validate(eq) && push!(eqs, eq)
             push!(dvs, s)
         end
         # etc for more switch cases...
@@ -254,9 +256,9 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF}; wi
     
     return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs,
                      name = nameof(compartment), discrete_events = cb,
-                    observed = obs)
+                    observed = obs, checks = CheckComponents)
 end
-
+#=
 function Base.convert(::Type{SDESystem}, compartment::CompartmentSystem{LIF}; with_cb = false)
 
     dvs = get_states(compartment)
@@ -276,7 +278,7 @@ function Base.convert(::Type{SDESystem}, compartment::CompartmentSystem{LIF}; wi
     return SDESystem(eqs, noise_eqs, t, dvs, ps; systems = syss, defaults = defs,
                      name = nameof(compartment), discrete_events = cb, observed = obs)
 end
-
+=#
 function CompartmentSystem(dynamics::HodgkinHuxley, defaults, extensions, name, parent)
 
     (; channels, synaptic_channels, axial_conductances, stimuli) = dynamics
@@ -292,7 +294,8 @@ function CompartmentSystem(dynamics::HodgkinHuxley, defaults, extensions, name, 
     currents = generate_currents!(gen, dynamics, Vₘ, aₘ)
     process_stimuli!(currents, gen, dynamics)
     # Voltage equation
-    push!(eqs, D(Vₘ) ~ -sum(currents)/(cₘ*aₘ))
+    eq = D(Vₘ) ~ -sum(currents)/(cₘ*aₘ)
+    validate(eq) && push!(eqs, eq)
     # Apply extensions
     extend_gen! = Base.Fix1(extend!, gen)
     foreach(extend_gen!, extensions)
@@ -376,7 +379,7 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
     syss = convert.(ODESystem, get_systems(compartment))
     
     return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs,
-                     name = nameof(compartment))
+                     name = nameof(compartment), checks = CheckComponents)
 end
 
 

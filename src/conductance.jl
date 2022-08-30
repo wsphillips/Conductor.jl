@@ -114,10 +114,13 @@ function ConductanceSystem(g::Num,
         hasdefault(sym) && push!(embed_defaults, sym => getdefault(sym))
     end
     
+    # VALIDATE EACH EQUATION
     if isempty(gate_vars)
-        push!(eqs, g ~ gbar)
+        eq = g ~ gbar
+        validate(eq) && push!(eqs, eq)
     else
-        push!(eqs, g ~ gbar * prod(output(x)^exponent(x) for x in gate_vars))
+        eq = g ~ gbar * prod(output(x)^exponent(x) for x in gate_vars)
+        validate(eq) && push!(eqs, eq)
     end
 
     # Remove parameters + generated states
@@ -159,7 +162,7 @@ function Base.convert(::Type{ODESystem}, condsys::ConductanceSystem)
     ps  = parameters(condsys)
     eqs = equations(condsys)
     defs = get_defaults(condsys)
-    sys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(condsys))
+    sys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(condsys), checks = CheckComponents)
     #return extend(sys, get_extensions(sys))
     return sys
 end

@@ -23,7 +23,7 @@ nav_kinetics = [
          name = :h)]
 
 # Calcium channels
-αᵣ = IfElse.ifelse(Vₘ <= zero(Float64), 0.005, exp(-Vₘ/20.0)/200.0)
+αᵣ = ifelse(Vₘ <= zero(Float64), 0.005, exp(-Vₘ/20.0)/200.0)
 
 ca_kinetics = [
     # Activation
@@ -35,7 +35,7 @@ ca_kinetics = [
     # Inactivation; unused in Pinsk & Rinzel reduction
     Gate(AlphaBeta,
          αᵣ,
-         IfElse.ifelse(Vₘ <= zero(Float64), zero(Float64), 0.005 - αᵣ),
+         ifelse(Vₘ <= zero(Float64), zero(Float64), 0.005 - αᵣ),
          name = :r)]
 # Delayed rectifier potassium
 kdr_kinetics = [
@@ -52,18 +52,18 @@ kahp_kinetics = [
          0.001,
          name = :q)]
 
-αc = IfElse.ifelse(Vₘ <= 50,
-                   (exp((Vₘ-10.)/11.)-exp((Vₘ-6.5)/27.))/18.975,
-                   2. *exp((6.5-Vₘ)/27.))
+αc = ifelse(Vₘ <= 50,
+            (exp((Vₘ-10.)/11.)-exp((Vₘ-6.5)/27.))/18.975,
+            2. *exp((6.5-Vₘ)/27.))
 
 # Calcium-dependent potassium
 kca_kinetics = [
     # Activation
     Gate(AlphaBeta,
          αc,
-         IfElse.ifelse(Vₘ <= 50,
-                       2. *exp((6.5-Vₘ)/27.) - αc,
-                       zero(Float64)),
+         ifelse(Vₘ <= 50,
+                2. *exp((6.5-Vₘ)/27.) - αc,
+                zero(Float64)),
          name = :c),
     # Calcium saturation term
     Gate(SimpleGate, min(Caᵢ/250., 1.),

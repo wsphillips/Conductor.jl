@@ -14,7 +14,7 @@ ABPD_channels = [NaV(100mS/cm^2),
                  KCa(5mS/cm^2),
                  Kdr(100mS/cm^2),
                  H(.01mS/cm^2),
-                 leak(0mS/cm^2)]
+                 leak(0mS/cm^2)];
 ABPD_dynamics = HodgkinHuxley(Vₘ, ABPD_channels, gradients; geometry = geo);
 
 @named ABPD = Compartment(ABPD_dynamics, extensions = [calcium_conversion]);
@@ -29,7 +29,7 @@ LP_channels = [NaV( 100mS/cm^2),
                KCa(   0mS/cm^2),
                Kdr(  25mS/cm^2),
                H(   .05mS/cm^2),
-               leak(.03mS/cm^2)]
+               leak(.03mS/cm^2)];
 LP_dynamics = HodgkinHuxley(Vₘ, LP_channels, gradients; geometry = geo);
 @named LP = Compartment(LP_dynamics, extensions = [calcium_conversion]);
 
@@ -43,7 +43,7 @@ PY_channels = [NaV( 100mS/cm^2),
                KCa(   0mS/cm^2),
                Kdr( 125mS/cm^2),
                H(   .05mS/cm^2),
-               leak(.01mS/cm^2)]
+               leak(.01mS/cm^2)];
 PY_dynamics = HodgkinHuxley(Vₘ, PY_channels, gradients; geometry = geo);
 @named PY = Compartment(LP_dynamics, extensions = [calcium_conversion]);
 

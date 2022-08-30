@@ -2,7 +2,7 @@
 module HodgkinHuxleySingle
 
 using Test
-using Conductor, ModelingToolkit, OrdinaryDiffEq, Unitful, IfElse
+using Conductor, ModelingToolkit, OrdinaryDiffEq, Unitful
 import ModelingToolkit: isparameter
 import Conductor: Na, K
 using Unitful: mV, mS, cm, µm, µA, ms, pA
@@ -15,7 +15,7 @@ Vₘ = MembranePotential(-65mV)
 
 nav_kinetics = [
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
          4.0*exp(-(Vₘ + 65.0)/18.0), p = 3, name = :m)
     Gate(AlphaBeta,
          0.07*exp(-(Vₘ+65.0)/20.0),
@@ -23,13 +23,13 @@ nav_kinetics = [
 
 kdr_kinetics = [
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
+         ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
          0.125 * exp(-(Vₘ + 65.0)/80.0),
          p = 4, name = :n)]
 
 alphamss = ((4.0exp(-3.6111111111111107 - (0.05555555555555555Vₘ)) +
-            IfElse.ifelse(Vₘ == -40.0, 1.0, (4.0 + 0.1Vₘ)*((1.0 - exp(-4.0 - (0.1Vₘ)))^-1)))^-1) * 
-            IfElse.ifelse(Vₘ == -40.0, 1.0, (4.0 + 0.1Vₘ)*((1.0 - exp(-4.0 - (0.1Vₘ)))^-1))
+            ifelse(Vₘ == -40.0, 1.0, (4.0 + 0.1Vₘ)*((1.0 - exp(-4.0 - (0.1Vₘ)))^-1)))^-1) * 
+            ifelse(Vₘ == -40.0, 1.0, (4.0 + 0.1Vₘ)*((1.0 - exp(-4.0 - (0.1Vₘ)))^-1))
 
 @test isequal(steadystate(nav_kinetics[1]), alphamss)
 
@@ -42,7 +42,10 @@ channels = [NaV, Kdr, leak]
 @test [length(equations(x)) for x in channels] == [3,2,1]
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 @named Iₑ = IonCurrent(NonIonic)
-electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0, IfElse.ifelse(t < 200.0, ustrip(Float64, µA, 400pA), 0.0), 0.0)
+@named I_rest = IonCurrent(NonIonic, 0.0µA, dynamic = false)
+@named I_step = IonCurrent(NonIonic, 400.0pA, dynamic = false)
+@parameters tstart = 100.0 [unit=ms] tstop = 200.0 [unit=ms]
+electrode_pulse = Iₑ ~ ifelse((t > tstart) & (t < tstop), I_step, I_rest)
 
 dynamics = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Sphere(radius = 20µm),

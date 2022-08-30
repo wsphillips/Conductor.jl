@@ -98,7 +98,7 @@ See also: [`get_eqs`](@ref).
 function Gate(form::Type{AlphaBeta}, α, β; name = Base.gensym("GateVar"), kwargs...)
     x∞ = α/(α + β)
     x = only(@variables $name(t) = x∞ [unit=NoUnits])
-    eqs = [ModelingToolkit.coerce_units(D(x) ~ (α*(1 - x) - β*x))]
+    eqs = [D(x) ~ (α*(1 - x) - β*x)]
     return Gate{AlphaBeta}(form, x, eqs; ss = x∞, kwargs...)
 end
 
@@ -177,15 +177,16 @@ Returns an equation of the form:
 function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     thold, decay = var.threshold, var.decay
     out = output(var)
-    isempty(subscriptions(chan)) && return [D(out) ~ STATIC_RATE]
+    isempty(subscriptions(chan)) && return [D(out) ~ 0]
     Vₓ = scalarize(ExtrinsicPotential(n = length(subscriptions(chan))))
     # Derived from Pinsky & Rinzel 1994 - Equation 4 
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
     sat_val = get(var, :saturation, nothing)
-    if isnothing(saturation)
+    if isnothing(sat_val)
         return [D(out) ~ sum(Vₓ .>= thold) .- (out/decay)]
     else
-        sat = only(@parameters $(Symbol(getname(out),"₊sat")) = sat_val [unit=NoUnits])
+        sat_sym = Symbol(getname(out),"₊sat")
+        sat = only(@parameters $sat_sym = sat_val [unit=NoUnits])
         # out cannot continue to grow past the saturation limit
         return [D(out) ~ (out < sat)*sum(Vₓ .>= thold) .- (out/decay)]
     end

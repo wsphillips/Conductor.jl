@@ -1,7 +1,7 @@
 
 module SimpleSynapse
 
-using Test, Conductor, IfElse, OrdinaryDiffEq, Unitful, ModelingToolkit
+using Test, Conductor, OrdinaryDiffEq, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, pA, nA, ms, nS, pS, µA, µm
 import Conductor: Na, K
 
@@ -11,7 +11,7 @@ Vₘ = MembranePotential(-65mV)
 
 nav_kinetics = [
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
          4.0*exp(-(Vₘ + 65.0)/18.0),
          p = 3, name = :m)
     Gate(AlphaBeta,
@@ -20,7 +20,7 @@ nav_kinetics = [
 
 kdr_kinetics = [
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
+         ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
          0.125 * exp(-(Vₘ + 65.0)/80.0),
          p = 4, name = :n)]
 
@@ -31,7 +31,8 @@ channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na   =>  50.0mV, K    => -77.0mV, Leak => -54.4mV])
 
 @named Iₑ = IonCurrent(NonIonic)
-holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
+@named I_holding = IonCurrent(NonIonic, 5000pA, dynamic = false)
+holding_current = Iₑ ~ I_holding 
 geo = Cylinder(radius = 25µm, height = 400µm)
 
 dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals; geometry = geo, stimuli = [holding_current]);

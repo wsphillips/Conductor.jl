@@ -50,7 +50,9 @@ import ModelingToolkit:
     setdefault,
     AbstractTimeDependentSystem,
     independent_variables,
-    get_variables!
+    get_variables!,
+    validate,
+    CheckComponents
 
 import ModelingToolkit.SciMLBase: parameterless_type
 

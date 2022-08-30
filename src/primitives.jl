@@ -31,8 +31,6 @@ Differential with respect to time, ``t``.
 """
 const D = Differential(t)
 
-const STATIC_RATE = only(@parameters nil=0 [unit=ms^-1])
-
 # TODO: Make IonSpecies user extendable instead of a fixed set of enums
 @enum IonSpecies::UInt128 begin
     NonIonic      = 1 << 0
