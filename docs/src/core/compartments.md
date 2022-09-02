@@ -9,7 +9,7 @@ ionic gradients (i.e. equilibrium potentials). We define these by directly provi
 of `ConductanceSystem` and `EquilibriumPotential` to the `CompartmentSystem`:
 
 ```@example compartment_example
-using Conductor, Unitful, ModelingToolkit, IfElse
+using Conductor, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm
 
 Vₘ = MembranePotential()
@@ -65,7 +65,7 @@ import Unitful: ms
 using OrdinaryDiffEq, Plots
 sim = Simulation(neuron, time = 300ms)
 solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
-plot(solution; vars=[Vₘ])
+plot(solution; idxs=[Vₘ])
 ```
 The neuron isn't spontaneously active. To make the neuron produce spikes, we can write an
 equation for an electrode current and provide it to `CompartmentSystem`: 
@@ -85,7 +85,7 @@ stim_dynamics = HodgkinHuxley(Vₘ, channels, reversals;
                               stimuli = [electrode_pulse])
 
 @named neuron_stim = CompartmentSystem(stim_dynamics)
-@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,8); # hide
+@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,12); # hide
 neuron_stim # hide
 ```
 Putting it all together, our neuron simulation now produces a train of action potentials:
@@ -93,7 +93,7 @@ Putting it all together, our neuron simulation now produces a train of action po
 ```@example compartment_example
 sim = Simulation(neuron_stim, time = 300ms)
 solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
-plot(solution; vars=[Vₘ])
+plot(solution; idxs=[Vₘ])
 ```
 
 ## Multiple Compartments
