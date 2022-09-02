@@ -6,13 +6,13 @@ include(joinpath(@__DIR__, "pinsky_setup.jl"))
 sim_time = 1500.0
 
 # Compartment holding currents
-is_val = ustrip(Float64, µA, -0.5µA)/p
-@named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
-soma_holding = Iₛ ~ is_val
+@named I_s_holding = IonCurrent(NonIonic, -0.5µA, dynamic = false)
+@named Iₛ = IonCurrent(NonIonic, -0.5µA, dynamic = false)
+soma_holding = Iₛ ~ I_s_holding/p
 
-id_val = ustrip(Float64, µA, 0.0µA)/(1-p)
-@named I_d = IonCurrent(NonIonic, id_val, dynamic = false)
-dendrite_holding = I_d ~ id_val
+@named I_d_holding = IonCurrent(NonIonic, 0.0µA, dynamic = false)
+@named I_d = IonCurrent(NonIonic, 0.0µA, dynamic = false)
+dendrite_holding = I_d ~ I_d_holding/(1-p)
 
 soma_dynamics = HodgkinHuxley(Vₘ,
                          [NaV(30mS/cm^2),

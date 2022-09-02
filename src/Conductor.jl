@@ -23,7 +23,8 @@ import Symbolics:
     tosymbol,
     VariableDefaultValue,
     wrap, unwrap, Arr,
-    scalarize
+    scalarize,
+    getname
 
 import ModelingToolkit:
     toparam,
@@ -41,6 +42,7 @@ import ModelingToolkit:
     get_systems,
     get_continuous_events,
     get_discrete_events,
+    get_unit,
     _merge,
     renamespace,
     hasdefault,
@@ -48,16 +50,24 @@ import ModelingToolkit:
     setdefault,
     AbstractTimeDependentSystem,
     independent_variables,
-    get_variables!
+    get_variables!,
+    validate,
+    CheckComponents
 
 import ModelingToolkit.SciMLBase: parameterless_type
 
 import Unitful:
     Time,
+    TimeUnits,
     Voltage,
+    VoltageUnits,
     Current,
+    CurrentUnits,
     Molarity,
-    ElectricalConductance
+    ElectricalConductance,
+    ElectricalConductanceUnits
+
+import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 
 import SymbolicUtils:
     FnType,
@@ -65,7 +75,6 @@ import SymbolicUtils:
     operation,
     arguments
 
-import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 import Base: show, display
 
 export Gate, SimpleGate, AlphaBeta, SteadyStateTau, SteadyState, ConstantValue, IonChannel,
@@ -95,7 +104,6 @@ export Sphere, Cylinder, Point, Unitless, area, radius, height
 export HodgkinHuxley
 
 # Metadata IDs
-struct ConductorUnits end
 struct ConductorMaxConductance end
 
 abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end

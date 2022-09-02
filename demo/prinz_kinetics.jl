@@ -1,6 +1,5 @@
-
 using Conductor, Unitful, ModelingToolkit
-import Unitful: mV, mS, cm, µm, ms, mM, µM
+import Unitful: mV, mS, cm, µm, ms, mM, µM, µA
 import Conductor: Na, K, Ca, Cation, Leak
 
 Vₘ = MembranePotential(-50mV)
@@ -60,14 +59,17 @@ h_kinetics = [
          1.0/(1.0+exp((Vₘ+75.0)/5.5)),
          2/( exp((Vₘ+169.7)/(-11.6)) + exp((Vₘ- 26.7)/(14.3))), name = :m)]
 
-# TODO: combine the calcium equilibrium and Ca2+ conversion into one "IonGradient" type
+Ca_Nernst(Ca) = 1000*((-8.314*283.15)/(2 * 96485.365))*log(max(Ca,0.001)/3000.0)
+@register_symbolic Ca_Nernst(Ca)
+ModelingToolkit.get_unit(op::typeof(Ca_Nernst), args) = mV
+
 gradients = Equilibria(Pair[Sodium    =>  50.0mV,
                             Potassium => -80.0mV,
                             Cation    => (-20mV, :H),
                             Leak      => -50mV,
                             # x1000 for mV; thresholding Cai in case negative conc
                             # TODO: write nernst function + use Unitful constants (RT/zℱ)
-                            Calcium   => 1000*((-8.314*283.15)/(2 * 96485.365))*log(max(Caᵢ,0.001)/3000.0)]);
+                            Calcium   => Ca_Nernst(Caᵢ)]);
 
 # Reported area value in Prinz 2003; the area of a cylinder without the ends (2πrh).
 # Dimensions r = 25µm, h = 400µm given by Liu et al 1998.
@@ -82,7 +84,7 @@ geo = Cylinder(radius = 25µm, height = 400µm)
 # Internal current units are µA (mS * mV) -> x1000 to match Prinz/Liu factor (uses nA)
 
 # conversion as published
-@parameters τCa = 200 Ca∞ = 0.05 fₚ = 14.96 
+@parameters τCa = 200.0 [unit=ms] Ca∞ = 0.05 [unit=µM] fₚ = 14.96 [unit=µM/µA]
 @named calcium_conversion = ODESystem([D(Caᵢ) ~ ((-fₚ*ICa*1000) - Caᵢ + Ca∞)/τCa]);
 
 @named NaV = IonChannel(Sodium, nav_kinetics) 

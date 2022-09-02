@@ -33,9 +33,9 @@ function build_toplevel(system)
     build_toplevel!(dvs, ps, eqs, defs, system)
 end
 
-function heaviside(x)
-    IfElse.ifelse(x > zero(x), one(x), zero(x))
-end
+heaviside(x) = ifelse(x > zero(x), one(x), zero(x))
+@register_symbolic heaviside(x)
+ModelingToolkit.get_unit(op::typeof(heaviside), args) = ms^-1
 
 # Hijacked and modified from Symbolics.jl
 function set_symarray_metadata(x, ctx, val)

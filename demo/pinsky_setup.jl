@@ -1,6 +1,7 @@
 import Unitful: µF, pA, µA, nA, µS
 @parameters ϕ = 0.13 β = 0.075 p = 0.5
-@named calcium_conversion = ODESystem([D(Caᵢ) ~ -ϕ*ICa - β*Caᵢ]);
+@named calcium_conversion = ODESystem([D(Caᵢ) ~ -ϕ*ICa - β*Caᵢ];
+                                      checks = ModelingToolkit.CheckComponents);
 reversals = Equilibria([Sodium    =>  120.0mV,
                         Potassium =>  -15.0mV,
                         Leak      =>    0.0mV,

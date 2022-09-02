@@ -9,14 +9,14 @@ ionic gradients (i.e. equilibrium potentials). We define these by directly provi
 of `ConductanceSystem` and `EquilibriumPotential` to the `CompartmentSystem`:
 
 ```@example compartment_example
-using Conductor, Unitful, ModelingToolkit, IfElse
+using Conductor, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm
 
 Vₘ = MembranePotential()
 
 nav_kinetics = [
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
          4.0*exp(-(Vₘ + 65.0)/18.0), p = 3, name = :m)
     Gate(AlphaBeta,
          0.07*exp(-(Vₘ+65.0)/20.0),
@@ -24,7 +24,7 @@ nav_kinetics = [
 
 kdr_kinetics = [
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
+         ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
          0.125 * exp(-(Vₘ + 65.0)/80.0),
          p = 4, name = :n)]
 
@@ -41,10 +41,6 @@ dynamics = HodgkinHuxley(Vₘ, channels, reversals)
 @assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8) # hide
 neuron # hide
 ```
-!!! note
-    We use `IfElse.ifelse` to handle discontinuities in the rate equations for Sodium and
-    Potassium channel dynamics. In Julia v1.8+ `Base.ifelse` may be used directly without
-    the need for an external dependency. 
 
 In the case above, the `CompartmentSystem` constructor assumes a dimensionless `geometry =
 Point()`. The maximum magnitudes of the ion channel conductances, ``\overline{g}``, have
@@ -69,7 +65,7 @@ import Unitful: ms
 using OrdinaryDiffEq, Plots
 sim = Simulation(neuron, time = 300ms)
 solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
-plot(solution; vars=[Vₘ])
+plot(solution; idxs=[Vₘ])
 ```
 The neuron isn't spontaneously active. To make the neuron produce spikes, we can write an
 equation for an electrode current and provide it to `CompartmentSystem`: 
@@ -79,17 +75,17 @@ import Unitful: µA, pA
 @named Iₑ = IonCurrent(NonIonic)
 
 # A 400 picoamp squarewave pulse when 100ms > t > 200ms
-electrode_pulse = Iₑ ~ IfElse.ifelse(t > 100.0,
-                                     IfElse.ifelse(t < 200.0,
-                                                   ustrip(Float64, µA, 400pA),
-                                                   0.0),
-                                     0.0)
+@named I_rest = IonCurrent(NonIonic, 0.0µA, dynamic = false)
+@named I_step = IonCurrent(NonIonic, 400.0pA, dynamic = false)
+@parameters tstart = 100.0 [unit=ms] tstop = 200.0 [unit=ms]
+electrode_pulse = Iₑ ~ ifelse((t > tstart) & (t < tstop), I_step, I_rest)
+
 stim_dynamics = HodgkinHuxley(Vₘ, channels, reversals;
                               geometry = soma_shape,
                               stimuli = [electrode_pulse])
 
 @named neuron_stim = CompartmentSystem(stim_dynamics)
-@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,8); # hide
+@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,12); # hide
 neuron_stim # hide
 ```
 Putting it all together, our neuron simulation now produces a train of action potentials:
@@ -97,7 +93,7 @@ Putting it all together, our neuron simulation now produces a train of action po
 ```@example compartment_example
 sim = Simulation(neuron_stim, time = 300ms)
 solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
-plot(solution; vars=[Vₘ])
+plot(solution; idxs=[Vₘ])
 ```
 
 ## Multiple Compartments

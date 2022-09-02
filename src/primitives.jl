@@ -24,7 +24,7 @@ const ℱ = Unitful.q*Unitful.Na # Faraday's constant
 """
 The independent variable for time, ``t``.
 """
-const t = let name = :t; only(@variables $name) end
+const t = let name = :t; only(@variables $name [unit=ms]) end
 
 """
 Differential with respect to time, ``t``.
@@ -86,34 +86,32 @@ If `V0 == nothing`, the default value of the resulting variable will be left una
 - `name::Symbol = :Vₘ`: the symbol to use for the symbolic variable
 """
 struct MembranePotential
-    function MembranePotential(V0 = -60mV; dynamic = true,
+    function MembranePotential(V0::Union{Nothing,Real,Voltage} = -60mV; dynamic = true,
                                source::PrimitiveSource = Intrinsic, n::Integer = 1,
                                name::Symbol = :Vₘ)
+
         V0_val = V0 isa Voltage ? ustrip(Float64, mV, V0) : V0
-        iv = dynamic ? t : nothing
         if n == one(n) 
             if isnothing(V0)
-                ret = only(dynamic ? @variables($name(t)) : @parameters($name))
+                ret = only(dynamic ? @variables($name(t),[unit=mV]) : @parameters($name,[unit=mV]))
             else
-                ret = only(dynamic ? @variables($name(t)=V0_val) : @parameters($name=V0_val))
+                ret = only(dynamic ? @variables($name(t)=V0_val,[unit=mV]) :
+                                     @parameters($name=V0_val,[unit=mV]))
             end
             ret = setmetadata(ret, PrimitiveSource, source)
             ret = setmetadata(ret, MembranePotential, true)
-            ret = V0 isa Voltage ? setmetadata(ret, ConductorUnits, mV) : ret
         elseif n > one(n)
             if isnothing(V0)
-                ret = only(dynamic ? @variables($name(t)[1:n]) : @parameters($name[1:n]))
+                ret = only(dynamic ? @variables($name(t)[1:n],[unit=mV]) : @parameters($name[1:n],[unit=mV]))
             else
-                ret = only(dynamic ? @variables($name(t)[1:n] = fill(V0_val, n)) :
-                                     @parameters($name[1:n] = fill(V0_val, n)))
+                ret = only(dynamic ? @variables($name(t)[1:n] = fill(V0_val, n),[unit=mV]) :
+                                     @parameters($name[1:n] = fill(V0_val, n),[unit=mV]))
             end
             ret = set_symarray_metadata(ret, PrimitiveSource, source)
             ret = set_symarray_metadata(ret, MembranePotential, true)
-            ret = V0 isa Voltage ? set_symarray_metadata(ret, ConductorUnits, mV) : ret
         else
             throw("'n' must be greater than or equal to 1")
         end
-   
         return ret
     end
 end
@@ -172,27 +170,20 @@ An intra/extracellular concentration of ions.
   variable. By default, a lookup table is used to find the ion's symbol on the periodic
   table of elements.
 """
-function IonConcentration(ion::IonSpecies, val = nothing;
+function IonConcentration(ion::IonSpecies, conc::Union{Nothing,Real,Molarity} = nothing;
                           location::PrimitiveLocation = Inside, dynamic::Bool = false,
                           name::Symbol = PERIODIC_SYMBOL[ion])
 
     sym = Symbol(name,(location == Inside ? "ᵢ" : "ₒ"))
-    var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
-    var = setmetadata(var,  IonConcentration, IonConcentration(ion, location))
-
-    if !isnothing(val)
-        if val isa Molarity
-            var = setmetadata(var, ConductorUnits, unit(val))
-            raw_val = ustrip(Float64, µM, val)
-            var = setdefault(var, raw_val)
-            return var
-        else
-            var = setdefault(var, val)
-            return var
-        end
+    conc_val = conc isa Molarity ? ustrip(µM, conc) : conc 
+    if isnothing(conc_val)
+        ret = dynamic ? only(@variables $sym(t) [unit=µM]) : only(@parameters $sym [unit=µM]) 
+    else 
+        ret = dynamic ? only(@variables($sym(t)=conc_val,[unit=µM])) :
+                        only(@parameters($sym=conc_val,[unit=µM])) 
     end
-
-    return var
+    ret = setmetadata(ret,  IonConcentration, IonConcentration(ion, location))
+    return ret
 end
 
 # Internal API: Concentration trait queries
@@ -219,26 +210,20 @@ An ionic membrane current.
   symbolic variable. By default, a lookup table is used to find the ion's symbol on the 
   periodic table of elements.
 """
-function IonCurrent(ion::IonSpecies, val = nothing; aggregate::Bool = false,
-                    dynamic::Bool = true, name::Symbol = Symbol("I", PERIODIC_SYMBOL[ion]))
+function IonCurrent(ion::IonSpecies, curr::Union{Nothing,Real,Current} = nothing;
+                    aggregate::Bool = false, dynamic::Bool = true,
+                    name::Symbol = Symbol("I", PERIODIC_SYMBOL[ion]))
 
-    var = dynamic ? only(@variables $name(t)) : only(@parameters $name)
-    var = setmetadata(var, IonCurrent, IonCurrent(ion, aggregate))
+    curr_val = curr isa Current ? ustrip(µA, curr) : curr 
 
-    if !isnothing(val)
-        if val isa Current
-            var = setmetadata(var, ConductorUnits, unit(val))
-            # FIXME: use proper unit checking
-            raw_val = ustrip(Float64, µA, val)
-            var = setdefault(var, raw_val)
-            return var
-        else
-            var = setdefault(var, val)
-            return var
-        end
+    if isnothing(curr_val)
+        ret = dynamic ? only(@variables $name(t) [unit=µA]) : only(@parameters $name [unit=µA]) 
+    else
+        curr_unit = curr isa Current ? µA : unit(curr)
+        ret = dynamic ? only(@variables($name(t) = curr_val,[unit=curr_unit])) :
+                        only(@parameters($name = curr_val,[unit=curr_unit])) 
     end
-
-    return var
+    return setmetadata(ret, IonCurrent, IonCurrent(ion, aggregate))
 end
 
 IonCurrent(cond::AbstractConductanceSystem) = 
@@ -270,25 +255,17 @@ An equilibrium (a.k.a. reversal) potential.
   symbolic variable. By default, a lookup table is used to find the ion's symbol on the 
   periodic table of elements.
 """
-function EquilibriumPotential(ion::IonSpecies, val; dynamic::Bool = false,
+function EquilibriumPotential(ion::IonSpecies, eqv::Union{Nothing,Real,Voltage}; dynamic::Bool = false,
                               name::Symbol = PERIODIC_SYMBOL[ion])
     sym = Symbol("E", name)
-    var = dynamic ? only(@variables $sym(t)) : only(@parameters $sym) 
-    var = setmetadata(var, EquilibriumPotential, EquilibriumPotential(ion))
-
-    if !isnothing(val)
-        if val isa Voltage
-            var = setmetadata(var, ConductorUnits, unit(val))
-            raw_val = ustrip(Float64, mV, val)
-            var = setdefault(var, raw_val)
-            return var
-        else
-            var = setdefault(var, val)
-            return var
-        end
+    eqv_val = eqv isa Voltage ? ustrip(mV, eqv) : eqv 
+    if isnothing(eqv_val)
+        ret = dynamic ? only(@variables $sym(t) [unit=mV]) : only(@parameters $sym [unit=mV]) 
+    else 
+        ret = dynamic ? only(@variables($sym(t) = eqv_val,[unit=mV])) :
+                        only(@parameters($sym = eqv_val,[unit=mV]))
     end
-
-    return var
+    return setmetadata(ret, EquilibriumPotential, EquilibriumPotential(ion))
 end
 
 # Internal API: EquilibriumPotential trait queries

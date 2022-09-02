@@ -16,4 +16,3 @@ EChol = Equilibrium(Cholinergic, -80mV, name = :Chol) # Leak as alias for non-sp
 @named Glut = SynapticChannel(Glutamatergic, [glut_kinetics]);
 @named Chol = SynapticChannel(Cholinergic, [chol_kinetics]);
 
-

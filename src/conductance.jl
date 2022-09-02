@@ -114,10 +114,13 @@ function ConductanceSystem(g::Num,
         hasdefault(sym) && push!(embed_defaults, sym => getdefault(sym))
     end
     
+    # VALIDATE EACH EQUATION
     if isempty(gate_vars)
-        push!(eqs, g ~ gbar)
+        eq = g ~ gbar
+        validate(eq) && push!(eqs, eq)
     else
-        push!(eqs, g ~ gbar * prod(output(x)^exponent(x) for x in gate_vars))
+        eq = g ~ gbar * prod(output(x)^exponent(x) for x in gate_vars)
+        validate(eq) && push!(eqs, eq)
     end
 
     # Remove parameters + generated states
@@ -159,7 +162,7 @@ function Base.convert(::Type{ODESystem}, condsys::ConductanceSystem)
     ps  = parameters(condsys)
     eqs = equations(condsys)
     defs = get_defaults(condsys)
-    sys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(condsys))
+    sys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(condsys), checks = CheckComponents)
     #return extend(sys, get_extensions(sys))
     return sys
 end
@@ -198,24 +201,22 @@ function IonChannel(ion::IonSpecies,
                     defaults = Dict())
 
     if max_g isa SpecificConductance
-        gbar_val = ustrip(Float64, mS/cm^2, max_g)
-        @parameters gbar
-        push!(defaults, gbar => gbar_val)
-    else
+        gbar_val = ustrip(mS/cm^2, max_g)
+        @parameters gbar = gbar_val [unit=mS/cm^2]
+    else # it's a Num
         gbar = max_g
-        if hasdefault(gbar)
+        gbar_units = get_unit(gbar)
+        if 1gbar_units isa SpecificConductance && gbar_units !== mS/cm^2 && hasdefault(gbar)
+            gbar_val = ustrip(mS/cm^2, getdefault(gbar)*gbar_units)
+            gbar_units = mS/cm^2
+        elseif hasdefault(gbar)
             gbar_val = getdefault(gbar)
-            if gbar_val isa SpecificConductance
-                gbar_val = ustrip(Float64, mS/cm^2, gbar_val)
-                gbar = setdefault(gbar, gbar_val)
-            end
         end
+        gbar = setmetadata(gbar, VariableUnit, gbar_units)
+        gbar = setdefault(gbar, gbar_val)
     end
 
-    @variables g(t)
-    g = setmetadata(g, ConductorUnits, mS/cm^2)
-    gbar = setmetadata(gbar, ConductorUnits, mS/cm^2)
-
+    @variables g(t) [unit=mS/cm^2]
     ConductanceSystem(g, ion, gate_vars; gbar = gbar, name = name, defaults = defaults, 
                       extensions = extensions)
 end
@@ -262,7 +263,7 @@ function SynapticChannel(ion::IonSpecies,
 
     if max_s isa ElectricalConductance
         sbar_val = ustrip(Float64, mS, max_s)
-        @parameters sbar = sbar_val
+        @parameters sbar = sbar_val [unit=mS]
         push!(defaults, sbar => sbar_val)
     else
         sbar = max_s
@@ -275,8 +276,7 @@ function SynapticChannel(ion::IonSpecies,
         end
     end
 
-    @variables s(t)
-    s = setmetadata(s, ConductorUnits, mS)
+    @variables s(t) [unit=mS]
     ConductanceSystem(s, ion, gate_vars; gbar = sbar, name = name, defaults = defaults,
                       aggregate = aggregate, extensions = extensions)
 end
@@ -289,7 +289,7 @@ end
 
 function (cond::AbstractConductanceSystem)(newgbar::Quantity)
     g = get_output(cond)
-    outunits = getmetadata(g, ConductorUnits)
+    outunits = get_unit(g)
     if dimension(outunits) !== dimension(newgbar)
         @error "Input Dimensions do not match output of ConductanceSystem"
     end

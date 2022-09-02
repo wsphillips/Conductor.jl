@@ -109,10 +109,11 @@ function MultiCompartment(topology; extensions = ODESystem[],
         trunk = SciMLBase.remake(trunk, dynamics = new_dynamics)
 
         if hasproperty(getproperty(trunk, nameof(axial)), :Vₘ)
-            push!(eqs, branch.Vₘ ~ getproperty(trunk, nameof(axial)).Vₘ)
+            eq = branch.Vₘ ~ getproperty(trunk, nameof(axial)).Vₘ
+            validate(eq) && push!(eqs, eq)
         end
-        
-        push!(eqs, branch.Vₘ ~ getproperty(trunk, tosymbol(branchvm_alias, escape=false)))
+        eq = branch.Vₘ ~ getproperty(trunk, tosymbol(branchvm_alias, escape=false))
+        validate(eq) && push!(eqs, eq)
         compartments[src(e)] = trunk
     end
 
@@ -176,6 +177,7 @@ function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
     eqs = get_eqs(mcsys)
     defs = get_defaults(mcsys)
     systems = map(x -> convert(ODESystem, x), get_systems(mcsys))
-    odesys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(mcsys), systems = systems)
+    odesys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(mcsys),
+                       systems = systems, checks = CheckComponents)
     return odesys
 end

@@ -7,13 +7,13 @@ include(joinpath(@__DIR__, "traub_kinetics.jl"))
 include(joinpath(@__DIR__, "pinsky_setup.jl"))
 
 # Base dynamics
-is_val = ustrip(Float64, µA, -0.5µA)/p
-@named Iₛ = IonCurrent(NonIonic, is_val, dynamic = false)
-soma_holding = Iₛ ~ is_val
+@named I_s_holding = IonCurrent(NonIonic, -0.5µA, dynamic = false)
+@named Iₛ = IonCurrent(NonIonic, -0.5µA, dynamic = false)
+soma_holding = Iₛ ~ I_s_holding/p
 
-id_val = ustrip(Float64, µA, 0.0µA)/(1-p)
-@named I_d = IonCurrent(NonIonic, id_val, dynamic = false)
-dendrite_holding = I_d ~ id_val
+@named I_d_holding = IonCurrent(NonIonic, 0.0µA, dynamic = false)
+@named I_d = IonCurrent(NonIonic, 0.0µA, dynamic = false)
+dendrite_holding = I_d ~ I_d_holding/(1-p)
 
 soma_dynamics = HodgkinHuxley(Vₘ,
                          [NaV(30mS/cm^2),
@@ -73,9 +73,11 @@ EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 revmap = Dict([NMDAChan => ENMDA, AMPAChan => EAMPA])
 
 # A single neuron was "briefly" stimulated to trigger the network
-is_stim_val = IfElse.ifelse((t > 150.0) & (t < 175.0), ustrip(Float64, µA, 5.0µA)/p, ustrip(Float64, µA, -0.5µA)/p)
-@named Istim = IonCurrent(NonIonic, is_stim_val)
-soma_stim = Istim ~ is_stim_val
+@named I_pulse = IonCurrent(NonIonic, 5.0µA; dynamic = false)
+@named I_holding = IonCurrent(NonIonic, -0.5µA; dynamic = false)
+@parameters t_on = 150.0 [unit=ms] t_off = 175.0 [unit=ms]
+@named Istim = IonCurrent(NonIonic, -0.5µA)
+soma_stim = Istim ~ ifelse((t > t_on) & (t < t_off), I_pulse/p, I_holding/p)
 
 soma_stim_dynamics = HodgkinHuxley(Vₘ,
                                    [NaV(30mS/cm^2),
@@ -113,7 +115,6 @@ end
 @named net = NeuronalNetworkSystem(topology, revmap);
 simp = Simulation(net, time = 2000.0ms, return_system = true)
 prob = Simulation(net, time = 2000.0ms)
-# this will take a while...
 @time sol = solve(prob, RK4());
 
 # Pinsky and Rinzel displayed their results as a plot of N neurons over 20mV
