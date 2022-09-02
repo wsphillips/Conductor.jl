@@ -51,21 +51,21 @@ kdr_kinetics = [
 @named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2)
 @named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
 @named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
+
+channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
 @named Iₑ = IonCurrent(NonIonic)
-holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
-channels = [NaV, Kdr, leak];
+@named I_hold = IonCurrent(NonIonic, 5000pA, dynamic = false)
+holding_current = Iₑ ~ I_hold
 
 dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Cylinder(radius = 25µm, height = 400µm),
                          stimuli = [holding_current])
-
-@named neuron1 = Compartment(dynamics_1)
-
 dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
                            geometry = Cylinder(radius = 25µm, height = 400µm))
 
+@named neuron1 = Compartment(dynamics_1)
 @named neuron2 = Compartment(dynamics_2)
 
 # Synaptic model
@@ -146,6 +146,7 @@ non-specific leak current.
 @named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2)
 @named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
 @named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
+channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 ```
 We also need to model current injection to stimulate spiking. We'll declare a new primitive
@@ -154,26 +155,22 @@ electrode current should be.
 
 ```@example gate_example; continued = true
 @named Iₑ = IonCurrent(NonIonic)
-holding_current = Iₑ ~ ustrip(Float64, µA, 5000pA)
+@named I_hold = IonCurrent(NonIonic, 5000pA, dynamic = false)
+holding_current = Iₑ ~ I_hold
 ```
-!!! note
-    Conductor.jl converts all currents to µA internally, so here we use `Unitful.ustrip` to
-    make sure our input is formatted appropriately.
 
 Finally, we construct our two neurons, providing the holding current stimulus to `neuron1`,
 which will be our presynaptic neuron.
 
 ```@example gate_example
-channels = [NaV, Kdr, leak];
 dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Cylinder(radius = 25µm, height = 400µm),
                          stimuli = [holding_current])
 
-@named neuron1 = Compartment(dynamics_1)
-
 dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
                            geometry = Cylinder(radius = 25µm, height = 400µm))
 
+@named neuron1 = Compartment(dynamics_1)
 @named neuron2 = Compartment(dynamics_2)
 ``` 
 For our neurons to talk to each other, we'll need a model for a synaptic conductance. This

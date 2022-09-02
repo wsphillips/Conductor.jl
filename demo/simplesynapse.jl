@@ -42,8 +42,9 @@ dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
                                    
 # Synaptic model
 Vₓ = ExtrinsicPotential()
-
-syn_kinetics = Gate(SteadyStateTau, syn∞(Vₓ), τsyn(Vₓ), name = :z)
+syn∞ = 1/(1 + exp((-35 - Vₓ)/5))
+τsyn = (1 - syn∞)/(1/40)
+syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
@@ -54,7 +55,6 @@ reversal_map = Dict([Glut => EGlut])
 @named net = NeuronalNetworkSystem(topology, reversal_map)
 total_time = 250.0
 sim = Simulation(net, time = total_time*ms)
-
 solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
 
 # Plot at 5kHz sampling
