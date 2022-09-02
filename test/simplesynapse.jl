@@ -62,14 +62,14 @@ reversal_map = Dict([Glut => EGlut])
 
 @test length.([equations(network),
                states(network),
-               parameters(network)]) == [29,29,18]
+               parameters(network)]) == [29,29,19]
 
 ttot = 250.
 simul_sys = Simulation(network, time = ttot*ms, return_system = true)
 
 @test length.([equations(simul_sys),
                states(simul_sys),
-               parameters(simul_sys)]) == [9,9,18]
+               parameters(simul_sys)]) == [9,9,19]
 
 # Skipped because synaptic systems generated via Base.gensym
 #expect_syms = [:neuron1₊Isyn] # just take one for now

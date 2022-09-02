@@ -55,14 +55,14 @@ dynamics = HodgkinHuxley(Vₘ, channels, reversals;
 
 @test length.([equations(neuron),
                states(neuron),
-               parameters(neuron)]) == [13,13,8]
+               parameters(neuron)]) == [13,13,12]
 
 time = 300.
 sim_sys = Simulation(neuron, time = time*ms, return_system = true)
 
 @test length.([equations(sim_sys),
                states(sim_sys),
-               parameters(sim_sys)]) == [4,4,8]
+               parameters(sim_sys)]) == [4,4,12]
 
 expect_syms = [:Vₘ, :NaV₊m, :NaV₊h, :Kdr₊n]
 @test all(x -> hasproperty(sim_sys, x), expect_syms)
@@ -127,7 +127,7 @@ function hodgkin_huxley!(du, u, p, t)
 end
 
 byhand_prob = ODEProblem{true}(hodgkin_huxley!, u0, (0.,300.), p)
-mtk_prob = ODAEProblem(sim_sys, [], (0., time), [])
+mtk_prob = ODEProblem(sim_sys, [], (0., time), [])
 
 byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
 current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol=1e-9, abstol=1e-9, saveat=0.025);
