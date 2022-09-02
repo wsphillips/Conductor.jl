@@ -11,14 +11,14 @@ individual gate and ``\overline{g}``.
 To model sodium conductance in a Hodgkin-Huxley model:
 
 ```@example
-using Conductor, ModelingToolkit, IfElse, Unitful
+using Conductor, ModelingToolkit, Unitful
 import Unitful: mV, mS, cm
 
 Vₘ = MembranePotential()
 
 nav_kinetics = [
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
          4.0*exp(-(Vₘ + 65.0)/18.0), p = 3, name = :m)
     Gate(AlphaBeta,
          0.07*exp(-(Vₘ+65.0)/20.0),
