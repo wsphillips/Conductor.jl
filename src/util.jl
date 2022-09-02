@@ -14,7 +14,6 @@ function GeneratedCollections(; eqs = Equation[], systems = AbstractTimeDependen
     return GeneratedCollections(eqs, dvs, ps, systems, observed, defs)
 end
 
-using IfElse
 import Symbolics: unwrap, symtype, getindex_posthook
 
 namegen(name) = Symbol(filter(x -> x !== '#', String(Base.gensym(name))))

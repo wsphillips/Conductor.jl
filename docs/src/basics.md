@@ -28,7 +28,7 @@ Here's a quick copy-paste example of two synaptically coupled neurons with Hodgk
 dynamics:
 
 ```@example
-using Conductor, IfElse, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
+using Conductor,  OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
 
@@ -36,7 +36,7 @@ Vₘ = MembranePotential(-65mV)
 
 nav_kinetics = [
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
          4.0*exp(-(Vₘ + 65.0)/18.0), p = 3, name = :m)
     Gate(AlphaBeta,
          0.07*exp(-(Vₘ+65.0)/20.0),
@@ -44,7 +44,7 @@ nav_kinetics = [
 
 kdr_kinetics = [
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
+         ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
          0.125 * exp(-(Vₘ + 65.0)/80.0),
          p = 4, name = :n)]
 
@@ -90,7 +90,7 @@ plot(solution; vars=[neuron1.Vₘ, neuron2.Vₘ])
 
 ## Step-by-step explanation
 ```@setup gate_example
-using Conductor, IfElse, OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
+using Conductor,  OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
 ```
@@ -119,7 +119,7 @@ Hodgkin-Huxley-style Sodium channels).
 nav_kinetics = [
     # the activation gate, m
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
+         ifelse(Vₘ == -40.0, 1.0, (0.1*(Vₘ + 40.0))/(1.0 - exp(-(Vₘ + 40.0)/10.0))),
          4.0*exp(-(Vₘ + 65.0)/18.0), p = 3, name = :m)
     # the inactivation gate, h
     Gate(AlphaBeta,
@@ -130,12 +130,12 @@ nav_kinetics = [
 kdr_kinetics = [
     # the activation gate, n
     Gate(AlphaBeta,
-         IfElse.ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
+         ifelse(Vₘ == -55.0, 0.1, (0.01*(Vₘ + 55.0))/(1.0 - exp(-(Vₘ + 55.0)/10.0))),
          0.125 * exp(-(Vₘ + 65.0)/80.0),
          p = 4, name = :n)]
 ```
 !!! note
-    There's a discontinuity in the original equations, so we use `IfElse.ifelse` to avoid a
+    There's a discontinuity in the original equations, so we use `ifelse` to avoid a
     divide-by-zero error.
 
 Now that we've defined the gating variables, we can construct some ion channels and define a

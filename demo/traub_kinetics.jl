@@ -1,4 +1,4 @@
-using Conductor, Unitful, ModelingToolkit, IfElse
+using Conductor, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, ms, mM, µM
 import Conductor: Na, K, Ca, Cation, Leak
 

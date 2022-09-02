@@ -289,7 +289,7 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF},
     end
     # equations _are_ order-dependent here. We can do this more nicely with a generic func affect 
     for (i, neuron) in enumerate(neurons)
-        push!(affect_eqs, neuron.V ~ IfElse.ifelse(spike_checks[i], neuron.V_rest, neuron.V))
+        push!(affect_eqs, neuron.V ~ ifelse(spike_checks[i], neuron.V_rest, neuron.V))
     end
 
     condition = reduce(|, spike_checks) # also tried with periodic callbacks--same issue
