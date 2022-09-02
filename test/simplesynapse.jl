@@ -2,7 +2,7 @@
 module SimpleSynapse
 
 using Test, Conductor, OrdinaryDiffEq, Unitful, ModelingToolkit
-import Unitful: mV, mS, cm, pA, nA, ms, nS, pS, µA, µm
+import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
 
 @testset "Simple excitatory synapse" begin
@@ -24,15 +24,17 @@ kdr_kinetics = [
          0.125 * exp(-(Vₘ + 65.0)/80.0),
          p = 4, name = :n)]
 
-@named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2) 
+@named NaV = IonChannel(Sodium, nav_kinetics, max_g = 120mS/cm^2)
 @named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS/cm^2)
 @named leak = IonChannel(Leak, max_g = 0.3mS/cm^2)
+
 channels = [NaV, Kdr, leak];
-reversals = Equilibria([Na   =>  50.0mV, K    => -77.0mV, Leak => -54.4mV])
+reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
 @named Iₑ = IonCurrent(NonIonic)
-@named I_holding = IonCurrent(NonIonic, 5000pA, dynamic = false)
-holding_current = Iₑ ~ I_holding 
+@named I_hold = IonCurrent(NonIonic, 5000pA, dynamic = false)
+holding_current = Iₑ ~ I_hold
+
 geo = Cylinder(radius = 25µm, height = 400µm)
 
 dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals; geometry = geo, stimuli = [holding_current]);
@@ -53,7 +55,7 @@ EGlut = Equilibrium(Cation, 0mV, name = :Glut)
                parameters(Glut)]) == [2,3,1]
 
 topology = NetworkTopology([neuron1, neuron2], [Glut]);
-Conductor.add_synapse!(topology, neuron1, neuron2, Glut)
+topology[neuron1, neuron2] = Glut
 reversal_map = Dict([Glut => EGlut])
 
 @named network = NeuronalNetworkSystem(topology, reversal_map)
