@@ -41,28 +41,25 @@ alphamss = ((4.0exp(-3.6111111111111107 - (0.05555555555555555Vₘ)) +
 channels = [NaV, Kdr, leak]
 @test [length(equations(x)) for x in channels] == [3,2,1]
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
-@named Iₑ = IonCurrent(NonIonic)
-@named I_rest = IonCurrent(NonIonic, 0.0µA, dynamic = false)
-@named I_step = IonCurrent(NonIonic, 400.0pA, dynamic = false)
-@parameters tstart = 100.0 [unit=ms] tstop = 200.0 [unit=ms]
-electrode_pulse = Iₑ ~ ifelse((t > tstart) & (t < tstop), I_step, I_rest)
+
+@named Iₑ = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
 
 dynamics = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Sphere(radius = 20µm),
-                         stimuli = [electrode_pulse])
+                         stimuli = [Iₑ])
 
 @named neuron = Compartment(dynamics)
 
 @test length.([equations(neuron),
                states(neuron),
-               parameters(neuron)]) == [13,13,12]
+               parameters(neuron)]) == [13,13,8]
 
 time = 300.
 sim_sys = Simulation(neuron, time = time*ms, return_system = true)
 
 @test length.([equations(sim_sys),
                states(sim_sys),
-               parameters(sim_sys)]) == [4,4,12]
+               parameters(sim_sys)]) == [4,4,8]
 
 expect_syms = [:Vₘ, :NaV₊m, :NaV₊h, :Kdr₊n]
 @test all(x -> hasproperty(sim_sys, x), expect_syms)

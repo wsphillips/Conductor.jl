@@ -31,13 +31,11 @@ kdr_kinetics = [
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
-@named Iₑ = IonCurrent(NonIonic)
-@named I_hold = IonCurrent(NonIonic, 5000pA, dynamic = false)
-holding_current = Iₑ ~ I_hold
+@named Iₑ = Bias(5000pA)
 
 geo = Cylinder(radius = 25µm, height = 400µm)
 
-dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals; geometry = geo, stimuli = [holding_current]);
+dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals; geometry = geo, stimuli = [Iₑ]);
 dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals; geometry = geo);
 @named neuron1 = Compartment(dynamics_1)
 @named neuron2 = Compartment(dynamics_2)
@@ -62,7 +60,7 @@ reversal_map = Dict([Glut => EGlut])
 
 @test length.([equations(network),
                states(network),
-               parameters(network)]) == [29,29,19]
+               parameters(network)]) == [28,28,19]
 
 ttot = 250.
 simul_sys = Simulation(network, time = ttot*ms, return_system = true)

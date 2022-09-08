@@ -6,22 +6,17 @@ include(joinpath(@__DIR__, "pinsky_setup.jl"))
 sim_time = 1500.0
 
 # Compartment holding currents
-@named I_s_holding = IonCurrent(NonIonic, -0.5µA, dynamic = false)
-@named Iₛ = IonCurrent(NonIonic, -0.5µA, dynamic = false)
-soma_holding = Iₛ ~ I_s_holding/p
-
-@named I_d_holding = IonCurrent(NonIonic, 0.0µA, dynamic = false)
-@named I_d = IonCurrent(NonIonic, 0.0µA, dynamic = false)
-dendrite_holding = I_d ~ I_d_holding/(1-p)
+@named Is_holding = Bias(-0.5µA / 0.5) # FIXME: we should be able to use 'p' parameter
+@named Id_holding = Bias(0.0µA / (1-0.5)) 
 
 soma_dynamics = HodgkinHuxley(Vₘ,
                          [NaV(30mS/cm^2),
                           Kdr(15mS/cm^2),
                           leak(0.1mS/cm^2)],
                           reversals[1:3];
-                          geometry = Unitless(0.5),
+                          geometry = Unitless(0.5), # FIXME: support 'p' parameter value
                           capacitance = capacitance,
-                          stimuli = [soma_holding]);
+                          stimuli = [Is_holding]);
 
 @named soma = Compartment(soma_dynamics)
 
@@ -33,9 +28,10 @@ dendrite_dynamics = HodgkinHuxley(Vₘ,
                              reversals[2:4],
                              geometry = Unitless(0.5),
                              capacitance = capacitance,
-                             stimuli = [dendrite_holding]);
+                             stimuli = [Id_holding]);
 
 @named dendrite = Compartment(dendrite_dynamics, extensions = [calcium_conversion])
+
 @named gc_soma = AxialConductance([Gate(SimpleGate, inv(p), name = :ps)], max_g = gc_val)
 @named gc_dendrite = AxialConductance([Gate(SimpleGate, inv(1-p), name = :pd)], max_g = gc_val)
 
