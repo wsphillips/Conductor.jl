@@ -18,7 +18,7 @@ struct HodgkinHuxley <: CompartmentForm
     "Axial (intercompartmental) conductances."
     axial_conductances::Vector{Tuple{AbstractConductanceSystem,Num}}
     "Experimental stimuli (for example, current injection)."
-    stimuli::Vector{Equation}
+    stimuli::Vector
 end
 
 # basic constructor
@@ -28,7 +28,7 @@ function HodgkinHuxley(
     channel_reversals;
     capacitance = 1µF/cm^2,
     geometry::Geometry = Point(),
-    stimuli::Vector{Equation} = Equation[])
+    stimuli::Vector = [])
 
     @parameters cₘ = ustrip(Float64, µF/cm^2, capacitance) [unit=µF/cm^2]
     synaptic_channels = Vector{AbstractConductanceSystem}()
@@ -123,21 +123,42 @@ function generate_currents!(gen, dynamics::HodgkinHuxley, Vₘ, aₘ)
     return currents
 end
 
-function process_stimuli!(currents, gen, dynamics::HodgkinHuxley)
+function process_stimulus!(currents, gen, stimulus::PulseTrain)
     (; eqs, dvs, ps, defs) = gen
-    for stimulus in dynamics.stimuli
-        I = only(get_variables(stimulus.lhs))
-        _vars = filter!(x -> !isequal(x,t), get_variables(stimulus.rhs))
-        foreach(x -> push!(isparameter(x) ? ps : dvs, x), _vars)
-        hasdefault(I) || push!(defs, I => stimulus.rhs)
-        if isparameter(I)
-            push!(ps, I)
-            push!(currents, -I)
-        else
-            validate(stimulus) && push!(eqs, stimulus)
-            push!(dvs, I)
-            push!(currents, -I)
-        end
+
+    I = only(get_variables(stimulus.lhs))
+    _vars = filter!(x -> !isequal(x,t), get_variables(stimulus.rhs))
+    foreach(x -> push!(isparameter(x) ? ps : dvs, x), _vars)
+    hasdefault(I) || push!(defs, I => stimulus.rhs)
+    if isparameter(I)
+        push!(ps, I)
+        push!(currents, -I)
+    else
+        validate(stimulus) && push!(eqs, stimulus)
+        push!(dvs, I)
+        push!(currents, -I)
+    end
+    return
+end
+
+# current bias stimulus
+function process_stimulus!(currents, gen, sym, stimulus::Bias{T}) where {T<:Current}
+    ps = gen.ps
+    push!(ps, sym)
+    push!(currents, -sym)
+    return
+end
+
+function process_stimulus!(currents, gen, sym, stimulus::PulseTrain{T}) where {T<:Current}
+    (; dvs, eqs) = gen
+    push!(dvs, sym)
+    push!(eqs, sym ~ current_pulses(t, stimulus))
+    push!(currents, -sym)
+end
+
+function process_stimuli!(currents, gen, dynamics::HodgkinHuxley)
+    for sym in dynamics.stimuli
+        process_stimulus!(currents, gen, sym, get_stimulus(sym))
     end
 end
 

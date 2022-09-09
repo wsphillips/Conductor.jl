@@ -101,6 +101,7 @@ export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate
 export Sphere, Cylinder, Point, Unitless, area, radius, height
 
 export HodgkinHuxley
+export Bias, PulseTrain
 
 # Metadata IDs
 struct ConductorMaxConductance end
@@ -111,6 +112,7 @@ abstract type AbstractNeuronalNetworkSystem <: AbstractTimeDependentSystem end
 
 include("util.jl")
 include("primitives.jl")
+include("stimulus.jl")
 include("gate.jl")
 include("conductance.jl")
 include("geometry.jl")

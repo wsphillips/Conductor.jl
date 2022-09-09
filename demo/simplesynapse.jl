@@ -27,13 +27,11 @@ kdr_kinetics = [
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
-@named Iₑ = IonCurrent(NonIonic)
-@named I_hold = IonCurrent(NonIonic, 5000pA, dynamic = false)
-holding_current = Iₑ ~ I_hold
+@named Iₑ = Bias(5000pA)
 
 dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
                            geometry = Cylinder(radius = 25µm, height = 400µm),
-                           stimuli = [holding_current]);
+                           stimuli = [Iₑ]);
 dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
                            geometry = Cylinder(radius = 25µm, height = 400µm));
 

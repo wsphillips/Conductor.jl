@@ -55,13 +55,11 @@ kdr_kinetics = [
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
-@named Iₑ = IonCurrent(NonIonic)
-@named I_hold = IonCurrent(NonIonic, 5000pA, dynamic = false)
-holding_current = Iₑ ~ I_hold
+@named Iₑ = Bias(5000pA)
 
 dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Cylinder(radius = 25µm, height = 400µm),
-                         stimuli = [holding_current])
+                         stimuli = [Iₑ])
 dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
                            geometry = Cylinder(radius = 25µm, height = 400µm))
 
@@ -154,9 +152,8 @@ current and use the resulting symbolic to write an equation describing what the 
 electrode current should be.
 
 ```@example gate_example; continued = true
-@named Iₑ = IonCurrent(NonIonic)
-@named I_hold = IonCurrent(NonIonic, 5000pA, dynamic = false)
-holding_current = Iₑ ~ I_hold
+@named Iₑ = Bias(5000pA)
+nothing # hide
 ```
 
 Finally, we construct our two neurons, providing the holding current stimulus to `neuron1`,
@@ -165,13 +162,14 @@ which will be our presynaptic neuron.
 ```@example gate_example
 dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Cylinder(radius = 25µm, height = 400µm),
-                         stimuli = [holding_current])
+                         stimuli = [Iₑ])
 
 dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
                            geometry = Cylinder(radius = 25µm, height = 400µm))
 
 @named neuron1 = Compartment(dynamics_1)
 @named neuron2 = Compartment(dynamics_2)
+nothing # hide
 ``` 
 For our neurons to talk to each other, we'll need a model for a synaptic conductance. This
 time we'll use a model that's presented in a different form in the literature. A model of a
@@ -213,6 +211,7 @@ add_synapse!(topology, neuron1, neuron2, Glut)
 reversal_map = Dict([Glut => EGlut])
 
 @named net = NeuronalNetworkSystem(topology, reversal_map)
+nothing # hide
 ```
 Now we're ready to run our simulation.
 
