@@ -55,13 +55,11 @@ kdr_kinetics = [
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
-@named Iₑ = IonCurrent(NonIonic)
-@named I_hold = IonCurrent(NonIonic, 5000pA, dynamic = false)
-holding_current = Iₑ ~ I_hold
+@named Iₑ = Bias(5000pA)
 
 dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Cylinder(radius = 25µm, height = 400µm),
-                         stimuli = [holding_current])
+                         stimuli = [Iₑ])
 dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
                            geometry = Cylinder(radius = 25µm, height = 400µm))
 
@@ -154,9 +152,7 @@ current and use the resulting symbolic to write an equation describing what the 
 electrode current should be.
 
 ```@example gate_example; continued = true
-@named Iₑ = IonCurrent(NonIonic)
-@named I_hold = IonCurrent(NonIonic, 5000pA, dynamic = false)
-holding_current = Iₑ ~ I_hold
+@named Iₑ = Bias(5000pA)
 ```
 
 Finally, we construct our two neurons, providing the holding current stimulus to `neuron1`,
@@ -165,7 +161,7 @@ which will be our presynaptic neuron.
 ```@example gate_example
 dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
                          geometry = Cylinder(radius = 25µm, height = 400µm),
-                         stimuli = [holding_current])
+                         stimuli = [Iₑ])
 
 dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
                            geometry = Cylinder(radius = 25µm, height = 400µm))

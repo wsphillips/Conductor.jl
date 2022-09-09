@@ -72,20 +72,16 @@ equation for an electrode current and provide it to `CompartmentSystem`:
 
 ```@example compartment_example
 import Unitful: µA, pA
-@named Iₑ = IonCurrent(NonIonic)
 
 # A 400 picoamp squarewave pulse when 100ms > t > 200ms
-@named I_rest = IonCurrent(NonIonic, 0.0µA, dynamic = false)
-@named I_step = IonCurrent(NonIonic, 400.0pA, dynamic = false)
-@parameters tstart = 100.0 [unit=ms] tstop = 200.0 [unit=ms]
-electrode_pulse = Iₑ ~ ifelse((t > tstart) & (t < tstop), I_step, I_rest)
+@named Iₑ = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
 
 stim_dynamics = HodgkinHuxley(Vₘ, channels, reversals;
                               geometry = soma_shape,
-                              stimuli = [electrode_pulse])
+                              stimuli = [Iₑ])
 
 @named neuron_stim = CompartmentSystem(stim_dynamics)
-@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,12); # hide
+@assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,8); # hide
 neuron_stim # hide
 ```
 Putting it all together, our neuron simulation now produces a train of action potentials:
