@@ -153,6 +153,7 @@ electrode current should be.
 
 ```@example gate_example; continued = true
 @named Iₑ = Bias(5000pA)
+nothing # hide
 ```
 
 Finally, we construct our two neurons, providing the holding current stimulus to `neuron1`,
