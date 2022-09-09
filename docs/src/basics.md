@@ -169,6 +169,7 @@ dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
 
 @named neuron1 = Compartment(dynamics_1)
 @named neuron2 = Compartment(dynamics_2)
+nothing # hide
 ``` 
 For our neurons to talk to each other, we'll need a model for a synaptic conductance. This
 time we'll use a model that's presented in a different form in the literature. A model of a
@@ -210,6 +211,7 @@ add_synapse!(topology, neuron1, neuron2, Glut)
 reversal_map = Dict([Glut => EGlut])
 
 @named net = NeuronalNetworkSystem(topology, reversal_map)
+nothing # hide
 ```
 Now we're ready to run our simulation.
 

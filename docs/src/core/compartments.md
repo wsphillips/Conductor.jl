@@ -82,7 +82,7 @@ stim_dynamics = HodgkinHuxley(Vₘ, channels, reversals;
 
 @named neuron_stim = CompartmentSystem(stim_dynamics)
 @assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,8); # hide
-neuron_stim # hide
+nothing # hide
 ```
 Putting it all together, our neuron simulation now produces a train of action potentials:
 
