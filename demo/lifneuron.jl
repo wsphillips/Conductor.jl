@@ -7,10 +7,31 @@ stim_dynamics = Conductor.LIF(-75.0, tau_membrane = 10.0, tau_synaptic = 10.0,
 @named stim_neuron = CompartmentSystem(stim_dynamics)
 
 sim_neuron = Simulation(stim_neuron, time = 1000ms)
-sol_neuron = solve(sim_neuron, Euler(); dt = 0.25);
+sol_neuron = solve(sim_neuron, Euler(); dt = 0.25, saveat=0.25, initialize_save=false);
+data = Array(sol_neuron(0.0:0.25:1000.0,idxs=1))
 
+function loss(p)
+    _prob = remake(sim_neuron, p=p);
+    _sol = solve(_prob, Euler(), dt = 0.25);
+    l = sum(abs2, Array(_sol(0.0:0.25:1000.0,idxs=1)) .- data[1,:]);
+    return l
+end
+
+ForwardDiff.gradient(loss, p0)
+
+p0 = rand(6)
+prob = remake(sim_neuron, p=p0)
 S = observed(stim_neuron)[1].lhs # hack until bug-fix in MTK
 Plots.plot(sol_neuron[stim_neuron.V] + sol_neuron[S]*(70))
+
+using SciMLSensitivity, Optimization, OptimizationOptimJL, DiffEqFlux, ForwardDiff
+
+adtype = Optimization.AutoZygote()
+optf = Optimization.OptimizationFunction((x,p)->loss(x), adtype)
+optprob = Optimization.OptimizationProblem(optf, p0)
+
+res = Optimization.solve(optprob, ADAM(0.01), maxiters = 300)
+
 
 # Network simulation, constant spiking
 n = 100 # number of neurons
