@@ -1,5 +1,5 @@
 
-using Conductor, ModelingToolkit, OrdinaryDiffEq,Graphs, SparseArrays, Plots
+using Conductor, ModelingToolkit, OrdinaryDiffEq, Graphs, SparseArrays, Plots
 import Unitful.ms
 
 stim_dynamics = Conductor.LIF(-75.0, tau_membrane = 10.0, tau_synaptic = 10.0,
@@ -14,26 +14,35 @@ data = Array(sol_neuron)[1:4000]
 function loss(p)
     _prob = remake(sim_neuron, p=p);
     _sol = solve(_prob, Euler(), dt = 0.25, saveat=0.25, save_idxs=1, sensealg = ForwardDiffSensitivity());
+
+    
+
     l = sum(abs2, Array(_sol)[1:4000] .- data);
     return l
 end
 
-ReverseDiff.gradient(loss, p0)
-ForwardDiff.gradient(loss, p0)
-p0 = rand(6)
-prob = remake(sim_neuron, p=p0)
-S = observed(stim_neuron)[1].lhs # hack until bug-fix in MTK
-Plots.plot(sol_neuron[stim_neuron.V] + sol_neuron[S]*(70))
+using SciMLSensitivity, Optimization, OptimizationOptimJL, ForwardDiff
+using OptimizationMultistartOptimization
+p0 = [0.0,0.0,-80.0,0.0,0.0,-50.0]
 
-using SciMLSensitivity, Optimization, OptimizationOptimJL, DiffEqFlux, ForwardDiff
+#ReverseDiff.gradient(loss, p0)
+#ForwardDiff.gradient(loss, p0)
+#prob = remake(sim_neuron, p=p0)
+#S = observed(stim_neuron)[1].lhs # hack until bug-fix in MTK
+#Plots.plot(sol_neuron[stim_neuron.V] + sol_neuron[S]*(70))
 
 adtype = Optimization.AutoForwardDiff()
 optf = Optimization.OptimizationFunction((x,p)->loss(x), adtype)
-optprob = Optimization.OptimizationProblem(optf, p0)
+prob = Optimization.OptimizationProblem(optf, p0, lb = [0.0,0.0,-100.0, 0.0, 0.0, -100.0],
+                                                  ub = [0.01,1000.0,100.0,1000.0,1000.0,100.0])
 
-res = Optimization.solve(optprob, ADAM(0.1), maxiters = 300000)
+callback = function (p,l,pred) #callback function to observe training
+    display(l)
+    #plot(solve(remake(sim_neuron, p=p), Euler(), dt=0.25)) |> display
+    return false # Tell it to not halt the optimization. If return true, then optimization stops
+end
 
-
+sol = solve(prob, MultistartOptimization.TikTak(1000), LBFGS(), maxiters=50000)
 # Network simulation, constant spiking
 n = 100 # number of neurons
 w = 400.0 # synaptic weight (homogenous)
