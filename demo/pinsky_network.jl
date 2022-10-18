@@ -1,5 +1,4 @@
 
-
 using LinearAlgebra, OrdinaryDiffEq
 LinearAlgebra.BLAS.set_num_threads(6)
 
@@ -44,10 +43,8 @@ dendrite_dynamics = HodgkinHuxley(Vₘ,
 @named gc_dendrite = AxialConductance([Gate(SimpleGate, inv(1-p), name = :pd)],
                                       max_g = gc_val)
 
-topology = Conductor.MultiCompartmentTopology([soma, dendrite]);
-
-Conductor.add_junction!(topology, soma,  dendrite, (gc_soma, gc_dendrite))
-
+topology = MultiCompartmentTopology([soma, dendrite]);
+add_junction!(topology, soma,  dendrite, (gc_soma, gc_dendrite))
 @named mcneuron = MultiCompartment(topology)
 
 ###########################################################################################
@@ -88,8 +85,8 @@ soma_stim_dynamics = HodgkinHuxley(Vₘ,
                                     stimuli = [soma_stim])
 
 soma_stimulated = Compartment(soma_stim_dynamics; name=:soma)
-mcstim_topology = Conductor.MultiCompartmentTopology([soma_stimulated, dendrite]);
-Conductor.add_junction!(mcstim_topology, soma_stimulated,  dendrite, (gc_soma, gc_dendrite))
+mcstim_topology = MultiCompartmentTopology([soma_stimulated, dendrite]);
+add_junction!(mcstim_topology, soma_stimulated,  dendrite, (gc_soma, gc_dendrite))
 @named mcneuron_stim = MultiCompartment(mcstim_topology)
 
 # Need to introduce 10% gca variance as per Pinsky/Rinzel

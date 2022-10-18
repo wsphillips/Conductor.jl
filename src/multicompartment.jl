@@ -97,12 +97,12 @@ $(TYPEDSIGNATURES)
 
 Basic constructor for a `MultiCompartmentSystem`.
 """
-function MultiCompartment(topology; extensions = ODESystem[],
+function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESystem[],
                           name = Base.gensym("MultiCompartment"), defaults = Dict())
     
     compartments = topology.compartments
     
-    # As a precaution, wipe any pre-existing axial currents
+    # As a precaution, wipe any pre-existing axial currents from compartments
     for (i, comp) in enumerate(compartments)
         isempty(get_axial_conductances(comp)) && continue
         dynamics = get_dynamics(comp)
@@ -137,7 +137,7 @@ function MultiCompartment(topology; extensions = ODESystem[],
                                   topology, compartments, extensions) 
 end
 
-function MultiCompartmentSystem(x::MultiCompartmentSystem; topology = get_topology(x),
+function SciMLBase.remake(x::MultiCompartmentSystem; topology = get_topology(x),
                                 extensions = get_extensions(x), name = nameof(x),
                                 defaults = get_defaults(x))
     MultiCompartmentSystem(topology;

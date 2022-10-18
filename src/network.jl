@@ -255,7 +255,7 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
             # subcompartments can't be namespaced!
             @set! mctop.compartments = MTK.rename.(compartments[idx_range],
                                                    denamespaced(topology)[idx_range])
-            neuron = MultiCompartmentSystem(neuron, topology = mctop)
+            neuron = SciMLBase.remake(neuron; topology = mctop)
         else
             neuron = only(compartments[idx_range])
         end

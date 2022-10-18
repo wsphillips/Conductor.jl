@@ -35,8 +35,8 @@ dendrite_dynamics = HodgkinHuxley(Vₘ,
 @named gc_soma = AxialConductance([Gate(SimpleGate, inv(p), name = :ps)], max_g = gc_val)
 @named gc_dendrite = AxialConductance([Gate(SimpleGate, inv(1-p), name = :pd)], max_g = gc_val)
 
-topology = Conductor.MultiCompartmentTopology([soma, dendrite]);
-Conductor.add_junction!(topology, soma,  dendrite, (gc_soma, gc_dendrite))
+topology = MultiCompartmentTopology([soma,dendrite]);
+add_junction!(topology, soma,  dendrite, (gc_soma, gc_dendrite))
 @named mcneuron = MultiCompartment(topology);
 
 # Note: Pinsky & Rinzel originally solved using RK4 and _fixed_ dt=0.05
