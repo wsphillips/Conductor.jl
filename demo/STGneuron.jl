@@ -12,24 +12,24 @@ include(joinpath(@__DIR__, "prinz_kinetics.jl"));
 ############################################################################################
 
 # Figure 2C Bursting neuron
-channels = [NaV(100mS/cm^2),
-            CaT(0mS/cm^2),
-            CaS(4mS/cm^2),
-            KA(0mS/cm^2),
-            KCa(15mS/cm^2),
-            Kdr(50mS/cm^2),
-            H(.02mS/cm^2),
-            leak(.03mS/cm^2)]
+channels = [NaV(100mS / cm^2),
+    CaT(0mS / cm^2),
+    CaS(4mS / cm^2),
+    KA(0mS / cm^2),
+    KCa(15mS / cm^2),
+    Kdr(50mS / cm^2),
+    H(0.02mS / cm^2),
+    leak(0.03mS / cm^2)]
 
 dynamics = HodgkinHuxley(Vₘ, channels, gradients; geometry = geo);
 
 @named neuron = CompartmentSystem(dynamics, extensions = [calcium_conversion]);
 t_total = 5000.0
-sim = Simulation(neuron, time = t_total*ms)
-solution = solve(sim, Rosenbrock23(), abstol=1e-6, reltol=1e-6, saveat=0.2);
+sim = Simulation(neuron, time = t_total * ms)
+solution = solve(sim, Rosenbrock23(), abstol = 1e-6, reltol = 1e-6, saveat = 0.2);
 
 # Plot at 5kHz sampling
-fig = plot(solution(0.0:0.5:t_total; idxs=[Vₘ]); size=(1200,800));
+fig = plot(solution(0.0:0.5:t_total; idxs = [Vₘ]); size = (1200, 800));
 gui(fig)
 
 # Uncomment and eval `png(...)` to save as PNG
@@ -201,5 +201,3 @@ channels = [NaV(300mS/cm^2),
             H(.01mS/cm^2),
             leak(0mS/cm^2)]
 =#
-
-

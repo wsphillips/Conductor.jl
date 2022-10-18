@@ -3,19 +3,19 @@ using ExprTools: splitdef
 using MacroTools: postwalk, prettify, prewalk, rmlines
 using RuntimeGeneratedFunctions
 
-isivsuffix(x,sys) = endswith(string(x),"($(independent_variable(sys)))")
+isivsuffix(x, sys) = endswith(string(x), "($(independent_variable(sys)))")
 
-function chopiv(x,sys)
+function chopiv(x, sys)
     suflen = length(string(independent_variable(sys))) + 2
     return Symbol(chop(string(x), tail = suflen))
 end
 
 function rgf_lambda_expr(x)
-    argnames,cache_tag,context_tag,id = ExprTools.parameters(typeof(x))
-    return :( @RuntimeGeneratedFunction($(Expr(:quote,:(($(argnames...),)->$(x.body)) ))))
+    argnames, cache_tag, context_tag, id = ExprTools.parameters(typeof(x))
+    return :(@RuntimeGeneratedFunction($(Expr(:quote, :(($(argnames...),) -> $(x.body))))))
 end
 
-function clean_expr(ex_org, sys; rgf=false, pretty=false, name=nothing)
+function clean_expr(ex_org, sys; rgf = false, pretty = false, name = nothing)
     def = splitdef(ex_org)
     body = prewalk(rmlines, def[:body])
     for (old, new) in zip(def[:args][1:3], [:du, :u, :p])
@@ -25,8 +25,8 @@ function clean_expr(ex_org, sys; rgf=false, pretty=false, name=nothing)
         body = postwalk(x -> x isa RuntimeGeneratedFunction ? rgf_lambda_expr(x) : x, body)
         body = prewalk(rmlines, body)
     end
-    body = postwalk(x -> (x isa Symbol && isivsuffix(x,sys)) ? chopiv(x,sys) : x, body)
-    
+    body = postwalk(x -> (x isa Symbol && isivsuffix(x, sys)) ? chopiv(x, sys) : x, body)
+
     def[:args][1:3] = [:du, :u, :p]
     def[:body] = body
     if !isnothing(name)
