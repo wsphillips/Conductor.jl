@@ -18,22 +18,36 @@ function find_compsys(compartment::AbstractCompartmentSystem, topology)
     return findfirst(isequal(nameof(compartment)), nameof.(vertices(topology)))::Int 
 end
 
-function add_junction!(topology, trunk, branch, conductance::ConductanceSystem; symmetric = true) 
+function add_junction!(topology, trunk, branch, conductance::ConductanceSystem) 
     src = find_compsys(trunk, topology)
     dst = find_compsys(branch, topology)
+
     add_edge!(graph(topology), src, dst)
     e = Graphs.SimpleEdge(src, dst)
     push!(topology.conductances, e => replicate(conductance))
-    if symmetric
-        add_edge!(topology.g, dst, src)
-        e = Graphs.SimpleEdge(dst, src)
-        push!(topology.conductances, e => replicate(conductance))
-    end
+
+    add_edge!(topology.g, dst, src)
+    e = Graphs.SimpleEdge(dst, src)
+    push!(topology.conductances, e => replicate(conductance))
     return nothing
 end
 
-function add_junction!(topology, x::Pair, conductance::ConductanceSystem; symmetric = true)
-    add_junction!(topology, x.first, x.second, conductance, symmetric)
+function add_junction!(topology, trunk, branch, conductances::NTuple{2,ConductanceSystem}) 
+    src = find_compsys(trunk, topology)
+    dst = find_compsys(branch, topology)
+
+    add_edge!(graph(topology), src, dst)
+    e = Graphs.SimpleEdge(src, dst)
+    push!(topology.conductances, e => replicate(conductances[1]))
+
+    add_edge!(topology.g, dst, src)
+    e = Graphs.SimpleEdge(dst, src)
+    push!(topology.conductances, e => replicate(conductances[2]))
+    return nothing
+end
+
+function add_junction!(topology, x::Pair, conductances::NTuple{2,ConductanceSystem})
+    add_junction!(topology, x.first, x.second, conductances)
 end
 
 """
