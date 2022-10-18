@@ -46,8 +46,7 @@ dendrite_dynamics = HodgkinHuxley(Vₘ,
 
 topology = Conductor.MultiCompartmentTopology([soma, dendrite]);
 
-Conductor.add_junction!(topology, soma,  dendrite, gc_soma, symmetric = false)
-Conductor.add_junction!(topology, dendrite,  soma, gc_dendrite, symmetric = false)
+Conductor.add_junction!(topology, soma,  dendrite, (gc_soma, gc_dendrite))
 
 @named mcneuron = MultiCompartment(topology)
 
@@ -90,8 +89,7 @@ soma_stim_dynamics = HodgkinHuxley(Vₘ,
 
 soma_stimulated = Compartment(soma_stim_dynamics; name=:soma)
 mcstim_topology = Conductor.MultiCompartmentTopology([soma_stimulated, dendrite]);
-Conductor.add_junction!(mcstim_topology, soma_stimulated,  dendrite, gc_soma, symmetric = false)
-Conductor.add_junction!(mcstim_topology, dendrite,  soma_stimulated, gc_dendrite, symmetric = false)
+Conductor.add_junction!(mcstim_topology, soma_stimulated,  dendrite, (gc_soma, gc_dendrite))
 @named mcneuron_stim = MultiCompartment(mcstim_topology)
 
 # Need to introduce 10% gca variance as per Pinsky/Rinzel

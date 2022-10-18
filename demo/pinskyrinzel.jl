@@ -36,8 +36,7 @@ dendrite_dynamics = HodgkinHuxley(Vₘ,
 @named gc_dendrite = AxialConductance([Gate(SimpleGate, inv(1-p), name = :pd)], max_g = gc_val)
 
 topology = Conductor.MultiCompartmentTopology([soma, dendrite]);
-Conductor.add_junction!(topology, soma,  dendrite, gc_soma, symmetric = false)
-Conductor.add_junction!(topology, dendrite,  soma, gc_dendrite, symmetric = false)
+Conductor.add_junction!(topology, soma,  dendrite, (gc_soma, gc_dendrite))
 @named mcneuron = MultiCompartment(topology);
 
 # Note: Pinsky & Rinzel originally solved using RK4 and _fixed_ dt=0.05
@@ -61,9 +60,9 @@ import Conductor: NMDA, AMPA, HeavisideSum
                  max_s = 0mS, aggregate = true)
 
 # To simulate constant NMDA activation, we make a fake suprathreshold cell
-dumb_Eleak = EquilibriumPotential(Leak, 20mV)
-dummy_dynamics = HodgkinHuxley(Vₘ, [leak(1mS/cm^2)], [dumb_Eleak])
-@named dummy = Compartment(dummy_dynamics)
+artificial_Eleak = EquilibriumPotential(Leak, 20mV)
+artificial_dynamics = HodgkinHuxley(Vₘ, [leak(1mS/cm^2)], [artificial_Eleak])
+@named dummy = Compartment(artificial_dynamics)
 
 ESyn = EquilibriumPotential(NMDA, 60mV, name = :syn)
 topology = NetworkTopology([dummy, mcneuron], [NMDAChan(2µS)]);
