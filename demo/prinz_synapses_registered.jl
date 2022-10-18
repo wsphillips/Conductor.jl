@@ -1,9 +1,9 @@
 import Conductor: Cholinergic, Glutamatergic
 # Synaptic kinetics
 Vₓ = ExtrinsicPotential()
-syn∞(V) = 1/(1 + exp((-35 - V)/5))
-Glut₊τsyn(V) = (1 - syn∞(V))/(1/40)
-Chol₊τsyn(V) = (1 - syn∞(V))/(1/100)
+syn∞(V) = 1 / (1 + exp((-35 - V) / 5))
+Glut₊τsyn(V) = (1 - syn∞(V)) / (1 / 40)
+Chol₊τsyn(V) = (1 - syn∞(V)) / (1 / 100)
 
 @register_symbolic syn∞(V)
 @register_symbolic Glut₊τsyn(V)
@@ -21,5 +21,3 @@ EChol = Equilibrium(Cholinergic, -80mV, name = :Chol) # Leak as alias for non-sp
 
 @named Glut = SynapticChannel(Glutamatergic, [glut_kinetics]);
 @named Chol = SynapticChannel(Cholinergic, [chol_kinetics]);
-
-

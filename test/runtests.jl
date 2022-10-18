@@ -11,4 +11,3 @@ end
 addtests("hodgkinhuxley.jl")
 addtests("prinzneuron.jl")
 addtests("simplesynapse.jl")
-

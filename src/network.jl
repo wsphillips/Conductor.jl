@@ -1,24 +1,24 @@
 
 struct NeuronalMultigraph
-    multigraph::Dict{Any, SparseMatrixCSC{Num,Int64}}
+    multigraph::Dict{Any, SparseMatrixCSC{Num, Int64}}
     neuron_map::Dict{AbstractCompartmentSystem, UnitRange{Int64}}
     denamespaced::Vector{Symbol}
 end
 
-struct NetworkTopology{T,F}
+struct NetworkTopology{T, F}
     graph::T
     compartments::Vector{CompartmentSystem{F}}
 end
 
-function NetworkTopology(neurons::Vector{CompartmentSystem{LIF}}, graph = SimpleDiGraph(lenght(neurons)); default_weight = 1.0)
+function NetworkTopology(neurons::Vector{CompartmentSystem{LIF}},
+                         graph = SimpleDiGraph(lenght(neurons)); default_weight = 1.0)
     n = length(neurons)
-    graph = adjacency_matrix(graph)*default_weight
+    graph = adjacency_matrix(graph) * default_weight
     NetworkTopology(graph, neurons)
 end
 
 function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
                          synaptic_models::Vector{<:AbstractConductanceSystem})
-
     neuron_map = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
     start = 1
     all_compartments = []
@@ -41,8 +41,8 @@ function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
 end
 
 function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartmentSystem},
-        synaptic_model::AbstractConductanceSystem, default_weight = get_gbar(synaptic_model))
-    
+                         synaptic_model::AbstractConductanceSystem,
+                         default_weight = get_gbar(synaptic_model))
     neuron_map = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
     start = 1
     all_compartments = CompartmentSystem[]
@@ -60,19 +60,23 @@ function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartment
 
     n = length(all_compartments)
     @assert length(vertices(g)) == length(neurons)
-    multigraph = Dict(synaptic_model => adjacency_matrix(g)*default_weight)
+    multigraph = Dict(synaptic_model => adjacency_matrix(g) * default_weight)
     graph = NeuronalMultigraph(multigraph, neuron_map, denamespaced)
 
     return NetworkTopology(graph, all_compartments)
 end
 
-function neurons(topology::NetworkTopology{NeuronalMultigraph,<:CompartmentForm})
+function neurons(topology::NetworkTopology{NeuronalMultigraph, <:CompartmentForm})
     [keys(neuron_map(topology))...]
 end
 
-denamespaced(topology::NetworkTopology{NeuronalMultigraph}) = getfield(topology,:graph).denamespaced
-neuron_map(topology::NetworkTopology{NeuronalMultigraph}) = getfield(topology,:graph).neuron_map
-neurons(topology::NetworkTopology{T,F}) where {T,F} = vertices(topology)
+function denamespaced(topology::NetworkTopology{NeuronalMultigraph})
+    getfield(topology, :graph).denamespaced
+end
+function neuron_map(topology::NetworkTopology{NeuronalMultigraph})
+    getfield(topology, :graph).neuron_map
+end
+neurons(topology::NetworkTopology{T, F}) where {T, F} = vertices(topology)
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :graph)
 graph(topology::NetworkTopology{NeuronalMultigraph}) = getfield(topology, :graph).multigraph
@@ -83,7 +87,8 @@ function add_synapse!(topology, pre, post, synaptic_model::ConductanceSystem)
     g[src, dst] = get_gbar(synaptic_model)
 end
 
-function add_synapse!(topology, pre::AbstractCompartmentSystem, post::AbstractCompartmentSystem, weight::Real)
+function add_synapse!(topology, pre::AbstractCompartmentSystem,
+                      post::AbstractCompartmentSystem, weight::Real)
     src = find_compsys(pre, topology)
     dst = find_compsys(post, topology)
     graph(topology)[src, dst] = weight
@@ -97,26 +102,29 @@ function remove_synapse!(topology, pre, post, synaptic_model)
     src = find_compsys(pre, topology)
     dst = find_compsys(post, topology)
     g = graph(topology)[synaptic_model]
-    g[src,dst] = zero(Num)
+    g[src, dst] = zero(Num)
     dropzeros!(g)
 end
 
-function add_layer!(topology, synaptic_model::ConductanceSystem, g = SimpleDiGraph(length(vertices(topology))), default_weight = get_gbar(synaptic_model))
-    push!(graph(topology), synaptic_model => adjacency_matrix(g)*default_weight)
+function add_layer!(topology, synaptic_model::ConductanceSystem,
+                    g = SimpleDiGraph(length(vertices(topology))),
+                    default_weight = get_gbar(synaptic_model))
+    push!(graph(topology), synaptic_model => adjacency_matrix(g) * default_weight)
 end
 
 Base.eltype(nt::NetworkTopology) = AbstractCompartmentSystem
 Base.length(nt::NetworkTopology) = length(neurons(nt))
 
-function Base.iterate(nt::NetworkTopology, state=1)
+function Base.iterate(nt::NetworkTopology, state = 1)
     state > length(nt) && return nothing
-    return (neurons(nt)[state], state+1)
+    return (neurons(nt)[state], state + 1)
 end
 
-function Base.iterate(rev_nt::Iterators.Reverse{NetworkTopology}, state=length(rev_nt.itr))
+function Base.iterate(rev_nt::Iterators.Reverse{NetworkTopology},
+                      state = length(rev_nt.itr))
     state < 1 && return nothing
     nt = rev_nt.itr
-    return (neurons(nt)[state], state-1)
+    return (neurons(nt)[state], state - 1)
 end
 
 function Base.getindex(nt::NetworkTopology, i)
@@ -130,7 +138,9 @@ function Base.setindex!(nt::NetworkTopology, g::SimpleDiGraph, cond::Conductance
     add_layer!(nt, cond, g)
 end
 
-function Base.setindex!(nt::NetworkTopology, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
+function Base.setindex!(nt::NetworkTopology, cond::ConductanceSystem, pre::T1,
+                        post::T2) where {T1 <: AbstractCompartmentSystem,
+                                         T2 <: AbstractCompartmentSystem}
     add_synapse!(nt, pre, post, cond)
 end
 
@@ -167,7 +177,8 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     """
     extensions::Vector{ODESystem}
     function NeuronalNetworkSystem(eqs, iv, states, ps, observed, name, systems, defaults,
-                                   continuous_events, discrete_events, topology, reversal_map,
+                                   continuous_events, discrete_events, topology,
+                                   reversal_map,
                                    extensions; checks = false)
         if checks
             # placeholder
@@ -184,9 +195,9 @@ Basic constructor for a `NeuronalNetworkSystem`.
 
 """
 function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reversal_map,
-    extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
-    defaults = Dict(), name::Symbol = Base.gensym(:Network)) where T
-    
+                               extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
+                               defaults = Dict(),
+                               name::Symbol = Base.gensym(:Network)) where {T}
     reversal_map = reversal_map isa AbstractDict ? reversal_map : Dict(reversal_map)
     eqs, dvs, ps, observed = Equation[], Num[], Num[], Equation[]
     ccbs, dcbs = MTK.SymbolicContinuousCallback[], MTK.SymbolicDiscreteCallback[]
@@ -208,11 +219,12 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                              reversal_map[synaptic_class])
             if isaggregate(synaptic_class)
                 new_synaptic_class = ConductanceSystem(synaptic_class,
-                                                       subscriptions = pre_compartments) 
+                                                       subscriptions = pre_compartments)
                 post_dynamics = get_dynamics(post_compartment)
                 new_dynamics = @set post_dynamics.synaptic_channels = [new_synaptic_class]
                 @set! new_dynamics.synaptic_reversals = new_revs
-                post_compartment = SciMLBase.remake(post_compartment, dynamics = new_dynamics)
+                post_compartment = SciMLBase.remake(post_compartment,
+                                                    dynamics = new_dynamics)
                 vars = MTK.namespace_variables(getproperty(post_compartment,
                                                            nameof(new_synaptic_class)))
                 Vxs = find_voltage(vars, isextrinsic)
@@ -222,7 +234,7 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                 end
             else
                 class_copies = [] # clone the synapse model for each presynaptic compartment
-                for (x,y) in zip(pre_compartments, weights)
+                for (x, y) in zip(pre_compartments, weights)
                     class_copy = ConductanceSystem(synaptic_class, subscriptions = [x],
                                                    gbar = y,
                                                    name = namegen(nameof(synaptic_class)),
@@ -232,10 +244,12 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                 post_dynamics = get_dynamics(post_compartment)
                 new_dynamics = @set post_dynamics.synaptic_channels = class_copies
                 @set! new_dynamics.synaptic_reversals = new_revs
-                post_compartment = SciMLBase.remake(post_compartment, dynamics = new_dynamics)
+                post_compartment = SciMLBase.remake(post_compartment,
+                                                    dynamics = new_dynamics)
                 for (class_copy, pre) in zip(class_copies, pre_compartments)
-                    vars = MTK.namespace_variables(getproperty(post_compartment, nameof(class_copy)))
-                    Vx = find_voltage(vars, isextrinsic) 
+                    vars = MTK.namespace_variables(getproperty(post_compartment,
+                                                               nameof(class_copy)))
+                    Vx = find_voltage(vars, isextrinsic)
                     push!(voltage_fwds, pre.Vₘ ~ Vx)
                     push!(defaults, Vx => pre.Vₘ)
                 end
@@ -263,29 +277,30 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
     end
     systems::Vector{AbstractTimeDependentSystem} = union(extensions, collect(keys(newmap)))
     return NeuronalNetworkSystem(eqs, t, dvs, ps, observed, name, systems, defaults,
-                                 ccbs, dcbs, topology, reversal_map, extensions; checks = false)
+                                 ccbs, dcbs, topology, reversal_map, extensions;
+                                 checks = false)
 end
 
-function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF}, 
-        extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
-        defaults = Dict(), name::Symbol = Base.gensym(:Network)) where T
-
-    g = graph(topology) 
+function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF},
+                               extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
+                               defaults = Dict(),
+                               name::Symbol = Base.gensym(:Network)) where {T}
+    g = graph(topology)
     neurons = vertices(topology)
     n = length(neurons)
-    @parameters W[1:n,1:n] = g 
+    @parameters W[1:n, 1:n] = g
     #@variables (Syn_inp(t))[1:n] = zeros(n)
-    reversal_map = Dict() 
+    reversal_map = Dict()
     gen = GeneratedCollections(systems = union(neurons, extensions),
                                ps = Set(scalarize(W)))
 
     (; eqs, dvs, ps, systems, observed) = gen
-    
+
     affect_eqs = Equation[]
     spike_checks = [neuron.V >= neuron.V_th for neuron in neurons]
 
     for (i, neuron) in enumerate(neurons)
-        push!(affect_eqs, neuron.I ~ neuron.I + sum(scalarize(W[:,i] .* spike_checks)))
+        push!(affect_eqs, neuron.I ~ neuron.I + sum(scalarize(W[:, i] .* spike_checks)))
     end
     # equations _are_ order-dependent here. We can do this more nicely with a generic func affect 
     for (i, neuron) in enumerate(neurons)
@@ -306,15 +321,16 @@ get_topology(x::AbstractNeuronalNetworkSystem) = getfield(x, :topology)
 Base.eltype(ns::NeuronalNetworkSystem) = AbstractCompartmentSystem
 Base.length(ns::NeuronalNetworkSystem) = length(neurons(get_topology(ns)))
 
-function Base.iterate(ns::NeuronalNetworkSystem, state=1)
+function Base.iterate(ns::NeuronalNetworkSystem, state = 1)
     state > length(ns) && return nothing
-    return (neurons(get_topology(ns))[state], state+1)
+    return (neurons(get_topology(ns))[state], state + 1)
 end
 
-function Base.iterate(rev_ns::Iterators.Reverse{NeuronalNetworkSystem}, state=length(rev_ns.itr))
+function Base.iterate(rev_ns::Iterators.Reverse{NeuronalNetworkSystem},
+                      state = length(rev_ns.itr))
     state < 1 && return nothing
     ns = rev_ns.itr
-    return (neurons(get_topology(ns))[state], state-1)
+    return (neurons(get_topology(ns))[state], state - 1)
 end
 
 function Base.getindex(ns::NeuronalNetworkSystem, i)
@@ -333,12 +349,13 @@ Base.lastindex(ns::NeuronalNetworkSystem) = length(get_topology(ns))
 
 function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     dvs = get_states(nnsys)
-    ps  = get_ps(nnsys)
+    ps = get_ps(nnsys)
     eqs = get_eqs(nnsys)
     defs = get_defaults(nnsys)
     ccbs = get_continuous_events(nnsys)
     dcbs = get_discrete_events(nnsys)
     syss = convert.(ODESystem, get_systems(nnsys))
-    return ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(nnsys), systems = syss, discrete_events = dcbs, continuous_events = ccbs, checks = CheckComponents)
+    return ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(nnsys), systems = syss,
+                     discrete_events = dcbs, continuous_events = ccbs,
+                     checks = CheckComponents)
 end
-
