@@ -9,7 +9,7 @@ struct GeneratedCollections
 end
 
 function GeneratedCollections(; eqs = Equation[], systems = AbstractTimeDependentSystem[],
-                              observed = Equation[], dvs = Set{Num}(), ps  = Set{Num}(),
+                              observed = Equation[], dvs = Set{Num}(), ps = Set{Num}(),
                               defs = Dict())
     return GeneratedCollections(eqs, dvs, ps, systems, observed, defs)
 end
@@ -18,7 +18,7 @@ import Symbolics: unwrap, symtype, getindex_posthook
 
 namegen(name) = Symbol(filter(x -> x !== '#', String(Base.gensym(name))))
 
-function replicate(x::Union{AbstractCompartmentSystem,AbstractConductanceSystem})
+function replicate(x::Union{AbstractCompartmentSystem, AbstractConductanceSystem})
     rootname = ModelingToolkit.getname(x)
     new = deepcopy(x)
     return ModelingToolkit.rename(new, namegen(rootname))
@@ -40,11 +40,11 @@ ModelingToolkit.get_unit(op::typeof(heaviside), args) = ms^-1
 function set_symarray_metadata(x, ctx, val)
     if symtype(x) <: AbstractArray
         if val isa AbstractArray
-            getindex_posthook(x) do r,x,i...
+            getindex_posthook(x) do r, x, i...
                 set_symarray_metadata(r, ctx, val[i...])
             end
         else
-            getindex_posthook(x) do r,x,i...
+            getindex_posthook(x) do r, x, i...
                 set_symarray_metadata(r, ctx, val)
             end
         end
@@ -52,4 +52,3 @@ function set_symarray_metadata(x, ctx, val)
         setmetadata(x, ctx, val)
     end
 end
-

@@ -13,7 +13,7 @@ function Base.setproperty!(value::AbstractGatingVariable, name::Symbol, x)
 end
 
 function Base.propertynames(value::AbstractGatingVariable, private::Bool = false)
-    props = collect(keys(getfield(value, :props))) 
+    props = collect(keys(getfield(value, :props)))
     if private
         union!(props, fieldnames(typeof(value)))
     end
@@ -41,19 +41,19 @@ function Conductor.get_eqs(g::Gate{MyNewGate}, comp::CompartmentSystem)
 end
 ```
 """
-abstract type GateVarForm end 
+abstract type GateVarForm end
 
-struct AlphaBeta <: GateVarForm end 
+struct AlphaBeta <: GateVarForm end
 struct SteadyStateTau <: GateVarForm end
 struct SimpleGate <: GateVarForm end
 struct ParameterGate <: GateVarForm end
 struct HeavisideSum <: GateVarForm end
 
-struct Gate{T<:GateVarForm} <: AbstractGatingVariable
+struct Gate{T <: GateVarForm} <: AbstractGatingVariable
     form::Type{T}
     output::Num
     eqs::Vector{Equation}
-    props::Dict{Symbol,Any}
+    props::Dict{Symbol, Any}
 end
 
 """
@@ -78,7 +78,8 @@ julia> (g.prop1, g.prop2)
 ("foo", 62)
 ```
 """
-function Gate{T}(form::Type{T}, output::Num, eqs::Vector{Equation}; kwargs...) where T <: GateVarForm
+function Gate{T}(form::Type{T}, output::Num, eqs::Vector{Equation};
+                 kwargs...) where {T <: GateVarForm}
     return Gate{T}(form, output, eqs, kwargs)
 end
 
@@ -96,9 +97,9 @@ kinetics.
 See also: [`get_eqs`](@ref).
 """
 function Gate(form::Type{AlphaBeta}, α, β; name = Base.gensym("GateVar"), kwargs...)
-    x∞ = α/(α + β)
-    x = only(@variables $name(t) = x∞ [unit=NoUnits])
-    eqs = [D(x) ~ (α*(1 - x) - β*x)]
+    x∞ = α / (α + β)
+    x = only(@variables $name(t)=x∞ [unit = NoUnits])
+    eqs = [D(x) ~ (α * (1 - x) - β * x)]
     return Gate{AlphaBeta}(form, x, eqs; ss = x∞, kwargs...)
 end
 
@@ -111,15 +112,15 @@ as descriptors for its kinetics.
 See also: [`get_eqs`](@ref).
 """
 function Gate(form::Type{SteadyStateTau}, x∞, τₓ; name = Base.gensym("GateVar"), kwargs...)
-    x = only(@variables $name(t) = x∞ [unit=NoUnits])
-    eqs = [D(x) ~ inv(τₓ)*(x∞ - x)]
+    x = only(@variables $name(t)=x∞ [unit = NoUnits])
+    eqs = [D(x) ~ inv(τₓ) * (x∞ - x)]
     return Gate{SteadyStateTau}(form, x, eqs; ss = x∞, kwargs...)
 end
 
 function Base.convert(::Type{Gate{SimpleGate}},
-                      x::Union{Gate{AlphaBeta},Gate{SteadyStateTau}})
+                      x::Union{Gate{AlphaBeta}, Gate{SteadyStateTau}})
     return Gate(SimpleGate, steadystate(x), p = exponent(x),
-                name = Symbolics.tosymbol(output(x), escape=false))
+                name = Symbolics.tosymbol(output(x), escape = false))
 end
 
 """
@@ -127,8 +128,9 @@ $(TYPEDSIGNATURES)
 
 Accepts any symbolic expression as an explicit definition of the gate dynamics.
 """
-function Gate(form::Type{SimpleGate}, rhs; default = rhs, name = Base.gensym("GateVar"), kwargs...)
-    x = only(@variables $name(t) = default [unit=NoUnits])
+function Gate(form::Type{SimpleGate}, rhs; default = rhs, name = Base.gensym("GateVar"),
+              kwargs...)
+    x = only(@variables $name(t)=default [unit = NoUnits])
     return Gate{SimpleGate}(form, x, [x ~ rhs]; kwargs...) # rhs must return NoUnits
 end
 
@@ -138,7 +140,7 @@ $(TYPEDSIGNATURES)
 A static parameter gate with initial value, `val`.
 """
 function Gate(form::Type{ParameterGate}, val; name = Base.gensym("GateVar"), kwargs...)
-    x = only(@parameters $name = val [unit=NoUnits])
+    x = only(@parameters $name=val [unit = NoUnits])
     return Gate{ParameterGate}(form, x, Equation[]; val = val, kwargs...)
 end
 
@@ -153,17 +155,17 @@ The optional argument `saturation` sets a upper limit on the value of this gate.
 See also: [`get_eqs`](@ref).
 """
 function Gate(form::Type{HeavisideSum}; threshold = 0mV, decay_rate = 150ms,
-              name = Base.gensym("GateVar"), kwargs...) 
-    x = only(@variables $name(t) = 0.0 [unit=NoUnits]) # synaptically activated gate inits to 0.0
+              name = Base.gensym("GateVar"), kwargs...)
+    x = only(@variables $name(t)=0.0 [unit = NoUnits]) # synaptically activated gate inits to 0.0
     thold_val = ustrip(mV, threshold)
-    thold_name = Symbol(name,"₊thold")
-    decay_name = Symbol(name,"₊decay")
+    thold_name = Symbol(name, "₊thold")
+    decay_name = Symbol(name, "₊decay")
     decay_val = ustrip(ms, decay_rate)
-    thold = only(@parameters $thold_name = thold_val [unit=mV])
-    decay = only(@parameters $decay_name = decay_val [unit=ms])
+    thold = only(@parameters $thold_name=thold_val [unit = mV])
+    decay = only(@parameters $decay_name=decay_val [unit = ms])
     return Gate{HeavisideSum}(form, x, Equation[]; threshold = thold, decay = decay,
                               kwargs...)
-end 
+end
 
 """
     get_eqs(var::Gate{HeavisideSum}, chan)
@@ -183,12 +185,11 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
     sat_val = get(var, :saturation, nothing)
     if isnothing(sat_val)
-        return [D(out) ~ sum(Vₓ .>= thold) .- (out/decay)]
+        return [D(out) ~ sum(Vₓ .>= thold) .- (out / decay)]
     else
-        sat_sym = Symbol(getname(out),"₊sat")
-        sat = only(@parameters $sat_sym = sat_val [unit=NoUnits])
+        sat_sym = Symbol(getname(out), "₊sat")
+        sat = only(@parameters $sat_sym=sat_val [unit = NoUnits])
         # out cannot continue to grow past the saturation limit
-        return [D(out) ~ (out < sat)*sum(Vₓ .>= thold) .- (out/decay)]
+        return [D(out) ~ (out < sat) * sum(Vₓ .>= thold) .- (out / decay)]
     end
 end
-
