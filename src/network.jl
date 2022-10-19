@@ -73,13 +73,16 @@ end
 function denamespaced(topology::NetworkTopology{NeuronalMultigraph})
     getfield(topology, :graph).denamespaced
 end
+
 function neuron_map(topology::NetworkTopology{NeuronalMultigraph})
     getfield(topology, :graph).neuron_map
 end
+
 neurons(topology::NetworkTopology{T, F}) where {T, F} = vertices(topology)
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :graph)
 graph(topology::NetworkTopology{NeuronalMultigraph}) = getfield(topology, :graph).multigraph
+
 function add_synapse!(topology, pre, post, synaptic_model::ConductanceSystem)
     src = find_compsys(pre, topology)
     dst = find_compsys(post, topology)
@@ -339,13 +342,6 @@ end
 
 Base.firstindex(ns::NeuronalNetworkSystem) = 1
 Base.lastindex(ns::NeuronalNetworkSystem) = length(get_topology(ns))
-
-#function Base.setindex!(ns::NeuronalNetworkSystem, g::SimpleDiGraph, cond::ConductanceSystem)
-#    add_layer!(ns, cond, g)
-#end
-#function Base.setindex!(ns::NeuronalNetworkSystem, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
-#    add_synapse!(ns, pre, post, cond)
-#end
 
 function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     dvs = get_states(nnsys)

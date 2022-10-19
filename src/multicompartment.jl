@@ -87,7 +87,6 @@ struct MultiCompartmentSystem <: AbstractCompartmentSystem
         end
         mc = new(eqs, iv, states, ps, observed, name, systems, defaults,
                  topology, compartments, extensions)
-        foreach(x -> setparent!(x, mc), compartments)
         return mc
     end
 end
@@ -161,8 +160,6 @@ function compartments(x::AbstractCompartmentSystem; namespace = true)
     end
     return compartment_systems
 end
-
-hasparent(x::MultiCompartmentSystem) = false
 
 Base.eltype(::MultiCompartmentSystem) = CompartmentSystem
 Base.length(M::MultiCompartmentSystem) = length(get_compartments(M))
