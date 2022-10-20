@@ -5,7 +5,7 @@ struct Synapse{T} <: AbstractSynapse
     system::T
     metadata::Dict{Symbol,Any}
 end
-
+#TODO: relax these fields to a current ?? 
 function Synapse(x::ConductanceSystem, rev::Num)
     metadata = Dict([:reversal => rev])
     return Synapse{typeof(x)}(x, metadata)
@@ -45,7 +45,7 @@ function compartments(x::Arborization)
 end
 
 function compartments!(out::Vector, x::Arborization)
-    isnothing(x.parent) || push!(out, x.parent.system))
+    isnothing(x.parent) || push!(out, x.parent.system)
     append!(out, getproperty.(x.children, :system))
     return
 end
@@ -111,10 +111,10 @@ struct CompartmentSystem{T <: AbstractDynamics} <: AbstractCompartmentSystem
     stimuli::Vector
     "Morphological geometry of the compartment."
     geometry::Geometry
-    function CompartmentSystem(voltage, dynamics::T, capcitance, eqs, iv, states, ps,
+    function CompartmentSystem(voltage, dynamics::T, capacitance, eqs, iv, states, ps,
                                observed, name, systems, defaults, extensions, synapses,
                                arbor, stimuli, geometry;
-                               checks = false) where {T <: CompartmentForm}
+                               checks = false) where {T <: AbstractDynamics}
         if checks
             foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"),
                     channel_reversals)
@@ -161,8 +161,8 @@ function process_stimulus!(currents, gen, sym, stimulus::PulseTrain{T}) where {T
     push!(currents, -sym)
 end
 
-function process_stimuli!(currents, gen, dynamics::HodgkinHuxley)
-    for sym in dynamics.stimuli
+function process_stimuli!(currents, gen, stimuli)
+    for sym in stimuli
         process_stimulus!(currents, gen, sym, get_stimulus(sym))
     end
 end
@@ -181,8 +181,8 @@ function resolve_channel_inputs!(gen, dynamics::HodgkinHuxley, synapses)
     return all_inputs
 end
 
-function get_required_states!(gen, dynamics::HodgkinHuxley)
-    required_states = resolve_channel_inputs!(gen, dynamics)
+function get_required_states!(gen, dynamics::HodgkinHuxley, synapses)
+    required_states = resolve_channel_inputs!(gen, dynamics, synapses)
     internally_modified = Set{Num}()
     foreach(x -> get_variables!(internally_modified, x.lhs), gen.eqs)
     union!(required_states, setdiff(gen.dvs, internally_modified))
@@ -223,13 +223,22 @@ end
 - `stimuli::Vector{Equation}`: 
 - `name::Symbol`: Name of the system.
 """
-function CompartmentSystem(dynamics; defaults = Dict(),
+function CompartmentSystem(Vₘ::Num, dynamics::T; defaults = Dict(),
+                           capacitance = 1µF/cm^2,
+                           geometry::Geometry = Point(),
+                           stimuli::Vector = [],
                            extensions::Vector{ODESystem} = ODESystem[],
-                           name::Symbol = Base.gensym("Compartment"))
-    return CompartmentSystem(dynamics, defaults, extensions, name)
+                           name::Symbol = Base.gensym("Compartment"),
+                          ) where {T <: AbstractDynamics}
+
+    @parameters cₘ=ustrip(Float64, µF / cm^2, capacitance) [unit = µF / cm^2]
+    arbor = Arborization()
+    synapses = []
+    return CompartmentSystem(Vₘ, dynamics, synapses, arbor, cₘ, geometry, stimuli, defaults,
+                             extensions, name)
 end
 
-struct LIF <: CompartmentForm
+struct LIF <: AbstractDynamics
     V::Num
     τ_mem::Num
     τ_syn::Num
@@ -287,55 +296,63 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF};
                      observed = obs, checks = CheckComponents)
 end
 
-function CompartmentSystem(dynamics::HodgkinHuxley,
-                           synapses,
-                           arbor,
-                           capacitance = 1µF / cm^2,
-                           geometry::Geometry = Point(),
-                           stimuli::Vector = []; defaults, extensions, name)
+function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses, arbor, cₘ,
+                           geometry::Geometry, stimuli::Vector, defaults, extensions, name)
 
-    (; channels, synaptic_channels, axial_conductances, stimuli) = dynamics
-    @parameters aₘ=area(dynamics.geometry) [unit = cm^2]
-    Vₘ, cₘ = dynamics.voltage, dynamics.capacitance
+    membrane_channels = dynamics.channels
+    synaptic_channels = conductance.(synapses)
+    axial_conductances = conductances(arbor)
+    @parameters aₘ=area(geometry) [unit = cm^2]
     gen = GeneratedCollections(dvs = Set(Vₘ), ps = Set((aₘ, cₘ)),
-                               systems = union(channels, synaptic_channels,
-                                               first.(axial_conductances)))
+                               systems = union(membrane_channels, synaptic_channels,
+                                               axial_conductances))
+
     (; eqs, dvs, ps, observed, systems, defs) = gen
 
     # Compile dynamics into system equations, states, parameters, etc
-    process_reversals!(gen, dynamics)
-    currents = generate_currents!(gen, dynamics, Vₘ, aₘ)
-    process_stimuli!(currents, gen, dynamics)
+    process_reversals!(gen, dynamics, synapses, arbor)
+    currents = generate_currents!(gen, dynamics, synapses, arbor, Vₘ, aₘ)
+    process_stimuli!(currents, gen, stimuli)
+
     # Voltage equation
     eq = D(Vₘ) ~ -sum(currents) / (cₘ * aₘ)
     validate(eq) && push!(eqs, eq)
+
     # Apply extensions
-    extend_gen! = Base.Fix1(extend!, gen)
-    foreach(extend_gen!, extensions)
+    foreach(Base.Fix1(extend!,gen), extensions)
+
     # Resolve undefined states
-    required_states = get_required_states!(gen, dynamics)
+    required_states = get_required_states!(gen, dynamics, synapses)
     resolve_states!(gen, required_states)
 
     merge!(defs, defaults)
 
-    return CompartmentSystem(dynamics, eqs, t, collect(dvs), collect(ps), observed, name,
-                             systems, defs, extensions)
+    return CompartmentSystem(Vₘ, dynamics, cₘ, eqs, t, collect(dvs), collect(ps), observed,
+                             name, systems, defs, extensions, synapses, arbor, stimuli,
+                             geometry)
 end
 
 function SciMLBase.remake(sys::CompartmentSystem;
+                          Vₘ = get_voltage(sys),
                           dynamics = get_dynamics(sys),
+                          synapses = get_synapses(sys),
+                          arbor = get_arbor(sys),
+                          capacitance = get_capacitance(sys),
+                          geometry = get_geometry(sys),
+                          stimuli = get_stimuli(sys),
                           extensions = get_extensions(sys),
                           name = nameof(sys),
                           defaults = get_defaults(sys))
-    CompartmentSystem(dynamics, defaults, extensions, name)
+    CompartmentSystem(Vₘ, dynamics, synapses, arbor, capacitance, geometry, stimuli, defaults,
+                      extensions, name)
 end
 
 get_dynamics(x::AbstractCompartmentSystem) = getfield(x, :form)
 get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 
-get_geometry(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).geometry
-area(x::CompartmentSystem{HodgkinHuxley}) = only(@parameters aₘ = area(get_geometry(x)))
-capacitance(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).capacitance
+get_geometry(x::CompartmentSystem) = getfield(x, :geometry)
+area(x::CompartmentSystem) = only(@parameters aₘ = area(get_geometry(x)))
+get_capacitance(x::CompartmentSystem) = getfield(x, :capacitance)
 
 get_output(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).voltage
 get_channels(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).channels

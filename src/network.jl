@@ -66,7 +66,7 @@ function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartment
     return NetworkTopology(graph, all_compartments)
 end
 
-function neurons(topology::NetworkTopology{NeuronalMultigraph, <:CompartmentForm})
+function neurons(topology::NetworkTopology{NeuronalMultigraph, <: AbstractDynamics})
     [keys(neuron_map(topology))...]
 end
 

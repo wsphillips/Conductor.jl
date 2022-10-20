@@ -7,7 +7,7 @@ end
 
 function MultiCompartmentTopology(compartments::Vector{CompartmentSystem{T}}) where {
                                                                                      T <:
-                                                                                     CompartmentForm
+                                                                                     AbstractDynamics
                                                                                      }
     g = SimpleDiGraph(length(compartments))
     conductances = Dict{Graphs.SimpleEdge{Int}, ConductanceSystem}()
