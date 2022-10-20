@@ -35,10 +35,14 @@ import Conductor: Na, K
 
     geo = Cylinder(radius = 25µm, height = 400µm)
 
-    dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals; geometry = geo, stimuli = [Iₑ])
-    dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals; geometry = geo)
-    @named neuron1 = Compartment(dynamics_1)
-    @named neuron2 = Compartment(dynamics_2)
+    dynamics_1 = HodgkinHuxley(channels, reversals)
+    dynamics_2 = HodgkinHuxley(channels, reversals)
+
+    @named neuron1 = Compartment(Vₘ, dynamics_1;
+                                 geometry = Cylinder(radius = 25µm, height = 400µm),
+                                 stimuli = [Iₑ]);
+    @named neuron2 = Compartment(Vₘ, dynamics_2;
+                                 geometry = Cylinder(radius = 25µm, height = 400µm))
 
     # Synaptic model
     Vₓ = ExtrinsicPotential()

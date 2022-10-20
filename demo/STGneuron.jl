@@ -21,9 +21,11 @@ channels = [NaV(100mS / cm^2),
     H(0.02mS / cm^2),
     leak(0.03mS / cm^2)]
 
-dynamics = HodgkinHuxley(Vₘ, channels, gradients; geometry = geo);
+dynamics = HodgkinHuxley(channels, gradients);
 
-@named neuron = CompartmentSystem(dynamics, extensions = [calcium_conversion]);
+@named neuron = CompartmentSystem(Vₘ, dynamics;
+                                  geometry = geo,
+                                  extensions = [calcium_conversion]);
 t_total = 5000.0
 sim = Simulation(neuron, time = t_total * ms)
 solution = solve(sim, Rosenbrock23(), abstol = 1e-6, reltol = 1e-6, saveat = 0.2);

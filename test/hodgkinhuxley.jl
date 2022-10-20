@@ -45,11 +45,10 @@ using Unitful: mV, mS, cm, µm, µA, ms, pA
 
     @named Iₑ = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
 
-    dynamics = HodgkinHuxley(Vₘ, channels, reversals;
-                             geometry = Sphere(radius = 20µm),
-                             stimuli = [Iₑ])
-
-    @named neuron = Compartment(dynamics)
+    dynamics = HodgkinHuxley(channels, reversals)
+                         
+    @named neuron = Compartment(Vₘ, dynamics; geometry = Sphere(radius = 20µm),
+                                stimuli = [Iₑ])
 
     @test length.([equations(neuron),
                       states(neuron),

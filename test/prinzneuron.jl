@@ -15,9 +15,11 @@ include(normpath(@__DIR__, "..", "demo", "prinz_kinetics.jl"))
         H(0.02mS / cm^2),
         leak(0.03mS / cm^2)]
 
-    dynamics = HodgkinHuxley(Vₘ, channels, gradients; geometry = geo)
-    @named neuron = CompartmentSystem(dynamics, extensions = [calcium_conversion])
+    dynamics = HodgkinHuxley(channels, gradients);
 
+    @named neuron = CompartmentSystem(Vₘ, dynamics;
+                                      geometry = geo,
+                                      extensions = [calcium_conversion]);
     @test length.([equations(neuron),
                       states(neuron),
                       parameters(neuron)]) == [39, 39, 17]
