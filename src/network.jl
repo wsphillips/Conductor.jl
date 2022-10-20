@@ -218,16 +218,16 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
             post_compartment = compartments[i]
             pre_compartments = compartments[rows[pre_indexes]] # use view?
             weights = vals[pre_indexes] # use view?
-            new_revs = union(get_synaptic_reversals(post_compartment),
-                             reversal_map[synaptic_class])
+#            new_revs = union(get_synaptic_reversals(post_compartment),
+#                             reversal_map[synaptic_class])
+            new_reversal = reversal_map[synaptic_class]
+            post_synapses = get_synapses(post_compartment)
             if isaggregate(synaptic_class)
                 new_synaptic_class = ConductanceSystem(synaptic_class,
                                                        subscriptions = pre_compartments)
-                post_dynamics = get_dynamics(post_compartment)
-                new_dynamics = @set post_dynamics.synaptic_channels = [new_synaptic_class]
-                @set! new_dynamics.synaptic_reversals = new_revs
-                post_compartment = SciMLBase.remake(post_compartment,
-                                                    dynamics = new_dynamics)
+                push!(post_synapses, Synapse(new_synaptic_class, new_reversal))
+                post_compartment = SciMLBase.remake(post_compartment;
+                                                    synapses = post_synapses)
                 vars = MTK.namespace_variables(getproperty(post_compartment,
                                                            nameof(new_synaptic_class)))
                 Vxs = find_voltage(vars, isextrinsic)
@@ -243,12 +243,10 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                                                    name = namegen(nameof(synaptic_class)),
                                                    defaults = Dict(y => getdefault(y)))
                     push!(class_copies, class_copy)
+                    push!(post_synapses, Synapse(class_copy, new_reversal))
                 end
-                post_dynamics = get_dynamics(post_compartment)
-                new_dynamics = @set post_dynamics.synaptic_channels = class_copies
-                @set! new_dynamics.synaptic_reversals = new_revs
-                post_compartment = SciMLBase.remake(post_compartment,
-                                                    dynamics = new_dynamics)
+                post_compartment = SciMLBase.remake(post_compartment;
+                                                    synapses = post_synapses)
                 for (class_copy, pre) in zip(class_copies, pre_compartments)
                     vars = MTK.namespace_variables(getproperty(post_compartment,
                                                                nameof(class_copy)))
