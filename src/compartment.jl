@@ -37,19 +37,6 @@ end
 Arborization() = Arborization(nothing, Junction[])
 
 # LOCAL / 1st degree connected nodes
-
-function compartments(x::Arborization)
-    out = []
-    compartments!(out, x)
-    return out
-end
-
-function compartments!(out::Vector, x::Arborization)
-    isnothing(x.parent) || push!(out, x.parent.system)
-    append!(out, getproperty.(x.children, :system))
-    return
-end
-
 function conductances(x::Arborization)
     out = []
     conductances!(out, x)
@@ -57,8 +44,8 @@ function conductances(x::Arborization)
 end
 
 function conductances!(out::Vector, x::Arborization)
-    isnothing(x.parent) || push!(out, x.parent.conductance)
-    append!(out, getproperty.(x.children, :conductance))
+    isnothing(x.parent) || push!(out, conductance(x.parent))
+    append!(out, conductance.(x.children))
     return
 end
 
@@ -69,11 +56,8 @@ function reversals(x::Arborization)
 end
 
 function reversals!(out::Vector, x::Arborization)
-    comps = compartments(x)
-    for comp in comps
-        v = get_voltage(comp)
-        push!(out, getvar(getname(v)))
-    end
+    isnothing(x.parent) || push!(out, reversal(x.parent))
+    append!(out, reversal.(x.children))
     return
 end
 
@@ -347,21 +331,22 @@ function SciMLBase.remake(sys::CompartmentSystem;
                       extensions, name)
 end
 
-get_dynamics(x::AbstractCompartmentSystem) = getfield(x, :form)
+get_dynamics(x::AbstractCompartmentSystem) = getfield(x, :dynamics)
 get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 
 get_geometry(x::CompartmentSystem) = getfield(x, :geometry)
 area(x::CompartmentSystem) = only(@parameters aₘ = area(get_geometry(x)))
 get_capacitance(x::CompartmentSystem) = getfield(x, :capacitance)
-
-get_output(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).voltage
+get_voltage(x::CompartmentSystem) = getfield(x, :voltage)
+get_output(x::CompartmentSystem) = get_voltage(x)
 get_channels(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).channels
-get_synapses(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).synaptic_channels
-get_stimuli(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).stimuli
+get_arbor(x::CompartmentSystem) = getfield(x, :arbor)
+get_synapses(x::CompartmentSystem) = getfield(x, :synapses)
+get_stimuli(x::CompartmentSystem) = getfield(x, :stimuli)
 
 function get_reversals(x::CompartmentSystem{HodgkinHuxley})
     dyn = get_dynamics(x)
-    return dyn.channel_reversals, dyn.synaptic_reversals
+    return dyn.channel_reversals, reversal.(get_synapses(x))
 end
 
 get_synaptic_reversals(x::CompartmentSystem{HodgkinHuxley}) = get_reversals(x)[2]
