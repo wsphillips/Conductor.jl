@@ -35,8 +35,8 @@ kdr_kinetics = [
 
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Sodium => 50.0mV, Potassium => -77.0mV, Leak => -54.4mV])
-dynamics = HodgkinHuxley(Vₘ, channels, reversals)
-@named neuron = CompartmentSystem(dynamics)
+dynamics = HodgkinHuxley(channels, reversals)
+@named neuron = CompartmentSystem(Vₘ, dynamics)
 
 @assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8) # hide
 neuron # hide
@@ -52,8 +52,8 @@ to describe the shape and size of the compartment:
 ```@example compartment_example
 import Unitful: µm
 soma_shape = Sphere(radius = 20µm)
-geo_dynamics = HodgkinHuxley(Vₘ, channels, reversals; geometry = soma_shape)
-@named neuron = CompartmentSystem(geo_dynamics)
+geo_dynamics = HodgkinHuxley(channels, reversals)
+@named neuron = CompartmentSystem(Vₘ, geo_dynamics; geometry = soma_shape)
 @assert length.((equations(neuron), states(neuron), parameters(neuron))) == (12,12,8); # hide
 nothing # hide
 ```
@@ -76,11 +76,11 @@ import Unitful: µA, pA
 # A 400 picoamp squarewave pulse when 100ms > t > 200ms
 @named Iₑ = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
 
-stim_dynamics = HodgkinHuxley(Vₘ, channels, reversals;
-                              geometry = soma_shape,
-                              stimuli = [Iₑ])
+stim_dynamics = HodgkinHuxley(channels, reversals)
 
-@named neuron_stim = CompartmentSystem(stim_dynamics)
+@named neuron_stim = CompartmentSystem(Vₘ, stim_dynamics;
+                                       geometry = soma_shape,
+                                       stimuli = [Iₑ])
 @assert length.((equations(neuron_stim), states(neuron_stim), parameters(neuron_stim))) == (13,13,8); # hide
 nothing # hide
 ```

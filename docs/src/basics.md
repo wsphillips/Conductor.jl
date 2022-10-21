@@ -57,14 +57,14 @@ reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
 @named Iₑ = Bias(5000pA)
 
-dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
-                         geometry = Cylinder(radius = 25µm, height = 400µm),
-                         stimuli = [Iₑ])
-dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
-                           geometry = Cylinder(radius = 25µm, height = 400µm))
+dynamics_1 = HodgkinHuxley(channels, reversals)
+dynamics_2 = HodgkinHuxley(channels, reversals)
 
-@named neuron1 = Compartment(dynamics_1)
-@named neuron2 = Compartment(dynamics_2)
+@named neuron1 = Compartment(Vₘ, dynamics_1;
+                             geometry = Cylinder(radius = 25µm, height = 400µm),
+                             stimuli = [Iₑ]);
+@named neuron2 = Compartment(Vₘ, dynamics_2;
+                            geometry = Cylinder(radius = 25µm, height = 400µm))
 
 # Synaptic model
 Vₓ = ExtrinsicPotential()
@@ -160,15 +160,14 @@ Finally, we construct our two neurons, providing the holding current stimulus to
 which will be our presynaptic neuron.
 
 ```@example gate_example
-dynamics_1 = HodgkinHuxley(Vₘ, channels, reversals;
-                         geometry = Cylinder(radius = 25µm, height = 400µm),
-                         stimuli = [Iₑ])
+dynamics_1 = HodgkinHuxley(channels, reversals)
+dynamics_2 = HodgkinHuxley(channels, reversals)
 
-dynamics_2 = HodgkinHuxley(Vₘ, channels, reversals;
-                           geometry = Cylinder(radius = 25µm, height = 400µm))
-
-@named neuron1 = Compartment(dynamics_1)
-@named neuron2 = Compartment(dynamics_2)
+@named neuron1 = Compartment(Vₘ, dynamics_1;
+                             geometry = Cylinder(radius = 25µm, height = 400µm),
+                             stimuli = [Iₑ]);
+@named neuron2 = Compartment(Vₘ, dynamics_2;
+                            geometry = Cylinder(radius = 25µm, height = 400µm))
 nothing # hide
 ``` 
 For our neurons to talk to each other, we'll need a model for a synaptic conductance. This
