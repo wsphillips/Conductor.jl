@@ -28,11 +28,11 @@ reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
 @named Iₑ = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
 
-dynamics = HodgkinHuxley(Vₘ, channels, reversals;
-                         geometry = Sphere(radius = 20µm),
-                         stimuli = [Iₑ]);
+dynamics = HodgkinHuxley(channels, reversals)
+                         
+@named neuron = Compartment(Vₘ, dynamics; geometry = Sphere(radius = 20µm),
+                         stimuli = [Iₑ])
 
-@named neuron = Compartment(dynamics)
 sim = Simulation(neuron, time = 300ms)
 solution = solve(sim, Rosenbrock23(), abstol = 0.01, reltol = 0.01, dtmax = 100.0);
 plot(solution; size = (1200, 800))

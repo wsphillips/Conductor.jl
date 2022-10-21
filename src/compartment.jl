@@ -1,41 +1,67 @@
-abstract type CompartmentForm end
 
-struct HodgkinHuxley <: CompartmentForm
-    "Voltage potential."
-    voltage::Num
-    "Membrane capacitance."
-    capacitance::Num
-    "Morphological geometry of the compartment."
-    geometry::Geometry
-    "Ionic conductances."
-    channels::Vector{AbstractConductanceSystem}
-    "Equilibrium potentials belonging to ionic membrane conductances."
-    channel_reversals::Vector{Num}
-    "Synaptic conductances."
-    synaptic_channels::Vector{AbstractConductanceSystem}
-    "Equilibrium potentials belonging to synaptic conductances."
-    synaptic_reversals::Vector{Num}
-    "Axial (intercompartmental) conductances."
-    axial_conductances::Vector{Tuple{AbstractConductanceSystem, Num}}
-    "Experimental stimuli (for example, current injection)."
-    stimuli::Vector
+abstract type AbstractSynapse end
+
+struct Synapse{T} <: AbstractSynapse
+    system::T
+    metadata::Dict{Symbol,Any}
+end
+#TODO: relax these fields to a current ?? 
+function Synapse(x::ConductanceSystem, rev::Num)
+    metadata = Dict([:reversal => rev])
+    return Synapse{typeof(x)}(x, metadata)
 end
 
-# basic constructor
-function HodgkinHuxley(Vₘ::Num,
-                       channels,
-                       channel_reversals;
-                       capacitance = 1µF / cm^2,
-                       geometry::Geometry = Point(),
-                       stimuli::Vector = [])
-    @parameters cₘ=ustrip(Float64, µF / cm^2, capacitance) [unit = µF / cm^2]
-    synaptic_channels = Vector{AbstractConductanceSystem}()
-    synaptic_reversals = Vector{Num}()
-    axial_conductances = Vector{Tuple{AbstractConductanceSystem, Num}}()
+conductance(x::Synapse{ConductanceSystem}) = x.system
+reversal(x::Synapse{ConductanceSystem}) = x.metadata[:reversal]
 
-    HodgkinHuxley(Vₘ, cₘ, geometry, channels, channel_reversals, synaptic_channels,
-                  synaptic_reversals, axial_conductances, stimuli)
+abstract type AbstractJunction end
+
+struct Junction{T} <: AbstractJunction
+    system::T
+    metadata::Dict{Symbol,Any}
 end
+
+function Junction(x::ConductanceSystem, rev::Num)
+    metadata = Dict([:reversal => rev]) 
+    return Junction{typeof(x)}(x, metadata)
+end
+
+conductance(x::Junction{ConductanceSystem}) = x.system
+reversal(x::Junction{ConductanceSystem}) = x.metadata[:reversal]
+
+struct Arborization
+    parent::Union{Nothing, Junction}
+    children::Vector{Junction}
+end
+
+Arborization() = Arborization(nothing, Junction[])
+
+# LOCAL / 1st degree connected nodes
+function conductances(x::Arborization)
+    out = []
+    conductances!(out, x)
+    return out
+end
+
+function conductances!(out::Vector, x::Arborization)
+    isnothing(x.parent) || push!(out, conductance(x.parent))
+    append!(out, conductance.(x.children))
+    return
+end
+
+function reversals(x::Arborization)
+    out = []
+    reversals!(out, x)
+    return out
+end
+
+function reversals!(out::Vector, x::Arborization)
+    isnothing(x.parent) || push!(out, reversal(x.parent))
+    append!(out, reversal.(x.children))
+    return
+end
+
+include("dynamics.jl")
 
 """
 $(TYPEDEF)
@@ -44,8 +70,12 @@ A neuronal compartment.
 
 $(TYPEDFIELDS)
 """
-struct CompartmentSystem{T <: CompartmentForm} <: AbstractCompartmentSystem
-    form::T
+struct CompartmentSystem{T <: AbstractDynamics} <: AbstractCompartmentSystem
+    "Voltage potential."
+    voltage::Num
+    dynamics::T
+    "Membrane capacitance."
+    capacitance::Union{Nothing,Num}
     eqs::Vector{Equation}
     "Independent variable. Defaults to time, ``t``."
     iv::Num
@@ -60,71 +90,28 @@ struct CompartmentSystem{T <: CompartmentForm} <: AbstractCompartmentSystem
     during conversion to `ODESystem`.
     """
     extensions::Vector{ODESystem}
-    "Reference to the parent system when the compartment is a subcompartment in a `MultiCompartmentSystem`."
-    parent::Ref{AbstractCompartmentSystem}
-
-    function CompartmentSystem(form::T, eqs, iv, states, ps, observed, name, systems,
-                               defaults, extensions, parent;
-                               checks = false) where {T <: CompartmentForm}
+    synapses::Vector
+    arbor::Arborization
+    stimuli::Vector
+    "Morphological geometry of the compartment."
+    geometry::Geometry
+    function CompartmentSystem(voltage, dynamics::T, capacitance, eqs, iv, states, ps,
+                               observed, name, systems, defaults, extensions, synapses,
+                               arbor, stimuli, geometry;
+                               checks = false) where {T <: AbstractDynamics}
         if checks
-            # placeholder
             foreach(x -> isreversal(x) || throw("Invalid Equilibrium Potential"),
                     channel_reversals)
             foreach(x -> iscurrent(x.lhs) || throw("Invalid current stimulus"), stimuli)
         end
-        new{T}(form, eqs, iv, states, ps, observed, name, systems, defaults, extensions,
-               parent)
+        new{T}(voltage, dynamics, capacitance, eqs, iv, states, ps, observed, name, systems,
+               defaults, extensions, synapses, arbor, stimuli, geometry)
     end
 end
 
 const Compartment = CompartmentSystem
 
-function process_reversals!(gen, dynamics::HodgkinHuxley)
-    reversal_equation_vars = Set{Num}()
-    (; channel_reversals, synaptic_reversals, axial_conductances) = dynamics
-    (; dvs, ps, eqs) = gen
-    all_reversals = union(channel_reversals, synaptic_reversals, last.(axial_conductances))
-
-    for Erev in all_reversals
-        if isparameter(Erev)
-            push!(ps, Erev)
-        else
-            push!(dvs, Erev)
-            # FIXME: hacked solution. This assumes the equation for a dynamic reversal == default value
-            if MTK.hasdefault(Erev)
-                get_variables!(reversal_equation_vars, getdefault(Erev))
-                push!(eqs, Erev ~ getdefault(Erev))
-            end
-        end
-    end
-    filter!(x -> !isequal(x, t), reversal_equation_vars) # remove iv
-    foreach(x -> isparameter(x) && push!(ps, x), reversal_equation_vars)
-    return nothing
-end
-
-function generate_currents!(gen, dynamics::HodgkinHuxley, Vₘ, aₘ)
-    (; channels, channel_reversals, synaptic_channels, synaptic_reversals,
-    axial_conductances) = dynamics
-    (; eqs, dvs) = gen
-    paired_channels = zip(channels,
-                          broadcast(chan -> find_reversal(chan, channel_reversals),
-                                    channels))
-    paired_synapses = zip(synaptic_channels,
-                          broadcast(chan -> find_reversal(chan, synaptic_reversals),
-                                    synaptic_channels))
-    paired_conductances = union(axial_conductances, paired_channels, paired_synapses)
-    currents = Set()
-    for (chan, Erev) in paired_conductances
-        I = IonCurrent(chan)
-        g = renamespace(chan, get_output(chan))
-        eq = I ~ g * (Vₘ - Erev) * (1 * get_unit(g) isa SpecificConductance ? aₘ : 1)
-        validate(eq) && push!(eqs, eq)
-        push!(dvs, I)
-        push!(currents, I)
-    end
-    return currents
-end
-
+# can be a `CurrentSystem` constructor
 function process_stimulus!(currents, gen, stimulus::PulseTrain)
     (; eqs, dvs, ps, defs) = gen
 
@@ -143,7 +130,7 @@ function process_stimulus!(currents, gen, stimulus::PulseTrain)
     return
 end
 
-# current bias stimulus
+# current bias stimulus (can be a `CurrentSystem` constructor)
 function process_stimulus!(currents, gen, sym, stimulus::Bias{T}) where {T <: Current}
     ps = gen.ps
     push!(ps, sym)
@@ -158,16 +145,16 @@ function process_stimulus!(currents, gen, sym, stimulus::PulseTrain{T}) where {T
     push!(currents, -sym)
 end
 
-function process_stimuli!(currents, gen, dynamics::HodgkinHuxley)
-    for sym in dynamics.stimuli
+function process_stimuli!(currents, gen, stimuli)
+    for sym in stimuli
         process_stimulus!(currents, gen, sym, get_stimulus(sym))
     end
 end
 
-function resolve_channel_inputs!(gen, dynamics::HodgkinHuxley)
+function resolve_channel_inputs!(gen, dynamics::HodgkinHuxley, synapses)
     all_inputs = Set{Num}()
     # Resolve in/out: "connect" / auto forward cell states to channels
-    for chan in union(dynamics.channels, dynamics.synaptic_channels)
+    for chan in union(dynamics.channels, conductance.(synapses))
         for inp in get_inputs(chan)
             isextrinsic(inp) && continue
             push!(all_inputs, inp)
@@ -178,8 +165,8 @@ function resolve_channel_inputs!(gen, dynamics::HodgkinHuxley)
     return all_inputs
 end
 
-function get_required_states!(gen, dynamics::HodgkinHuxley)
-    required_states = resolve_channel_inputs!(gen, dynamics)
+function get_required_states!(gen, dynamics::HodgkinHuxley, synapses)
+    required_states = resolve_channel_inputs!(gen, dynamics, synapses)
     internally_modified = Set{Num}()
     foreach(x -> get_variables!(internally_modified, x.lhs), gen.eqs)
     union!(required_states, setdiff(gen.dvs, internally_modified))
@@ -220,14 +207,22 @@ end
 - `stimuli::Vector{Equation}`: 
 - `name::Symbol`: Name of the system.
 """
-function CompartmentSystem(dynamics; defaults = Dict(),
+function CompartmentSystem(Vₘ::Num, dynamics::T; defaults = Dict(),
+                           capacitance = 1µF/cm^2,
+                           geometry::Geometry = Point(),
+                           stimuli::Vector = [],
                            extensions::Vector{ODESystem} = ODESystem[],
-                           name::Symbol = Base.gensym("Compartment"))
-    parent = Ref{AbstractCompartmentSystem}()
-    return CompartmentSystem(dynamics, defaults, extensions, name, parent)
+                           name::Symbol = Base.gensym("Compartment"),
+                          ) where {T <: AbstractDynamics}
+
+    @parameters cₘ=ustrip(Float64, µF / cm^2, capacitance) [unit = µF / cm^2]
+    arbor = Arborization()
+    synapses = []
+    return CompartmentSystem(Vₘ, dynamics, synapses, arbor, cₘ, geometry, stimuli, defaults,
+                             extensions, name)
 end
 
-struct LIF <: CompartmentForm
+struct LIF <: AbstractDynamics
     V::Num
     τ_mem::Num
     τ_syn::Num
@@ -246,7 +241,7 @@ function LIF(voltage = 0.0; tau_membrane = 10.0, tau_synaptic = 10.0, threshold 
     return LIF(V, τ_mem, τ_syn, V_th, R, inputs, [Iₑ])
 end
 
-function CompartmentSystem(dynamics::LIF, defaults, extensions, name, parent)
+function CompartmentSystem(dynamics::LIF, defaults, extensions, name)
     (; V, τ_mem, τ_syn, V_th, R, stimuli) = dynamics
     Iₑ = stimuli[1]
     @variables I(t)=0.0 S(t)=false
@@ -261,7 +256,7 @@ function CompartmentSystem(dynamics::LIF, defaults, extensions, name, parent)
     push!(observed, S ~ V >= V_th)
     merge!(defs, defaults)
     return CompartmentSystem(dynamics, eqs, t, collect(dvs), collect(ps), observed, name,
-                             systems, defs, extensions, parent)
+                             systems, defs, extensions)
 end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF};
@@ -284,89 +279,74 @@ function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF};
                      name = nameof(compartment), discrete_events = cb,
                      observed = obs, checks = CheckComponents)
 end
-#=
-function Base.convert(::Type{SDESystem}, compartment::CompartmentSystem{LIF}; with_cb = false)
 
-    dvs = get_states(compartment)
-    ps  = get_ps(compartment)
-    eqs = get_eqs(compartment)
-    defs = get_defaults(compartment)
-    obs = get_observed(compartment)
-    syss = convert.(ODESystem, get_systems(compartment))
-    V = @nonamespace compartment.V
-    S = @nonamespace compartment.S
-    V_th = @nonamespace compartment.V_th
-    V_rest = @nonamespace compartment.V_rest
+function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses, arbor, cₘ,
+                           geometry::Geometry, stimuli::Vector, defaults, extensions, name)
 
-    cb = with_cb ? MTK.SymbolicDiscreteCallback(V >= V_th, [V~V_rest]) : MTK.SymbolicDiscreteCallback[]
-
-    noise_eqs = [0.0, 1.0]
-    return SDESystem(eqs, noise_eqs, t, dvs, ps; systems = syss, defaults = defs,
-                     name = nameof(compartment), discrete_events = cb, observed = obs)
-end
-=#
-function CompartmentSystem(dynamics::HodgkinHuxley, defaults, extensions, name, parent)
-    (; channels, synaptic_channels, axial_conductances, stimuli) = dynamics
-    @parameters aₘ=area(dynamics.geometry) [unit = cm^2]
-    Vₘ, cₘ = dynamics.voltage, dynamics.capacitance
+    membrane_channels = dynamics.channels
+    synaptic_channels = conductance.(synapses)
+    axial_conductances = conductances(arbor)
+    @parameters aₘ=area(geometry) [unit = cm^2]
     gen = GeneratedCollections(dvs = Set(Vₘ), ps = Set((aₘ, cₘ)),
-                               systems = union(channels, synaptic_channels,
-                                               first.(axial_conductances)))
+                               systems = union(membrane_channels, synaptic_channels,
+                                               axial_conductances))
+
     (; eqs, dvs, ps, observed, systems, defs) = gen
 
     # Compile dynamics into system equations, states, parameters, etc
-    process_reversals!(gen, dynamics)
-    currents = generate_currents!(gen, dynamics, Vₘ, aₘ)
-    process_stimuli!(currents, gen, dynamics)
+    process_reversals!(gen, dynamics, synapses, arbor)
+    currents = generate_currents!(gen, dynamics, synapses, arbor, Vₘ, aₘ)
+    process_stimuli!(currents, gen, stimuli)
+
     # Voltage equation
     eq = D(Vₘ) ~ -sum(currents) / (cₘ * aₘ)
     validate(eq) && push!(eqs, eq)
+
     # Apply extensions
-    extend_gen! = Base.Fix1(extend!, gen)
-    foreach(extend_gen!, extensions)
+    foreach(Base.Fix1(extend!,gen), extensions)
+
     # Resolve undefined states
-    required_states = get_required_states!(gen, dynamics)
+    required_states = get_required_states!(gen, dynamics, synapses)
     resolve_states!(gen, required_states)
 
     merge!(defs, defaults)
 
-    return CompartmentSystem(dynamics, eqs, t, collect(dvs), collect(ps), observed, name,
-                             systems, defs, extensions, parent)
+    return CompartmentSystem(Vₘ, dynamics, cₘ, eqs, t, collect(dvs), collect(ps), observed,
+                             name, systems, defs, extensions, synapses, arbor, stimuli,
+                             geometry)
 end
 
 function SciMLBase.remake(sys::CompartmentSystem;
+                          Vₘ = get_voltage(sys),
                           dynamics = get_dynamics(sys),
+                          synapses = get_synapses(sys),
+                          arbor = get_arbor(sys),
+                          capacitance = get_capacitance(sys),
+                          geometry = get_geometry(sys),
+                          stimuli = get_stimuli(sys),
                           extensions = get_extensions(sys),
-                          parent = parent(sys),
                           name = nameof(sys),
                           defaults = get_defaults(sys))
-    CompartmentSystem(dynamics, defaults, extensions, name, parent)
+    CompartmentSystem(Vₘ, dynamics, synapses, arbor, capacitance, geometry, stimuli, defaults,
+                      extensions, name)
 end
 
-get_dynamics(x::AbstractCompartmentSystem) = getfield(x, :form)
+get_dynamics(x::AbstractCompartmentSystem) = getfield(x, :dynamics)
 get_extensions(x::AbstractCompartmentSystem) = getfield(x, :extensions)
 
-get_geometry(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).geometry
-area(x::CompartmentSystem{HodgkinHuxley}) = only(@parameters aₘ = area(get_geometry(x)))
-capacitance(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).capacitance
-
-get_output(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).voltage
+get_geometry(x::CompartmentSystem) = getfield(x, :geometry)
+area(x::CompartmentSystem) = only(@parameters aₘ = area(get_geometry(x)))
+get_capacitance(x::CompartmentSystem) = getfield(x, :capacitance)
+get_voltage(x::CompartmentSystem) = getfield(x, :voltage)
+get_output(x::CompartmentSystem) = get_voltage(x)
 get_channels(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).channels
-get_synapses(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).synaptic_channels
-get_stimuli(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).stimuli
-
-hasparent(x::CompartmentSystem) = isassigned(getfield(x, :parent))
-parent(x::CompartmentSystem) = getfield(x, :parent)
-
-function setparent!(child::CompartmentSystem, parent::AbstractCompartmentSystem)
-    ref = getfield(child, :parent)
-    ref[] = parent
-    return nothing
-end
+get_arbor(x::CompartmentSystem) = getfield(x, :arbor)
+get_synapses(x::CompartmentSystem) = getfield(x, :synapses)
+get_stimuli(x::CompartmentSystem) = getfield(x, :stimuli)
 
 function get_reversals(x::CompartmentSystem{HodgkinHuxley})
     dyn = get_dynamics(x)
-    return dyn.channel_reversals, dyn.synaptic_reversals
+    return dyn.channel_reversals, reversal.(get_synapses(x))
 end
 
 get_synaptic_reversals(x::CompartmentSystem{HodgkinHuxley}) = get_reversals(x)[2]

@@ -5,10 +5,7 @@ struct MultiCompartmentTopology
     conductances::Dict{Graphs.SimpleEdge{Int}, ConductanceSystem}
 end
 
-function MultiCompartmentTopology(compartments::Vector{CompartmentSystem{T}}) where {
-                                                                                     T <:
-                                                                                     CompartmentForm
-                                                                                     }
+function MultiCompartmentTopology(compartments::Vector{CompartmentSystem{T}}) where {T <: AbstractDynamics}
     g = SimpleDiGraph(length(compartments))
     conductances = Dict{Graphs.SimpleEdge{Int}, ConductanceSystem}()
     return MultiCompartmentTopology(g, compartments, conductances)
@@ -87,7 +84,6 @@ struct MultiCompartmentSystem <: AbstractCompartmentSystem
         end
         mc = new(eqs, iv, states, ps, observed, name, systems, defaults,
                  topology, compartments, extensions)
-        foreach(x -> setparent!(x, mc), compartments)
         return mc
     end
 end
@@ -106,10 +102,8 @@ function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESy
 
     # As a precaution, wipe any pre-existing axial currents from compartments
     for (i, comp) in enumerate(compartments)
-        isempty(get_axial_conductances(comp)) && continue
-        dynamics = get_dynamics(comp)
-        new_dynamics = @set dynamics.axial_conductances = NULL_AXIAL
-        compartments[i] = SciMLBase.remake(comp, dynamics = new_dynamics)
+        isempty(conductances(get_arbor(comp))) && continue
+        compartments[i] = SciMLBase.remake(comp, arbor = Arborization())
     end
 
     observed = Equation[]
@@ -119,11 +113,14 @@ function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESy
         axial = topology.conductances[e]
         trunk = compartments[src(e)]
         branch = compartments[dst(e)]
+
         branchvm_alias = MembranePotential(nothing; name = Symbol(:V, nameof(branch)))
-        dynamics = get_dynamics(trunk)
-        new_dynamics = @set dynamics.axial_conductances = union(get_axial_conductances(trunk),
-                                                                [(axial, branchvm_alias)])
-        trunk = SciMLBase.remake(trunk, dynamics = new_dynamics)
+        trunk_arbor = get_arbor(trunk)
+        push!(trunk_arbor.children,
+#              Junction(axial, Num(renamespace(branch, get_voltage(branch)))))
+              Junction(axial, branchvm_alias))
+
+        trunk = SciMLBase.remake(trunk, arbor = trunk_arbor)
 
         if hasproperty(getproperty(trunk, nameof(axial)), :Vₘ)
             eq = branch.Vₘ ~ getproperty(trunk, nameof(axial)).Vₘ
@@ -150,7 +147,6 @@ end
 
 get_topology(x::MultiCompartmentSystem) = getfield(x, :topology)
 get_compartments(x::MultiCompartmentTopology) = getfield(x, :compartments)
-get_axial_conductances(x::CompartmentSystem) = get_dynamics(x).axial_conductances
 get_compartments(x::MultiCompartmentSystem) = getfield(x, :compartments)
 get_compartments(x::CompartmentSystem) = [x]
 
@@ -161,8 +157,6 @@ function compartments(x::AbstractCompartmentSystem; namespace = true)
     end
     return compartment_systems
 end
-
-hasparent(x::MultiCompartmentSystem) = false
 
 Base.eltype(::MultiCompartmentSystem) = CompartmentSystem
 Base.length(M::MultiCompartmentSystem) = length(get_compartments(M))

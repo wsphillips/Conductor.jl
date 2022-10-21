@@ -66,20 +66,23 @@ function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartment
     return NetworkTopology(graph, all_compartments)
 end
 
-function neurons(topology::NetworkTopology{NeuronalMultigraph, <:CompartmentForm})
+function neurons(topology::NetworkTopology{NeuronalMultigraph, <: AbstractDynamics})
     [keys(neuron_map(topology))...]
 end
 
 function denamespaced(topology::NetworkTopology{NeuronalMultigraph})
     getfield(topology, :graph).denamespaced
 end
+
 function neuron_map(topology::NetworkTopology{NeuronalMultigraph})
     getfield(topology, :graph).neuron_map
 end
+
 neurons(topology::NetworkTopology{T, F}) where {T, F} = vertices(topology)
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :graph)
 graph(topology::NetworkTopology{NeuronalMultigraph}) = getfield(topology, :graph).multigraph
+
 function add_synapse!(topology, pre, post, synaptic_model::ConductanceSystem)
     src = find_compsys(pre, topology)
     dst = find_compsys(post, topology)
@@ -215,16 +218,16 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
             post_compartment = compartments[i]
             pre_compartments = compartments[rows[pre_indexes]] # use view?
             weights = vals[pre_indexes] # use view?
-            new_revs = union(get_synaptic_reversals(post_compartment),
-                             reversal_map[synaptic_class])
+#            new_revs = union(get_synaptic_reversals(post_compartment),
+#                             reversal_map[synaptic_class])
+            new_reversal = reversal_map[synaptic_class]
+            post_synapses = get_synapses(post_compartment)
             if isaggregate(synaptic_class)
                 new_synaptic_class = ConductanceSystem(synaptic_class,
                                                        subscriptions = pre_compartments)
-                post_dynamics = get_dynamics(post_compartment)
-                new_dynamics = @set post_dynamics.synaptic_channels = [new_synaptic_class]
-                @set! new_dynamics.synaptic_reversals = new_revs
-                post_compartment = SciMLBase.remake(post_compartment,
-                                                    dynamics = new_dynamics)
+                push!(post_synapses, Synapse(new_synaptic_class, new_reversal))
+                post_compartment = SciMLBase.remake(post_compartment;
+                                                    synapses = post_synapses)
                 vars = MTK.namespace_variables(getproperty(post_compartment,
                                                            nameof(new_synaptic_class)))
                 Vxs = find_voltage(vars, isextrinsic)
@@ -240,12 +243,10 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                                                    name = namegen(nameof(synaptic_class)),
                                                    defaults = Dict(y => getdefault(y)))
                     push!(class_copies, class_copy)
+                    push!(post_synapses, Synapse(class_copy, new_reversal))
                 end
-                post_dynamics = get_dynamics(post_compartment)
-                new_dynamics = @set post_dynamics.synaptic_channels = class_copies
-                @set! new_dynamics.synaptic_reversals = new_revs
-                post_compartment = SciMLBase.remake(post_compartment,
-                                                    dynamics = new_dynamics)
+                post_compartment = SciMLBase.remake(post_compartment;
+                                                    synapses = post_synapses)
                 for (class_copy, pre) in zip(class_copies, pre_compartments)
                     vars = MTK.namespace_variables(getproperty(post_compartment,
                                                                nameof(class_copy)))
@@ -339,13 +340,6 @@ end
 
 Base.firstindex(ns::NeuronalNetworkSystem) = 1
 Base.lastindex(ns::NeuronalNetworkSystem) = length(get_topology(ns))
-
-#function Base.setindex!(ns::NeuronalNetworkSystem, g::SimpleDiGraph, cond::ConductanceSystem)
-#    add_layer!(ns, cond, g)
-#end
-#function Base.setindex!(ns::NeuronalNetworkSystem, cond::ConductanceSystem, pre::T1, post::T2) where {T1<:AbstractCompartmentSystem, T2<:AbstractCompartmentSystem}
-#    add_synapse!(ns, pre, post, cond)
-#end
 
 function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
     dvs = get_states(nnsys)

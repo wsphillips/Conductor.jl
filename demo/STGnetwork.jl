@@ -15,9 +15,9 @@ ABPD_channels = [NaV(100mS / cm^2),
     Kdr(100mS / cm^2),
     H(0.01mS / cm^2),
     leak(0mS / cm^2)];
-ABPD_dynamics = HodgkinHuxley(Vₘ, ABPD_channels, gradients; geometry = geo);
+ABPD_dynamics = HodgkinHuxley(ABPD_channels, gradients);
 
-@named ABPD = Compartment(ABPD_dynamics, extensions = [calcium_conversion]);
+@named ABPD = Compartment(Vₘ, ABPD_dynamics; geometry = geo, extensions = [calcium_conversion]);
 
 ABPD # display
 
@@ -30,8 +30,8 @@ LP_channels = [NaV(100mS / cm^2),
     Kdr(25mS / cm^2),
     H(0.05mS / cm^2),
     leak(0.03mS / cm^2)];
-LP_dynamics = HodgkinHuxley(Vₘ, LP_channels, gradients; geometry = geo);
-@named LP = Compartment(LP_dynamics, extensions = [calcium_conversion]);
+LP_dynamics = HodgkinHuxley(LP_channels, gradients);
+@named LP = Compartment(Vₘ, LP_dynamics; geometry = geo, extensions = [calcium_conversion]);
 
 LP # display
 
@@ -44,8 +44,8 @@ PY_channels = [NaV(100mS / cm^2),
     Kdr(125mS / cm^2),
     H(0.05mS / cm^2),
     leak(0.01mS / cm^2)];
-PY_dynamics = HodgkinHuxley(Vₘ, PY_channels, gradients; geometry = geo);
-@named PY = Compartment(LP_dynamics, extensions = [calcium_conversion]);
+PY_dynamics = HodgkinHuxley(PY_channels, gradients);
+@named PY = Compartment(Vₘ, PY_dynamics; geometry = geo, extensions = [calcium_conversion]);
 
 PY # display
 

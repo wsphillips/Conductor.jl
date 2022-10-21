@@ -6,37 +6,30 @@ include(joinpath(@__DIR__, "traub_kinetics.jl"))
 include(joinpath(@__DIR__, "pinsky_setup.jl"))
 
 # Base dynamics
-@named I_s_holding = IonCurrent(NonIonic, -0.5µA, dynamic = false)
-@named Iₛ = IonCurrent(NonIonic, -0.5µA, dynamic = false)
-soma_holding = Iₛ ~ I_s_holding / p
+@named I_s_holding = Bias(-0.5µA / 0.5)
+@named I_d_holding = Bias(0.0µA / (1 - 0.5))
 
-@named I_d_holding = IonCurrent(NonIonic, 0.0µA, dynamic = false)
-@named I_d = IonCurrent(NonIonic, 0.0µA, dynamic = false)
-dendrite_holding = I_d ~ I_d_holding / (1 - p)
+soma_dynamics = HodgkinHuxley([NaV(30mS / cm^2),
+                               Kdr(15mS / cm^2),
+                               leak(0.1mS / cm^2)],
+                              reversals[1:3])
 
-soma_dynamics = HodgkinHuxley(Vₘ,
-                              [NaV(30mS / cm^2),
-                                  Kdr(15mS / cm^2),
-                                  leak(0.1mS / cm^2)],
-                              reversals[1:3];
+@named soma = Compartment(Vₘ, soma_dynamics;
+                          geometry = Unitless(0.5), # FIXME: should take p param
+                          capacitance = capacitance,
+                          stimuli = [I_s_holding])
+
+dendrite_dynamics = HodgkinHuxley([KAHP(0.8mS / cm^2),
+                                   CaS(10mS / cm^2),
+                                   KCa(15mS / cm^2),
+                                   leak(0.1mS / cm^2)],
+                                  reversals[2:4])
+
+@named dendrite = Compartment(Vₘ, dendrite_dynamics;
+                              extensions = [calcium_conversion],
                               geometry = Unitless(0.5), # FIXME: should take p param
                               capacitance = capacitance,
-                              stimuli = [soma_holding])
-
-@named soma = Compartment(soma_dynamics)
-
-dendrite_dynamics = HodgkinHuxley(Vₘ,
-                                  [KAHP(0.8mS / cm^2),
-                                      CaS(10mS / cm^2),
-                                      KCa(15mS / cm^2),
-                                      leak(0.1mS / cm^2)],
-                                  reversals[2:4],
-                                  geometry = Unitless(0.5), # FIXME: should take p param
-                                  capacitance = capacitance,
-                                  stimuli = [dendrite_holding])
-
-@named dendrite = Compartment(dendrite_dynamics,
-                              extensions = [calcium_conversion])
+                              stimuli = [I_d_holding])
 
 @named gc_soma = AxialConductance([Gate(SimpleGate, inv(p), name = :ps)],
                                   max_g = gc_val)
@@ -74,22 +67,16 @@ EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 revmap = Dict([NMDAChan => ENMDA, AMPAChan => EAMPA])
 
 # A single neuron was "briefly" stimulated to trigger the network
-@named I_pulse = IonCurrent(NonIonic, 5.0µA; dynamic = false)
-@named I_holding = IonCurrent(NonIonic, -0.5µA; dynamic = false)
-@parameters t_on=150.0 [unit = ms] t_off=175.0 [unit = ms]
-@named Istim = IonCurrent(NonIonic, -0.5µA)
-soma_stim = Istim ~ ifelse((t > t_on) & (t < t_off), I_pulse / p, I_holding / p)
+@named I_pulse = PulseTrain(amplitude = 5.0µA / 0.5,
+                            duration = 25ms,
+                            delay = 150.0ms,
+                            offset = -0.5µA / 0.5)
 
-soma_stim_dynamics = HodgkinHuxley(Vₘ,
-                                   [NaV(30mS / cm^2),
-                                       Kdr(15mS / cm^2),
-                                       leak(0.1mS / cm^2)],
-                                   reversals[1:3];
-                                   geometry = Unitless(0.5), # FIXME: should take p param
-                                   capacitance = capacitance,
-                                   stimuli = [soma_stim])
-
-soma_stimulated = Compartment(soma_stim_dynamics; name = :soma)
+soma_stimulated = Compartment(Vₘ, deepcopy(soma_dynamics);
+                              geometry = Unitless(0.5), # FIXME: should take p param
+                              capacitance = capacitance,
+                              stimuli = [I_pulse],
+                              name = :soma)
 mcstim_topology = MultiCompartmentTopology([soma_stimulated, dendrite]);
 add_junction!(mcstim_topology, soma_stimulated, dendrite, (gc_soma, gc_dendrite))
 @named mcneuron_stim = MultiCompartment(mcstim_topology)

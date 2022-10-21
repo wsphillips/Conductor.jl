@@ -9,28 +9,22 @@ sim_time = 1500.0
 @named Is_holding = Bias(-0.5µA / 0.5) # FIXME: we should be able to use 'p' parameter
 @named Id_holding = Bias(0.0µA / (1 - 0.5))
 
-soma_dynamics = HodgkinHuxley(Vₘ,
-                              [NaV(30mS / cm^2),
-                                  Kdr(15mS / cm^2),
-                                  leak(0.1mS / cm^2)],
-                              reversals[1:3];
-                              geometry = Unitless(0.5), # FIXME: support 'p' parameter value
+soma_dynamics = HodgkinHuxley([NaV(30mS / cm^2), Kdr(15mS / cm^2), leak(0.1mS / cm^2)],
+                              reversals[1:3]);
+
+@named soma = Compartment(Vₘ, soma_dynamics;
+                          capacitance = capacitance,
+                          geometry = Unitless(0.5), # FIXME: support 'p' parameter value
+                          stimuli = [Is_holding])
+
+dendrite_dynamics = HodgkinHuxley([KAHP(0.8mS / cm^2), CaS(10mS / cm^2), KCa(15mS / cm^2),
+                                   leak(0.1mS / cm^2)], reversals[2:4]);
+
+@named dendrite = Compartment(Vₘ, dendrite_dynamics;
                               capacitance = capacitance,
-                              stimuli = [Is_holding]);
-
-@named soma = Compartment(soma_dynamics)
-
-dendrite_dynamics = HodgkinHuxley(Vₘ,
-                                  [KAHP(0.8mS / cm^2),
-                                      CaS(10mS / cm^2),
-                                      KCa(15mS / cm^2),
-                                      leak(0.1mS / cm^2)],
-                                  reversals[2:4],
-                                  geometry = Unitless(0.5),
-                                  capacitance = capacitance,
-                                  stimuli = [Id_holding]);
-
-@named dendrite = Compartment(dendrite_dynamics, extensions = [calcium_conversion])
+                              geometry = Unitless(0.5),
+                              stimuli = [Id_holding],
+                              extensions = [calcium_conversion])
 
 @named gc_soma = AxialConductance([Gate(SimpleGate, inv(p), name = :ps)], max_g = gc_val)
 @named gc_dendrite = AxialConductance([Gate(SimpleGate, inv(1 - p), name = :pd)],
@@ -66,8 +60,8 @@ import Conductor: NMDA, AMPA, HeavisideSum
 
 # To simulate constant NMDA activation, we make a fake suprathreshold cell
 artificial_Eleak = EquilibriumPotential(Leak, 20mV)
-artificial_dynamics = HodgkinHuxley(Vₘ, [leak(1mS / cm^2)], [artificial_Eleak])
-@named dummy = Compartment(artificial_dynamics)
+artificial_dynamics = HodgkinHuxley([leak(1mS / cm^2)], [artificial_Eleak])
+@named dummy = Compartment(Vₘ, artificial_dynamics)
 
 ESyn = EquilibriumPotential(NMDA, 60mV, name = :syn)
 topology = NetworkTopology([dummy, mcneuron], [NMDAChan(2µS)]);
