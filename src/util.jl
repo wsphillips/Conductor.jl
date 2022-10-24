@@ -14,6 +14,13 @@ function GeneratedCollections(; eqs = Equation[], systems = AbstractTimeDependen
     return GeneratedCollections(eqs, dvs, ps, systems, observed, defs)
 end
 
+copy_collections(sys::AbstractSystem) = GeneratedCollections(eqs = get_eqs(sys),
+                                                             systems = get_systems(sys),
+                                                             observed = get_observed(sys),
+                                                             dvs = get_dvs(sys),
+                                                             ps = get_ps(sys),
+                                                             defs = get_defaults(sys))
+
 import Symbolics: unwrap, symtype, getindex_posthook
 
 namegen(name) = Symbol(filter(x -> x !== '#', String(Base.gensym(name))))

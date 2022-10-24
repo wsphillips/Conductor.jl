@@ -1,16 +1,13 @@
 
 abstract type Stimulus end
-get_stimulus(x::Num) = getmetadata(x, Stimulus)
 
-# Fixed value
 struct Bias{T} <: Stimulus
     val::T
+    name::Symbol
 end
 
 function Bias(amplitude::T; name = Base.gensym("bias")) where {T <: Current}
-    val = ustrip(µA, amplitude)
-    sym = only(@parameters $name=val [unit = µA])
-    return setmetadata(sym, Stimulus, Bias{T}(amplitude))
+    return Bias{T}(amplitude, name)
 end
 
 struct PulseTrain{U} <: Stimulus
@@ -20,6 +17,7 @@ struct PulseTrain{U} <: Stimulus
     npulses::Int
     offset::Any
     amplitude::Any
+    name::Symbol
 end
 
 function current_pulses(t, x)
@@ -43,15 +41,13 @@ function PulseTrain(; amplitude::T1,
                     npulses = 1,
                     interval::Time = duration,
                     name = Base.gensym("pulsetrain")) where {T1 <: Current, T2 <: Current}
-    val = ustrip(µA, offset)
-    sym = only(@variables $name(t)=val [unit = µA])
-    return setmetadata(sym, Stimulus,
-                       PulseTrain{T1}(ustrip(ms, interval),
-                                      ustrip(ms, duration),
-                                      ustrip(ms, delay),
-                                      npulses,
-                                      val, # offset
-                                      ustrip(µA, amplitude)))
+    return PulseTrain{T1}(ustrip(ms, interval),
+                          ustrip(ms, duration),
+                          ustrip(ms, delay),
+                          npulses,
+                          offset,
+                          ustrip(µA, amplitude),
+                          name)
 end
 
 # Arbitrary input

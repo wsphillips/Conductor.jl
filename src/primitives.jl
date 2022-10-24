@@ -237,6 +237,14 @@ function IonCurrent(cond::AbstractConductanceSystem)
     IonCurrent(permeability(cond); name = Symbol("I", nameof(cond)))
 end
 
+function IonCurrent(stim::Bias{T}) where {T <: Current}
+    IonCurrent(NonIonic, stim.val; dynamic = false, name = :Iₑ)
+end
+
+function IonCurrent(stim::PulseTrain{T}) where {T <: Current}
+    IonCurrent(NonIonic, stim.offset; dynamic = true, name = :Iₑ)
+end
+
 # Internal API: Current trait queries
 iscurrent(x) = hasmetadata(value(x), IonCurrent)
 iscurrent(x::IonCurrent) = true

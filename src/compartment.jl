@@ -5,6 +5,7 @@ struct Synapse{T} <: AbstractSynapse
     system::T
     metadata::Dict{Symbol,Any}
 end
+
 #TODO: relax these fields to a current ?? 
 function Synapse(x::ConductanceSystem, rev::Num)
     metadata = Dict([:reversal => rev])
@@ -110,25 +111,6 @@ struct CompartmentSystem{T <: AbstractDynamics} <: AbstractCompartmentSystem
 end
 
 const Compartment = CompartmentSystem
-
-# can be a `CurrentSystem` constructor
-function process_stimulus!(currents, gen, stimulus::PulseTrain)
-    (; eqs, dvs, ps, defs) = gen
-
-    I = only(get_variables(stimulus.lhs))
-    _vars = filter!(x -> !isequal(x, t), get_variables(stimulus.rhs))
-    foreach(x -> push!(isparameter(x) ? ps : dvs, x), _vars)
-    hasdefault(I) || push!(defs, I => stimulus.rhs)
-    if isparameter(I)
-        push!(ps, I)
-        push!(currents, -I)
-    else
-        validate(stimulus) && push!(eqs, stimulus)
-        push!(dvs, I)
-        push!(currents, -I)
-    end
-    return
-end
 
 # current bias stimulus (can be a `CurrentSystem` constructor)
 function process_stimulus!(currents, gen, sym, stimulus::Bias{T}) where {T <: Current}
@@ -283,29 +265,24 @@ end
 function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses, arbor, cₘ,
                            geometry::Geometry, stimuli::Vector, defaults, extensions, name)
 
-    membrane_channels = dynamics.channels
-    synaptic_channels = conductance.(synapses)
-    axial_conductances = conductances(arbor)
     @parameters aₘ=area(geometry) [unit = cm^2]
-    gen = GeneratedCollections(dvs = Set(Vₘ), ps = Set((aₘ, cₘ)),
-                               systems = union(membrane_channels, synaptic_channels,
-                                               axial_conductances))
-
+    gen = GeneratedCollections(dvs = Set(Vₘ), ps = Set((aₘ, cₘ)))
     (; eqs, dvs, ps, observed, systems, defs) = gen
+    currents = Set()
 
     # Compile dynamics into system equations, states, parameters, etc
-    process_reversals!(gen, dynamics, synapses, arbor)
-    currents = generate_currents!(gen, dynamics, synapses, arbor, Vₘ, aₘ)
-    process_stimuli!(currents, gen, stimuli)
+    for cond_type in (dynamics, arbor, synapses, stimuli)
+        generate_currents!(currents, gen, cond_type, Vₘ, aₘ)
+    end
 
-    # Voltage equation
+    # Voltage equation for HH
     eq = D(Vₘ) ~ -sum(currents) / (cₘ * aₘ)
     validate(eq) && push!(eqs, eq)
 
     # Apply extensions
     foreach(Base.Fix1(extend!,gen), extensions)
 
-    # Resolve undefined states
+    # Resolve undefined states (e.g. net ion flux)
     required_states = get_required_states!(gen, dynamics, synapses)
     resolve_states!(gen, required_states)
 
