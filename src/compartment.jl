@@ -1,67 +1,3 @@
-
-abstract type AbstractSynapse end
-
-struct Synapse{T} <: AbstractSynapse
-    system::T
-    metadata::Dict{Symbol,Any}
-end
-
-#TODO: relax these fields to a current ?? 
-function Synapse(x::ConductanceSystem, rev::Num)
-    metadata = Dict([:reversal => rev])
-    return Synapse{typeof(x)}(x, metadata)
-end
-
-conductance(x::Synapse{ConductanceSystem}) = x.system
-reversal(x::Synapse{ConductanceSystem}) = x.metadata[:reversal]
-
-abstract type AbstractJunction end
-
-struct Junction{T} <: AbstractJunction
-    system::T
-    metadata::Dict{Symbol,Any}
-end
-
-function Junction(x::ConductanceSystem, rev::Num)
-    metadata = Dict([:reversal => rev]) 
-    return Junction{typeof(x)}(x, metadata)
-end
-
-conductance(x::Junction{ConductanceSystem}) = x.system
-reversal(x::Junction{ConductanceSystem}) = x.metadata[:reversal]
-
-struct Arborization
-    parent::Union{Nothing, Junction}
-    children::Vector{Junction}
-end
-
-Arborization() = Arborization(nothing, Junction[])
-
-# LOCAL / 1st degree connected nodes
-function conductances(x::Arborization)
-    out = []
-    conductances!(out, x)
-    return out
-end
-
-function conductances!(out::Vector, x::Arborization)
-    isnothing(x.parent) || push!(out, conductance(x.parent))
-    append!(out, conductance.(x.children))
-    return
-end
-
-function reversals(x::Arborization)
-    out = []
-    reversals!(out, x)
-    return out
-end
-
-function reversals!(out::Vector, x::Arborization)
-    isnothing(x.parent) || push!(out, reversal(x.parent))
-    append!(out, reversal.(x.children))
-    return
-end
-
 include("dynamics.jl")
 
 """
@@ -112,27 +48,6 @@ end
 
 const Compartment = CompartmentSystem
 
-# current bias stimulus (can be a `CurrentSystem` constructor)
-function process_stimulus!(currents, gen, sym, stimulus::Bias{T}) where {T <: Current}
-    ps = gen.ps
-    push!(ps, sym)
-    push!(currents, -sym)
-    return
-end
-
-function process_stimulus!(currents, gen, sym, stimulus::PulseTrain{T}) where {T <: Current}
-    (; dvs, eqs) = gen
-    push!(dvs, sym)
-    push!(eqs, sym ~ current_pulses(t, stimulus))
-    push!(currents, -sym)
-end
-
-function process_stimuli!(currents, gen, stimuli)
-    for sym in stimuli
-        process_stimulus!(currents, gen, sym, get_stimulus(sym))
-    end
-end
-
 function resolve_channel_inputs!(gen, dynamics::HodgkinHuxley, synapses)
     all_inputs = Set{Num}()
     # Resolve in/out: "connect" / auto forward cell states to channels
@@ -155,13 +70,6 @@ function get_required_states!(gen, dynamics::HodgkinHuxley, synapses)
     return required_states
 end
 
-function extend!(gen, extension)
-    union!(gen.eqs, equations(extension))
-    union!(gen.ps, parameters(extension))
-    union!(gen.dvs, states(extension))
-    return nothing
-end
-
 function resolve_states!(gen, required_states)
     (; eqs, dvs, ps) = gen
     component_currents = filter(x -> iscurrent(x) && !isaggregate(x), union(dvs, ps))
@@ -176,6 +84,14 @@ function resolve_states!(gen, required_states)
     end
     return nothing
 end
+
+function extend!(gen::GeneratedCollections, extension::AbstractSystem)
+    union!(gen.eqs, equations(extension))
+    union!(gen.ps, parameters(extension))
+    union!(gen.dvs, states(extension))
+    return nothing
+end
+
 
 """
     CompartmentSystem(Vₘ, channels, reversals; <keyword arguments>)
@@ -280,7 +196,9 @@ function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses, arbor, cₘ,
     validate(eq) && push!(eqs, eq)
 
     # Apply extensions
-    foreach(Base.Fix1(extend!,gen), extensions)
+    for extension in extensions
+        extend!(gen, extension)
+    end
 
     # Resolve undefined states (e.g. net ion flux)
     required_states = get_required_states!(gen, dynamics, synapses)

@@ -1,4 +1,68 @@
+# Current specifications
+abstract type AbstractSynapse end
 
+struct Synapse{T} <: AbstractSynapse
+    system::T
+    metadata::Dict{Symbol,Any}
+end
+
+#TODO: relax these fields to a current ?? 
+function Synapse(x::ConductanceSystem, rev::Num)
+    metadata = Dict([:reversal => rev])
+    return Synapse{typeof(x)}(x, metadata)
+end
+
+conductance(x::Synapse{ConductanceSystem}) = x.system
+reversal(x::Synapse{ConductanceSystem}) = x.metadata[:reversal]
+
+abstract type AbstractJunction end
+
+struct Junction{T} <: AbstractJunction
+    system::T
+    metadata::Dict{Symbol,Any}
+end
+
+function Junction(x::ConductanceSystem, rev::Num)
+    metadata = Dict([:reversal => rev]) 
+    return Junction{typeof(x)}(x, metadata)
+end
+
+conductance(x::Junction{ConductanceSystem}) = x.system
+reversal(x::Junction{ConductanceSystem}) = x.metadata[:reversal]
+
+struct Arborization
+    parent::Union{Nothing, Junction}
+    children::Vector{Junction}
+end
+
+Arborization() = Arborization(nothing, Junction[])
+
+# LOCAL / 1st degree connected nodes
+function conductances(x::Arborization)
+    out = []
+    conductances!(out, x)
+    return out
+end
+
+function conductances!(out::Vector, x::Arborization)
+    isnothing(x.parent) || push!(out, conductance(x.parent))
+    append!(out, conductance.(x.children))
+    return
+end
+
+function reversals(x::Arborization)
+    out = []
+    reversals!(out, x)
+    return out
+end
+
+function reversals!(out::Vector, x::Arborization)
+    isnothing(x.parent) || push!(out, reversal(x.parent))
+    append!(out, reversal.(x.children))
+    return
+end
+
+# CurrentSystem + methods
 struct CurrentSystem <: AbstractCurrentSystem
     eqs::Vector{Equation}
     "Independent variable. Defaults to time, ``t``."
