@@ -50,6 +50,14 @@ function PulseTrain(; amplitude::T1,
                           name)
 end
 
+function IonCurrent(stim::Bias{T}) where {T <: Current}
+    IonCurrent(NonIonic, stim.val; dynamic = false, name = :Iₑ)
+end
+
+function IonCurrent(stim::PulseTrain{T}) where {T <: Current}
+    IonCurrent(NonIonic, stim.offset; dynamic = true, name = :Iₑ)
+end
+
 # Arbitrary input
 #struct CommandCurrent end
 #struct CommandPotential end

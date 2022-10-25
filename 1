@@ -66,6 +66,7 @@ function get_required_states!(gen, currents)
     internally_modified = Set{Num}()
     foreach(x -> MTK.modified_states!(internally_modified, x), gen.eqs)
     union!(required_states, setdiff(gen.dvs, internally_modified))
+    println("there are $(length(required_states)) states to resolve")
     return required_states
 end
 

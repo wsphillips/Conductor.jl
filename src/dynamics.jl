@@ -7,6 +7,13 @@ struct HodgkinHuxley <: AbstractDynamics
     channel_reversals::Vector{Num}
 end
 
+function reversals(dynamics::HodgkinHuxley)
+    (; channels, channel_reversals) = dynamics
+    map(Base.Fix2(find_reversal,channel_reversals), channels)
+end
+
+conductances(dynamics::HodgkinHuxley) = dynamics.channels
+
 function filter_reversal!(gen, Erev)
     (; dvs, ps, eqs) = gen
     reversal_equation_vars = Set{Num}()
@@ -27,34 +34,21 @@ function filter_reversal!(gen, Erev)
     return
 end
 
-# FIXME!!!!
-function generate_currents!(currents, gen, paired_conductances, Vₘ, aₘ)
-    CurrentSystem()
-#    (; eqs, dvs) = gen
-#    for (chan, Erev) in paired_conductances
-#        I = IonCurrent(chan)
-#        g = renamespace(chan, get_output(chan))
-#        eq = I ~ g * (Vₘ - Erev) * (1 * get_unit(g) isa SpecificConductance ? aₘ : 1)
-#        validate(eq) && push!(eqs, eq)
-#        push!(dvs, I)
-#        push!(currents, I)
-#    end
+function generate_currents!(current_systems, gen, dynamics, Vₘ, aₘ)
+    paired_conductances = zip(conductances(dynamics), reversals(dynamics))
+    for (cond, Erev) in paired_conductances
+        filter_reversal!(gen, Erev)
+        sys = CurrentSystem(Vₘ, cond, Erev; aₘ = aₘ)
+        push!(current_systems, sys) 
+        push!(gen.systems, sys)
+    end
     return
 end
 
-function generate_currents!(currents, gen, dynamics::HodgkinHuxley, Vₘ, aₘ)
-    (; channels, channel_reversals) = dynamics
-    paired_channels = zip(channels,
-                          map(Base.Fix2(find_reversal,channel_reversals), channels))
-    generate_currents!(currents, gen, paired_conductances, Vₘ, aₘ)
-end
-
-function generate_currents!(currents, gen, synapses::Vector{Synapse}, Vₘ, aₘ)
-    paired_synapses = zip(conductance.(synapses), reversal.(synapses))
-    generate_currents!(currents, gen, paired_synapses, Vₘ, aₘ)
-end
-       
-function generate_currents!(currents, gen, arbor::Arborization, Vₘ, aₘ)
-    paired_axials = zip(conductances(arbor), reversals(arbor))
-    generate_currents!(currents, gen, paired_axials, Vₘ, aₘ)
+function generate_currents!(current_systems, gen, stimuli::Vector{<:Stimulus}, Vₘ, aₘ)
+    for stimulus in stimuli
+        sys = CurrentSystem(Vₘ, stimulus)
+        push!(current_systems, sys)
+        push!(gen.systems, sys)
+    end
 end
