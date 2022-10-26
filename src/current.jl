@@ -105,9 +105,16 @@ inputs(x::CurrentSystem) = renamespace.(x, get_inputs(x))
 function CurrentSystem(Vₘ::Num, cond::ConductanceSystem, Erev::Num;
                        aₘ = 1, extensions::Vector{ODESystem} = ODESystem[],
                        defaults = Dict(), name::Symbol = nameof(cond))
-
+    
     # Extend the conductance system to a current system
     (; eqs, dvs, ps, systems, observed, defs) = copy_collections(cond)
+    if aₘ isa Num
+        aₘ = ParentScope(aₘ)
+        push!(ps, aₘ)
+    end
+    Erev = ParentScope(Erev)
+    Vₘ = ParentScope(Vₘ)
+    push!(ps, Erev)
     push!(dvs, Vₘ)
     inps = Set(get_inputs(cond))
     push!(inps, Vₘ)
