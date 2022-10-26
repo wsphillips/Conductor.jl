@@ -45,17 +45,17 @@ function PulseTrain(; amplitude::T1,
                           ustrip(ms, duration),
                           ustrip(ms, delay),
                           npulses,
-                          offset,
+                          ustrip(µA, offset),
                           ustrip(µA, amplitude),
                           name)
 end
 
 function IonCurrent(stim::Bias{T}) where {T <: Current}
-    IonCurrent(NonIonic, stim.val; dynamic = false, name = :Iₑ)
+    IonCurrent(NonIonic, stim.val*µA; dynamic = false, name = :Iₑ)
 end
 
 function IonCurrent(stim::PulseTrain{T}) where {T <: Current}
-    IonCurrent(NonIonic, stim.offset; dynamic = true, name = :Iₑ)
+    IonCurrent(NonIonic, stim.offset*µA; dynamic = true, name = :Iₑ)
 end
 
 # Arbitrary input

@@ -34,21 +34,24 @@ function filter_reversal!(gen, Erev)
     return
 end
 
-function generate_currents!(current_systems, gen, dynamics, Vₘ, aₘ)
+function generate_currents!(currents, current_systems, gen, dynamics, Vₘ, aₘ)
     paired_conductances = zip(conductances(dynamics), reversals(dynamics))
     for (cond, Erev) in paired_conductances
-        filter_reversal!(gen, Erev)
-        sys = CurrentSystem(Vₘ, cond, Erev; aₘ = aₘ)
+        filter_reversal!(gen, LocalScope(Erev))
+        sys = CurrentSystem(ParentScope(Vₘ),
+                            cond, ParentScope(LocalScope(Erev)); aₘ = ParentScope(aₘ))
         push!(current_systems, sys) 
         push!(gen.systems, sys)
+        push!(currents, output(sys))
     end
     return
 end
 
-function generate_currents!(current_systems, gen, stimuli::Vector{<:Stimulus}, Vₘ, aₘ)
+function generate_currents!(currents, current_systems, gen, stimuli::Vector{<:Stimulus}, Vₘ, aₘ)
     for stimulus in stimuli
-        sys = CurrentSystem(Vₘ, stimulus)
+        sys = CurrentSystem(ParentScope(Vₘ), stimulus)
         push!(current_systems, sys)
         push!(gen.systems, sys)
+        push!(currents, -output(sys))
     end
 end

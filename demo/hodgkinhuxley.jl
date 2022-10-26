@@ -3,7 +3,7 @@ using Conductor, Unitful, ModelingToolkit, OrdinaryDiffEq, Plots
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
-Vₘ = MembranePotential(-65mV)
+Vₘ = ParentScope(MembranePotential(-65mV))
 
 nav_kinetics = [Gate(AlphaBeta,
                      ifelse(Vₘ == -40.0, 1.0,

@@ -48,21 +48,21 @@ end
 
 const Compartment = CompartmentSystem
 
-function resolve_current_inputs!(gen, currents)
+function get_intrinsic_inputs(currents)
     all_inputs = Set{Num}()
     for current in currents
         for inp in get_inputs(current)
             isextrinsic(inp) && continue
             push!(all_inputs, inp)
-            subinp = renamespace(current, inp)
-            push!(gen.eqs, inp ~ subinp)
+            #subinp = renamespace(current, inp)
+            #push!(gen.eqs, inp ~ subinp)
         end
     end
     return all_inputs
 end
 
 function get_required_states!(gen, currents)
-    required_states = resolve_current_inputs!(gen, currents)
+    required_states = get_intrinsic_inputs(currents)
     internally_modified = Set{Num}()
     foreach(x -> MTK.modified_states!(internally_modified, x), gen.eqs)
     union!(required_states, setdiff(gen.dvs, internally_modified))
@@ -116,6 +116,7 @@ function CompartmentSystem(Vₘ::Num, dynamics::T; defaults = Dict(),
     @parameters cₘ=ustrip(Float64, µF / cm^2, capacitance) [unit = µF / cm^2]
     arbor = Arborization()
     synapses = Synapse[]
+    Vₘ = LocalScope(Vₘ)
     return CompartmentSystem(Vₘ, dynamics, synapses, arbor, cₘ, geometry, stimuli, defaults,
                              extensions, name)
 end
@@ -126,18 +127,17 @@ function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses, arbor, cₘ,
     @parameters aₘ=area(geometry) [unit = cm^2]
     gen = GeneratedCollections(dvs = Set(Vₘ), ps = Set((aₘ, cₘ)))
     (; eqs, dvs, ps, observed, systems, defs) = gen
+    currents = Set{Num}()
     current_systems = []
-
     # Compile dynamics into system equations, states, parameters, etc
     for cond_type in (dynamics, arbor, synapses, stimuli)
-        generate_currents!(current_systems, gen, cond_type, Vₘ, aₘ)
+        generate_currents!(currents, current_systems, gen, cond_type, ParentScope(Vₘ), ParentScope(aₘ))
     end
     
-    currents = output.(current_systems)
-
     # Voltage equation for HH
     eq = D(Vₘ) ~ -sum(currents) / (cₘ * aₘ)
     validate(eq) && push!(eqs, eq)
+    
     # Apply extensions
     for extension in extensions
         extend!(gen, extension)
