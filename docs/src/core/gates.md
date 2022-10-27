@@ -5,7 +5,7 @@ integrates zero or more inputs into a single unitless weighting value. If desire
 explicitly define the symbolic expression that models the output of a gate:
 
 ```jldoctest gate_example
-using Conductor
+using Conductor, ModelingToolkit
 # Voltage-dependent sigmoid activation
 Vₘ = ParentScope(MembranePotential())
 @named sigmoid = Gate(SimpleGate, inv(1 + exp(-Vₘ)))
