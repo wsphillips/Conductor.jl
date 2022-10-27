@@ -6,8 +6,8 @@ include(joinpath(@__DIR__, "pinsky_setup.jl"))
 sim_time = 1500.0
 
 # Compartment holding currents
-@named Is_holding = Bias(0.0µA / 0.5) # FIXME: we should be able to use 'p' parameter
-@named Id_holding = Bias(0.75µA / (1 - 0.5))
+@named Is_holding = Bias(-0.5µA / 0.5) # FIXME: we should be able to use 'p' parameter
+@named Id_holding = Bias(0.0µA / (1 - 0.5))
 
 soma_dynamics = HodgkinHuxley([NaV(30mS / cm^2), Kdr(15mS / cm^2), leak(0.1mS / cm^2)],
                               reversals[1:3]);
@@ -36,9 +36,9 @@ add_junction!(topology, soma, dendrite, (gc_soma, gc_dendrite))
 
 # Note: Pinsky & Rinzel originally solved using RK4 and _fixed_ dt=0.05
 # Here we let the solver use adaptive stepping, because its about 10X faster
- prob = Simulation(mcneuron, time=sim_time*ms)
- sol = solve(prob, RK4())
- plot(sol(0.0:0.2:sim_time, idxs=[soma.Vₘ]), size=(1440,900))
+# prob = Simulation(mcneuron, time=sim_time*ms)
+# sol = solve(prob, RK4())
+# plot(sol(0.0:0.2:sim_time, idxs=[soma.Vₘ]), size=(1440,900))
 
 # Published initial values
 # prob = remake(prob; u0 = [-4.6, 0.999, 0.001, 0.2, -4.5, 0.01, 0.009, .007])
