@@ -14,8 +14,8 @@ end
 
 conductance(x::Synapse{ConductanceSystem}) = x.system
 reversal(x::Synapse{ConductanceSystem}) = x.metadata[:reversal]
-conductances(x::Vector{Synapse{ConductanceSystem}}) = conductance.(x)
-reversals(x::Vector{Synapse{ConductanceSystem}}) = reversal.(x)
+conductances(x::Vector{<:Synapse}) = conductance.(x)
+reversals(x::Vector{<:Synapse}) = reversal.(x)
 
 abstract type AbstractJunction end
 
@@ -40,9 +40,6 @@ end
 Arborization() = Arborization(nothing, Junction[])
 
 # LOCAL / 1st degree connected nodes
-
-conductances(x) = isempty(x) ? [] : throw("oops")
-reversals(x) = isempty(x) ? [] : throw("oops")
 
 function conductances(x::Arborization)
     out = []
@@ -110,7 +107,7 @@ function CurrentSystem(Vₘ::Num, cond::ConductanceSystem, Erev::Num;
     (; eqs, dvs, ps, systems, observed, defs) = copy_collections(cond)
     
     push!(ps, aₘ)
-    push!(ps, Erev)
+    push!(isparameter(Erev) ? ps : dvs, Erev)
     push!(dvs, Vₘ)
     inps = Set(get_inputs(cond))
     push!(inps, Vₘ)

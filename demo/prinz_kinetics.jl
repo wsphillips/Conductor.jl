@@ -2,7 +2,7 @@ using Conductor, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, ms, mM, µM, µA
 import Conductor: Na, K, Ca, Cation, Leak
 
-Vₘ = MembranePotential(-50mV)
+Vₘ = ParentScope(MembranePotential(-50mV))
 Caᵢ = Concentration(Calcium, 0.05µM, dynamic = true)
 ICa = IonCurrent(Calcium, aggregate = true)
 
@@ -42,7 +42,7 @@ ka_kinetics = [Gate(SteadyStateTau,
 
 kca_kinetics = [
     Gate(SteadyStateTau,
-         (Caᵢ / (Caᵢ + 3.0)) / (1.0 + exp((Vₘ + 28.3) / -12.6)),
+         (ParentScope(Caᵢ) / (ParentScope(Caᵢ) + 3.0)) / (1.0 + exp((Vₘ + 28.3) / -12.6)),
          180.6 - 150.2 / (1.0 + exp((Vₘ + 46.0) / -22.7)),
          p = 4, name = :m)]
 

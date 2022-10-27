@@ -14,12 +14,14 @@ function GeneratedCollections(; eqs = Equation[], systems = AbstractTimeDependen
     return GeneratedCollections(eqs, dvs, ps, systems, observed, defs)
 end
 
-copy_collections(sys::AbstractSystem) = GeneratedCollections(eqs = deepcopy(get_eqs(sys)),
-                                                             systems = deepcopy(get_systems(sys)),
-                                                             observed = deepcopy(get_observed(sys)),
-                                                             dvs = Set(deepcopy(get_states(sys))),
-                                                             ps = Set(deepcopy(get_ps(sys))),
-                                                             defs = deepcopy(get_defaults(sys)))
+function copy_collections(sys::AbstractSystem) 
+    GeneratedCollections(eqs = deepcopy(get_eqs(sys)),
+                         systems = deepcopy(get_systems(sys)),
+                         observed = deepcopy(get_observed(sys)),
+                         dvs = Set(deepcopy(get_states(sys))),
+                         ps = Set(deepcopy(get_ps(sys))),
+                         defs = deepcopy(get_defaults(sys)))
+end
 
 import Symbolics: unwrap, symtype, getindex_posthook
 

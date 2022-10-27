@@ -27,9 +27,9 @@ struct CompartmentSystem{T <: AbstractDynamics} <: AbstractCompartmentSystem
     during conversion to `ODESystem`.
     """
     extensions::Vector{ODESystem}
-    synapses::Vector
+    synapses::Vector{Synapse{<:AbstractSystem}}
     arbor::Arborization
-    stimuli::Vector
+    stimuli::Vector{<:Stimulus}
     "Morphological geometry of the compartment."
     geometry::Geometry
     function CompartmentSystem(voltage, dynamics::T, capacitance, eqs, iv, states, ps,
@@ -69,10 +69,12 @@ function get_required_states!(gen, currents)
     return required_states
 end
 
-function resolve_states!(gen, required_states)
+function resolve_states!(gen, required_states, current_systems)
     (; eqs, dvs, ps) = gen
     # Filter non-aggregate "component" currents
-    component_currents = filter(x -> iscurrent(x) && !isaggregate(x), union(dvs, ps))
+    current_outputs = Set{Num}()
+    foreach(x -> push!(current_outputs, output(x)), current_systems)
+    component_currents = filter(x -> iscurrent(x) && !isaggregate(x), current_outputs)
     # Resolve unavailable states
     for s in required_states
         if iscurrent(s) && isaggregate(s)
@@ -121,9 +123,9 @@ function CompartmentSystem(Vₘ::Num, dynamics::T; defaults = Dict(),
                              extensions, name)
 end
 
-function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses, arbor, cₘ,
+function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses::Vector{<:Synapse}, arbor, cₘ,
         geometry::Geometry, stimuli::Vector{<:Stimulus}, defaults, extensions, name)
-
+    Vₘ = LocalScope(Vₘ)
     @parameters aₘ=area(geometry) [unit = cm^2]
     gen = GeneratedCollections(dvs = Set(Vₘ), ps = Set((aₘ, cₘ)))
     (; eqs, dvs, ps, observed, systems, defs) = gen
@@ -131,7 +133,7 @@ function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses, arbor, cₘ,
     current_systems = []
     # Compile dynamics into system equations, states, parameters, etc
     for cond_type in (dynamics, arbor, synapses, stimuli)
-        generate_currents!(currents, current_systems, gen, cond_type, ParentScope(Vₘ), ParentScope(aₘ))
+        generate_currents!(currents, current_systems, gen, cond_type, Vₘ, aₘ)
     end
     
     # Voltage equation for HH
@@ -145,7 +147,7 @@ function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses, arbor, cₘ,
 
     # Resolve undefined states (e.g. net ion flux)
     required_states = get_required_states!(gen, current_systems)
-    resolve_states!(gen, required_states)
+    resolve_states!(gen, required_states, current_systems)
 
     merge!(defs, defaults)
 

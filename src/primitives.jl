@@ -234,7 +234,7 @@ function IonCurrent(ion::IonSpecies, curr::Union{Nothing, Real, Current} = nothi
 end
 
 function IonCurrent(cond::AbstractConductanceSystem)
-    IonCurrent(permeability(cond); name = Symbol("I", nameof(cond)))
+    IonCurrent(permeability(cond); name = :I)
 end
 
 # Internal API: Current trait queries

@@ -2,12 +2,12 @@
 abstract type Stimulus end
 
 struct Bias{T} <: Stimulus
-    val::T
+    val::Any
     name::Symbol
 end
 
 function Bias(amplitude::T; name = Base.gensym("bias")) where {T <: Current}
-    return Bias{T}(amplitude, name)
+    return Bias{T}(ustrip(µA, amplitude), name)
 end
 
 struct PulseTrain{U} <: Stimulus
