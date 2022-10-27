@@ -7,7 +7,7 @@ explicitly define the symbolic expression that models the output of a gate:
 ```jldoctest gate_example
 using Conductor
 # Voltage-dependent sigmoid activation
-Vₘ = MembranePotential()
+Vₘ = ParentScope(MembranePotential())
 @named sigmoid = Gate(SimpleGate, inv(1 + exp(-Vₘ)))
 
 # output
