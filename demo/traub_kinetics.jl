@@ -2,7 +2,7 @@ using Conductor, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, ms, mM, µM
 import Conductor: Na, K, Ca, Cation, Leak
 
-Vₘ = MembranePotential(-4.6mV)
+Vₘ = ParentScope(MembranePotential(-4.6mV))
 Caᵢ = Concentration(Calcium, 0.2µM, dynamic = true)
 ICa = IonCurrent(Calcium, aggregate = true)
 #@parameters ϕ β = 0.075
@@ -48,7 +48,7 @@ kdr_kinetics = [
 # Note: The Traub model calls Calcium concentration 'χ' 
 kahp_kinetics = [
     Gate(AlphaBeta,
-         min(0.00002 * Caᵢ, 0.01),
+         min(0.00002 * ParentScope(Caᵢ), 0.01),
          0.001,
          name = :q)]
 
@@ -66,7 +66,7 @@ kca_kinetics = [
                 zero(Float64)),
          name = :c),
     # Calcium saturation term
-    Gate(SimpleGate, min(Caᵢ / 250.0, 1.0),
+    Gate(SimpleGate, min(ParentScope(Caᵢ) / 250.0, 1.0),
          name = :χ)]
 
 # A-type Potassium
