@@ -22,7 +22,7 @@ include(normpath(@__DIR__, "..", "demo", "prinz_kinetics.jl"))
                                       extensions = [calcium_conversion]);
     @test length.([equations(neuron),
                       states(neuron),
-                      parameters(neuron)]) == [39, 39, 17]
+                      parameters(neuron)]) == [31, 31, 17]
 
     time = 2000
     simul_sys = Simulation(neuron, time = time * ms, return_system = true)

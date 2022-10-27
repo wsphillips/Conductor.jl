@@ -11,7 +11,7 @@ using Unitful: mV, mS, cm, µm, µA, ms, pA
 
     # Symbolic model construction
 
-    Vₘ = MembranePotential(-65mV)
+    Vₘ = ParentScope(MembranePotential(-65mV))
 
     nav_kinetics = [Gate(AlphaBeta,
                          ifelse(Vₘ == -40.0, 1.0,
@@ -43,16 +43,16 @@ using Unitful: mV, mS, cm, µm, µA, ms, pA
     @test [length(equations(x)) for x in channels] == [3, 2, 1]
     reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
-    @named Iₑ = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
+    @named step_pulse = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
 
     dynamics = HodgkinHuxley(channels, reversals)
                          
     @named neuron = Compartment(Vₘ, dynamics; geometry = Sphere(radius = 20µm),
-                                stimuli = [Iₑ])
+                                stimuli = [step_pulse])
 
     @test length.([equations(neuron),
                       states(neuron),
-                      parameters(neuron)]) == [13, 13, 8]
+                      parameters(neuron)]) == [11, 11, 8]
 
     time = 300.0
     sim_sys = Simulation(neuron, time = time * ms, return_system = true)

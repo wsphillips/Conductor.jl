@@ -6,7 +6,7 @@ import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
 
 @testset "Simple excitatory synapse" begin
-    Vₘ = MembranePotential(-65mV)
+    Vₘ = ParentScope(MembranePotential(-65mV))
 
     nav_kinetics = [Gate(AlphaBeta,
                          ifelse(Vₘ == -40.0, 1.0,
@@ -31,7 +31,7 @@ import Conductor: Na, K
     channels = [NaV, Kdr, leak]
     reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
-    @named Iₑ = Bias(5000pA)
+    @named holding_current = Bias(5000pA)
 
     geo = Cylinder(radius = 25µm, height = 400µm)
 
@@ -40,7 +40,7 @@ import Conductor: Na, K
 
     @named neuron1 = Compartment(Vₘ, dynamics_1;
                                  geometry = Cylinder(radius = 25µm, height = 400µm),
-                                 stimuli = [Iₑ]);
+                                 stimuli = [holding_current]);
     @named neuron2 = Compartment(Vₘ, dynamics_2;
                                  geometry = Cylinder(radius = 25µm, height = 400µm))
 
@@ -64,7 +64,7 @@ import Conductor: Na, K
 
     @test length.([equations(network),
                       states(network),
-                      parameters(network)]) == [28, 28, 19]
+                      parameters(network)]) == [24, 24, 19]
 
     ttot = 250.0
     simul_sys = Simulation(network, time = ttot * ms, return_system = true)
