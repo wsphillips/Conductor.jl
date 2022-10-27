@@ -20,7 +20,7 @@ The dynamics of a `Gate{SimpleGate}` are just an algebraic equation:
 Conductor.get_eqs(sigmoid, nothing) # internal API call
 
 # output
-1-element Vector{Symbolics.Equation}:
+1-element Vector{Equation}:
  sigmoid(t) ~ 1 / (1 + exp(-Vₘ(t)))
 ```
 
@@ -41,7 +41,7 @@ are often described in terms of forward (``\alpha``) and reverse (``\beta``) rea
 )
 
 # output
-Gate{AlphaBeta}(AlphaBeta, h(t), Symbolics.Equation[Differential(t)(h(t)) ~ (-h(t)) / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07(1 - h(t))*exp(-3.25 - 0.05Vₘ(t))], Dict{Symbol, Any}(:ss => (0.07exp(-3.25 - 0.05Vₘ(t))) / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t)))))
+Gate{AlphaBeta}(AlphaBeta, h(t), Equation[Differential(t)(h(t)) ~ (-h(t)) / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07(1 - h(t))*exp(-3.25 - 0.05Vₘ(t))], Dict{Symbol, Any}(:ss => (0.07exp(-3.25 - 0.05Vₘ(t))) / (1.0 / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07exp(-3.25 - 0.05Vₘ(t)))))
 
 ```
 
@@ -50,7 +50,7 @@ Now when we ask for the dynamics of a `Gate{AlphaBeta}`, we get the differential
 Conductor.get_eqs(h, nothing)
 
 # output
-1-element Vector{Symbolics.Equation}:
+1-element Vector{Equation}:
  Differential(t)(h(t)) ~ (-h(t)) / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07(1 - h(t))*exp(-3.25 - 0.05Vₘ(t))
 ```
 ...which is the equivalent to:
