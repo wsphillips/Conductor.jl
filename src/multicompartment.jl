@@ -114,20 +114,11 @@ function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESy
         trunk = compartments[src(e)]
         branch = compartments[dst(e)]
 
-        branchvm_alias = MembranePotential(nothing; name = Symbol(:V, nameof(branch)))
         trunk_arbor = get_arbor(trunk)
         push!(trunk_arbor.children,
-#              Junction(axial, Num(renamespace(branch, get_voltage(branch)))))
-              Junction(axial, branchvm_alias))
+              Junction(axial, Num(renamespace(branch, get_voltage(branch)))))
 
         trunk = SciMLBase.remake(trunk, arbor = trunk_arbor)
-
-        if hasproperty(getproperty(trunk, nameof(axial)), :Vₘ)
-            eq = branch.Vₘ ~ getproperty(trunk, nameof(axial)).Vₘ
-            validate(eq) && push!(eqs, eq)
-        end
-        eq = branch.Vₘ ~ getproperty(trunk, tosymbol(branchvm_alias, escape = false))
-        validate(eq) && push!(eqs, eq)
         compartments[src(e)] = trunk
     end
 

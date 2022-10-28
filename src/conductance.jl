@@ -108,7 +108,7 @@ function ConductanceSystem(g::Num,
         foreach(x -> get_variables!(inputs, x), vareqs)
         union!(eqs, vareqs)
     end
-
+    
     for sym in inputs
         isparameter(sym) && push!(ps, sym)
         hasdefault(sym) && push!(embed_defaults, sym => getdefault(sym))

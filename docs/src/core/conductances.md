@@ -14,7 +14,7 @@ To model sodium conductance in a Hodgkin-Huxley model:
 using Conductor, ModelingToolkit, Unitful
 import Unitful: mV, mS, cm
 
-Vₘ = MembranePotential()
+Vₘ = ParentScope(MembranePotential())
 
 nav_kinetics = [
     Gate(AlphaBeta,

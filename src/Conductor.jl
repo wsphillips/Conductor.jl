@@ -107,6 +107,7 @@ export Bias, PulseTrain
 # Metadata IDs
 struct ConductorMaxConductance end
 
+abstract type AbstractCurrentSystem <: AbstractTimeDependentSystem end
 abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
 abstract type AbstractNeuronalNetworkSystem <: AbstractTimeDependentSystem end
@@ -116,6 +117,7 @@ include("primitives.jl")
 include("stimulus.jl")
 include("gate.jl")
 include("conductance.jl")
+include("current.jl")
 include("geometry.jl")
 include("compartment.jl")
 include("multicompartment.jl")

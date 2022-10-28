@@ -3,7 +3,7 @@ using Conductor, Unitful, ModelingToolkit, OrdinaryDiffEq, Plots
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
 import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
-Vₘ = MembranePotential(-65mV)
+Vₘ = ParentScope(MembranePotential(-65mV))
 
 nav_kinetics = [Gate(AlphaBeta,
                      ifelse(Vₘ == -40.0, 1.0,
@@ -26,12 +26,12 @@ kdr_kinetics = [
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
-@named Iₑ = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
+@named pulse_stim = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
 
-dynamics = HodgkinHuxley(channels, reversals)
+dynamics = HodgkinHuxley(channels, reversals);
                          
 @named neuron = Compartment(Vₘ, dynamics; geometry = Sphere(radius = 20µm),
-                         stimuli = [Iₑ])
+                         stimuli = [pulse_stim])
 
 sim = Simulation(neuron, time = 300ms)
 solution = solve(sim, Rosenbrock23(), abstol = 0.01, reltol = 0.01, dtmax = 100.0);

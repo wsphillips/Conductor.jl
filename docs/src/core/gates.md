@@ -5,9 +5,9 @@ integrates zero or more inputs into a single unitless weighting value. If desire
 explicitly define the symbolic expression that models the output of a gate:
 
 ```jldoctest gate_example
-using Conductor
+using Conductor, ModelingToolkit
 # Voltage-dependent sigmoid activation
-Vₘ = MembranePotential()
+Vₘ = ParentScope(MembranePotential())
 @named sigmoid = Gate(SimpleGate, inv(1 + exp(-Vₘ)))
 
 # output
@@ -20,7 +20,7 @@ The dynamics of a `Gate{SimpleGate}` are just an algebraic equation:
 Conductor.get_eqs(sigmoid, nothing) # internal API call
 
 # output
-1-element Vector{Symbolics.Equation}:
+1-element Vector{Equation}:
  sigmoid(t) ~ 1 / (1 + exp(-Vₘ(t)))
 ```
 
@@ -50,7 +50,7 @@ Now when we ask for the dynamics of a `Gate{AlphaBeta}`, we get the differential
 Conductor.get_eqs(h, nothing)
 
 # output
-1-element Vector{Symbolics.Equation}:
+1-element Vector{Equation}:
  Differential(t)(h(t)) ~ (-h(t)) / (1.0 + exp(-3.5 - 0.1Vₘ(t))) + 0.07(1 - h(t))*exp(-3.25 - 0.05Vₘ(t))
 ```
 ...which is the equivalent to:

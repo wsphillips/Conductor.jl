@@ -7,52 +7,65 @@ struct HodgkinHuxley <: AbstractDynamics
     channel_reversals::Vector{Num}
 end
 
-function process_reversals!(gen, dynamics::HodgkinHuxley, synapses, arbor)
+function reversals(dynamics::HodgkinHuxley)
+    (; channels, channel_reversals) = dynamics
+    map(Base.Fix2(find_reversal,channel_reversals), channels)
+end
+
+conductances(dynamics::HodgkinHuxley) = dynamics.channels
+
+function filter_reversal!(gen, Erev)
     (; dvs, ps, eqs) = gen
     reversal_equation_vars = Set{Num}()
-    all_reversals = dynamics.channel_reversals # channel reversal potentials
-    append!(all_reversals, reversal.(synapses)) # synaptic reversal potentials
-    reversals!(all_reversals, arbor) # axial reversal potentials
 
-    for Erev in all_reversals
-        if isparameter(Erev)
-            push!(ps, Erev)
-        else
-            push!(dvs, Erev)
-            # FIXME: hacked solution. This assumes the equation for a dynamic reversal == default value
-            if MTK.hasdefault(Erev)
-                get_variables!(reversal_equation_vars, getdefault(Erev))
-                push!(eqs, Erev ~ getdefault(Erev))
-            end
+    if isparameter(Erev)
+        push!(ps, Erev)
+    else
+        push!(dvs, Erev)
+        # FIXME: hacked solution (assumes eq for dynamic reversal stored in default value)
+        if MTK.hasdefault(Erev)
+            rhs = getdefault(Erev)
+            get_variables!(reversal_equation_vars, rhs)
+            push!(eqs, Erev ~ rhs)
         end
     end
-    filter!(x -> !isequal(x, t), reversal_equation_vars) # remove iv
+    setdiff!(reversal_equation_vars, t) # remove iv
     foreach(x -> isparameter(x) && push!(ps, x), reversal_equation_vars)
-    return nothing
+    return
 end
 
-# TODO: turn this into constructor for a `CurrentSystem`
-function generate_currents!(gen, dynamics::HodgkinHuxley, synapses, arbor, Vₘ, aₘ)
-
-    currents = Set()
-    (; eqs, dvs) = gen
-
-    (; channels, channel_reversals) = dynamics
-    paired_channels = zip(channels,
-                          map(Base.Fix2(find_reversal,channel_reversals), channels))
-    paired_synapses = zip(conductance.(synapses), reversal.(synapses))
-    paired_axials = zip(conductances(arbor), reversals(arbor))
-    paired_conductances = union(paired_axials, paired_channels, paired_synapses)
-
-    for (chan, Erev) in paired_conductances
-        I = IonCurrent(chan)
-        g = renamespace(chan, get_output(chan))
-        eq = I ~ g * (Vₘ - Erev) * (1 * get_unit(g) isa SpecificConductance ? aₘ : 1)
-        validate(eq) && push!(eqs, eq)
-        push!(dvs, I)
-        push!(currents, I)
+function generate_currents!(currents, current_systems, gen, dynamics, Vₘ, aₘ)
+    paired_conductances = zip(conductances(dynamics), reversals(dynamics))
+    for (cond, Erev) in paired_conductances
+        filter_reversal!(gen, LocalScope(Erev))
+        sys = CurrentSystem(ParentScope(Vₘ),
+                            cond, ParentScope(LocalScope(Erev)); aₘ = ParentScope(aₘ))
+        push!(current_systems, sys) 
+        push!(gen.systems, sys)
+        push!(currents, output(sys))
     end
-    return currents
+    return
+end
+
+function generate_currents!(currents, current_systems, gen, dynamics::Arborization, Vₘ, aₘ)
+    paired_conductances = zip(conductances(dynamics), reversals(dynamics))
+    for (cond, Erev) in paired_conductances
+        push!(gen.dvs, ParentScope(LocalScope(Erev)))
+        sys = CurrentSystem(ParentScope(Vₘ),
+                            cond, ParentScope(ParentScope(LocalScope(Erev))); aₘ = ParentScope(aₘ))
+        push!(current_systems, sys) 
+        push!(gen.systems, sys)
+        push!(currents, output(sys))
+    end
+    return
 end
 
 
+function generate_currents!(currents, current_systems, gen, stimuli::Vector{<:Stimulus}, Vₘ, aₘ)
+    for stimulus in stimuli
+        sys = CurrentSystem(ParentScope(Vₘ), stimulus)
+        push!(current_systems, sys)
+        push!(gen.systems, sys)
+        push!(currents, -output(sys))
+    end
+end

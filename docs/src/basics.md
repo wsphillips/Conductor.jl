@@ -32,7 +32,7 @@ using Conductor,  OrdinaryDiffEq, Plots, Unitful, ModelingToolkit
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
 
-Vₘ = MembranePotential(-65mV)
+Vₘ = ParentScope(MembranePotential(-65mV))
 
 nav_kinetics = [
     Gate(AlphaBeta,
@@ -55,14 +55,14 @@ kdr_kinetics = [
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
 
-@named Iₑ = Bias(5000pA)
+@named holding_current = Bias(5000pA)
 
 dynamics_1 = HodgkinHuxley(channels, reversals)
 dynamics_2 = HodgkinHuxley(channels, reversals)
 
 @named neuron1 = Compartment(Vₘ, dynamics_1;
                              geometry = Cylinder(radius = 25µm, height = 400µm),
-                             stimuli = [Iₑ]);
+                             stimuli = [holding_current]);
 @named neuron2 = Compartment(Vₘ, dynamics_2;
                             geometry = Cylinder(radius = 25µm, height = 400µm))
 
@@ -96,7 +96,7 @@ We start by defining a primitive variable for voltage, `Vₘ`, which we'll use t
 equations describing the kinetics of some Hodgkin-Huxley gating particles.
 
 ```@example gate_example; continued = true
-Vₘ = MembranePotential(-65mV)
+Vₘ = ParentScope(MembranePotential(-65mV))
 ```
 Often the voltage- and time-dependent dynamics of ion channels are described in books and
 journal articles using forward, ``\alpha``, and reverse, ``\beta``, reaction rates:
@@ -152,7 +152,7 @@ current and use the resulting symbolic to write an equation describing what the 
 electrode current should be.
 
 ```@example gate_example; continued = true
-@named Iₑ = Bias(5000pA)
+@named holding_current = Bias(5000pA)
 nothing # hide
 ```
 
@@ -165,7 +165,7 @@ dynamics_2 = HodgkinHuxley(channels, reversals)
 
 @named neuron1 = Compartment(Vₘ, dynamics_1;
                              geometry = Cylinder(radius = 25µm, height = 400µm),
-                             stimuli = [Iₑ]);
+                             stimuli = [holding_current]);
 @named neuron2 = Compartment(Vₘ, dynamics_2;
                             geometry = Cylinder(radius = 25µm, height = 400µm))
 nothing # hide
