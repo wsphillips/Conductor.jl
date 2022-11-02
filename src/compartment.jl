@@ -237,6 +237,7 @@ area(x::CompartmentSystem) = only(@parameters aₘ = area(get_geometry(x)))
 get_capacitance(x::CompartmentSystem) = getfield(x, :capacitance)
 get_voltage(x::CompartmentSystem) = getfield(x, :voltage)
 get_output(x::CompartmentSystem) = get_voltage(x)
+voltage(x::CompartmentSystem) = renamespace(x, get_voltage(x))
 get_channels(x::CompartmentSystem{HodgkinHuxley}) = get_dynamics(x).channels
 get_arbor(x::CompartmentSystem) = getfield(x, :arbor)
 get_synapses(x::CompartmentSystem) = getfield(x, :synapses)

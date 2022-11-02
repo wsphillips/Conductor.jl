@@ -169,8 +169,6 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     name::Symbol
     systems::Vector{AbstractTimeDependentSystem}
     defaults::Dict
-    continuous_events::Vector{MTK.SymbolicContinuousCallback}
-    discrete_events::Vector{MTK.SymbolicDiscreteCallback}
     # Conductor fields
     topology::NetworkTopology
     reversal_map::Dict
@@ -180,14 +178,14 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     """
     extensions::Vector{ODESystem}
     function NeuronalNetworkSystem(eqs, iv, states, ps, observed, name, systems, defaults,
-                                   continuous_events, discrete_events, topology,
+                                   topology,
                                    reversal_map,
                                    extensions; checks = false)
         if checks
             # placeholder
         end
-        new(eqs, iv, states, ps, observed, name, systems, defaults, continuous_events,
-            discrete_events, topology, reversal_map, extensions)
+        new(eqs, iv, states, ps, observed, name, systems, defaults, topology, reversal_map,
+            extensions)
     end
 end
 
@@ -201,84 +199,88 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
                                extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
                                defaults = Dict(),
                                name::Symbol = Base.gensym(:Network)) where {T}
+
     reversal_map = reversal_map isa AbstractDict ? reversal_map : Dict(reversal_map)
-    eqs, dvs, ps, observed = Equation[], Num[], Num[], Equation[]
-    ccbs, dcbs = MTK.SymbolicContinuousCallback[], MTK.SymbolicDiscreteCallback[]
-    voltage_fwds = Set{Equation}()
-    multigraph = graph(topology)
-    compartments = vertices(topology)
 
-    for synaptic_class in keys(multigraph)
-        g = multigraph[synaptic_class]
-        rows = rowvals(g)
-        vals = nonzeros(g)
-        for i in axes(g, 2) # for each set of presynaptic neurons per postsynaptic neuron
-            pre_indexes = nzrange(g, i)
-            iszero(length(pre_indexes)) && continue
-            post_compartment = compartments[i]
-            pre_compartments = compartments[rows[pre_indexes]] # use view?
-            weights = vals[pre_indexes] # use view?
-#            new_revs = union(get_synaptic_reversals(post_compartment),
-#                             reversal_map[synaptic_class])
-            new_reversal = reversal_map[synaptic_class]
-            post_synapses = get_synapses(post_compartment)
-            if isaggregate(synaptic_class)
-                new_synaptic_class = ConductanceSystem(synaptic_class,
-                                                       subscriptions = pre_compartments)
-                push!(post_synapses, Synapse(new_synaptic_class, new_reversal))
-                post_compartment = SciMLBase.remake(post_compartment;
-                                                    synapses = post_synapses)
-                vars = MTK.namespace_variables(getproperty(post_compartment,
-                                                           nameof(new_synaptic_class)))
-                Vxs = find_voltage(vars, isextrinsic)
-                for (Vx, pre) in zip(Vxs, pre_compartments)
-                    push!(voltage_fwds, pre.Vₘ ~ Vx)
-                    push!(defaults, Vx => pre.Vₘ)
-                end
-            else
-                class_copies = [] # clone the synapse model for each presynaptic compartment
-                for (x, y) in zip(pre_compartments, weights)
-                    class_copy = ConductanceSystem(synaptic_class, subscriptions = [x],
-                                                   gbar = y,
-                                                   name = namegen(nameof(synaptic_class)),
-                                                   defaults = Dict(y => getdefault(y)))
-                    push!(class_copies, class_copy)
-                    push!(post_synapses, Synapse(class_copy, new_reversal))
-                end
-                post_compartment = SciMLBase.remake(post_compartment;
-                                                    synapses = post_synapses)
-                for (class_copy, pre) in zip(class_copies, pre_compartments)
-                    vars = MTK.namespace_variables(getproperty(post_compartment,
-                                                               nameof(class_copy)))
-                    Vx = find_voltage(vars, isextrinsic)
-                    push!(voltage_fwds, pre.Vₘ ~ Vx)
-                    push!(defaults, Vx => pre.Vₘ)
-                end
-            end
-            compartments[i] = post_compartment
-        end
-    end
+    (; eqs, dvs, ps, systems, observed, defs) = GeneratedCollections()
 
-    union!(eqs, voltage_fwds)
+    #voltage_fwds = Set{Equation}()
+    #multigraph = graph(topology)
+    #compartments = vertices(topology)
 
-    newmap = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
-    # Construct revised neurons
-    for neuron in neurons(topology)
-        idx_range = neuron_map(topology)[neuron]
-        if neuron isa MultiCompartmentSystem
-            mctop = get_topology(neuron)
-            # subcompartments can't be namespaced!
-            @set! mctop.compartments = MTK.rename.(compartments[idx_range],
-                                                   denamespaced(topology)[idx_range])
-            neuron = SciMLBase.remake(neuron; topology = mctop)
-        else
-            neuron = only(compartments[idx_range])
-        end
-        newmap[neuron] = idx_range
-    end
-    systems::Vector{AbstractTimeDependentSystem} = union(extensions, collect(keys(newmap)))
-    return NeuronalNetworkSystem(eqs, t, dvs, ps, observed, name, systems, defaults,
-                                 ccbs, dcbs, topology, reversal_map, extensions;
+    #for synaptic_class in keys(multigraph)
+    #    g = multigraph[synaptic_class]
+    #    rows = rowvals(g)
+    #    vals = nonzeros(g)
+    #    for i in axes(g, 2) # for each set of presynaptic neurons per postsynaptic neuron
+    #        pre_indexes = nzrange(g, i)
+    #        iszero(length(pre_indexes)) && continue
+    #        post_compartment = compartments[i]
+    #        pre_compartments = compartments[rows[pre_indexes]] # use view?
+    #        weights = vals[pre_indexes] # use view?
+#   #         new_revs = union(get_synaptic_reversals(post_compartment),
+#   #                          reversal_map[synaptic_class])
+    #        new_reversal = reversal_map[synaptic_class]
+    #        post_synapses = get_synapses(post_compartment)
+    #        if isaggregate(synaptic_class)
+    #            new_synaptic_class = ConductanceSystem(synaptic_class,
+    #                                                   subscriptions = pre_compartments)
+    #            push!(post_synapses, Synapse(new_synaptic_class, new_reversal))
+    #            post_compartment = SciMLBase.remake(post_compartment;
+    #                                                synapses = post_synapses)
+    #            vars = MTK.namespace_variables(getproperty(post_compartment,
+    #                                                       nameof(new_synaptic_class)))
+    #            Vxs = find_voltage(vars, isextrinsic)
+    #            for (Vx, pre) in zip(Vxs, pre_compartments)
+    #                push!(voltage_fwds, pre.Vₘ ~ Vx)
+    #                push!(defaults, Vx => pre.Vₘ)
+    #            end
+    #        else
+    #            class_copies = [] # clone the synapse model for each presynaptic compartment
+    #            for (x, y) in zip(pre_compartments, weights)
+    #                class_copy = ConductanceSystem(synaptic_class, subscriptions = [x],
+    #                                               gbar = y,
+    #                                               name = namegen(nameof(synaptic_class)),
+    #                                               defaults = Dict(y => getdefault(y)))
+    #                push!(class_copies, class_copy)
+    #                push!(post_synapses, Synapse(class_copy, new_reversal))
+    #            end
+    #            post_compartment = SciMLBase.remake(post_compartment;
+    #                                                synapses = post_synapses)
+    #            for (class_copy, pre) in zip(class_copies, pre_compartments)
+    #                vars = MTK.namespace_variables(getproperty(post_compartment,
+    #                                                           nameof(class_copy)))
+    #                Vx = find_voltage(vars, isextrinsic)
+    #                push!(voltage_fwds, pre.Vₘ ~ Vx)
+    #                push!(defaults, Vx => pre.Vₘ)
+    #            end
+    #        end
+    #        compartments[i] = post_compartment
+    #    end
+    #end
+
+    #union!(eqs, voltage_fwds)
+
+    #newmap = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
+    ## Construct revised neurons
+    #for neuron in neurons(topology)
+    #    idx_range = neuron_map(topology)[neuron]
+    #    if neuron isa MultiCompartmentSystem
+    #        mctop = get_topology(neuron)
+    #        # subcompartments can't be namespaced!
+    #        @set! mctop.compartments = MTK.rename.(compartments[idx_range],
+    #                                               denamespaced(topology)[idx_range])
+    #        neuron = SciMLBase.remake(neuron; topology = mctop)
+    #    else
+    #        neuron = only(compartments[idx_range])
+    #    end
+    #    newmap[neuron] = idx_range
+    #end
+    #systems::Vector{AbstractTimeDependentSystem} = union(extensions, collect(keys(newmap)))
+
+    union!(systems, neurons(topology))
+    return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
+                                 defaults, topology, reversal_map, extensions;
                                  checks = false)
 end
 

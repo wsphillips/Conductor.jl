@@ -36,9 +36,25 @@ function Simulation(neuron::CompartmentSystem{LIF}; time::Time, return_system = 
     end
 end
 
+indexof(sym, syms) = findfirst(isequal(sym), syms)
+
 function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false,
                     jac = false, sparse = false, parallel = nothing)
     t_val, simplified = simplify_simulation(network, time)
+
+    # map neuron somatic voltages
+
+    dvs = states(simplified)
+    ps = parameters(simplified)
+    neuron_Vms = voltage.(neurons(get_topology(network)))
+    Vm_idxs = similar(neuron_Vms, Int64)
+     
+    for i in eachindex(neuron_Vms)
+        Vm_idxs[i] = indexof(neuron_Vms[i], dvs)
+    end
+
+    # Vm_view = view(u, Vm_idxs) # add to head of callback functions
+
     if return_system
         return simplified
     else

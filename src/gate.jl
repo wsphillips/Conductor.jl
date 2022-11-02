@@ -177,19 +177,19 @@ Returns an equation of the form:
 ``
 """
 function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
-    thold, decay = var.threshold, var.decay
+    decay = var.decay
     out = output(var)
-    isempty(subscriptions(chan)) && return [D(out) ~ 0]
-    Vₓ = scalarize(ExtrinsicPotential(n = length(subscriptions(chan))))
+    #isempty(subscriptions(chan)) && return [D(out) ~ 0]
+    #Vₓ = scalarize(ExtrinsicPotential(n = length(subscriptions(chan))))
     # Derived from Pinsky & Rinzel 1994 - Equation 4 
     # S'ᵢ = ∑ 𝐻(Vⱼ - 10) - Sᵢ/150
-    sat_val = get(var, :saturation, nothing)
-    if isnothing(sat_val)
-        return [D(out) ~ sum(Vₓ .>= thold) .- (out / decay)]
-    else
-        sat_sym = Symbol(getname(out), "₊sat")
-        sat = only(@parameters $sat_sym=sat_val [unit = NoUnits])
-        # out cannot continue to grow past the saturation limit
-        return [D(out) ~ (out < sat) * sum(Vₓ .>= thold) .- (out / decay)]
-    end
+    #sat_val = get(var, :saturation, nothing)
+    #if isnothing(sat_val)
+    return [D(out) ~ -(out / decay)]
+    #else
+    #    sat_sym = Symbol(getname(out), "₊sat")
+    #    sat = only(@parameters $sat_sym=sat_val [unit = NoUnits])
+    #    # out cannot continue to grow past the saturation limit
+    #    return [D(out) ~ (out < sat) * sum(Vₓ .>= thold) .- (out / decay)]
+    #end
 end
