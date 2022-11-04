@@ -36,6 +36,14 @@ function Simulation(neuron::CompartmentSystem{LIF}; time::Time, return_system = 
     end
 end
 
+struct NetworkParameters{T,G,C}
+    ps::Vector{T}
+    topology::NetworkTopology{G,C}
+end
+
+Base.getindex(x::NetworkParameters, i) = x.ps[i]
+topology(x::NetworkParameters) = getfield(x, :topology)
+
 indexof(sym, syms) = findfirst(isequal(sym), syms)
 function indexmap(syms, ref)
     idxs = similar(syms, Int64)
@@ -45,7 +53,7 @@ function indexmap(syms, ref)
     return idxs
 end
 
-spike_check(V,Vprev) = V >= 10 && Vprev < 10
+spike_check(V,Vprev)::Float64 = V >= 10 && Vprev < 10
 
 function spike_check_callback(integrator, Vm_idxs)
     Vm = view(integrator.u, Vm_idxs)
@@ -54,10 +62,10 @@ function spike_check_callback(integrator, Vm_idxs)
 end
 
 function spike_propagation_callback(integrator, S)
-    mg = multigraph(integrator.p) # multilayered graph of weights (one layer per synapse type)
+    topology = topology(integrator.p) # multilayered graph of weights (one layer per synapse type)
 
     # each synaptic conductance has a parameter value OR cicular buffer of spike input
-    # by default the value is zero (no spikes) so we may need a way to reset on the dt after a spike
+    # by default the value is zero (no spikes) so we may need a way to reset on the time step after a spike
     view_of_input_ps = view(integrator.p, input_ps_idxs)
 
     Vth = 10.0 # eventually pull stored parameters for spike threshold
