@@ -43,8 +43,8 @@ end
 
 Base.getindex(x::NetworkParameters, i) = x.ps[i]
 topology(x::NetworkParameters) = getfield(x, :topology)
-
 indexof(sym, syms) = findfirst(isequal(sym), syms)
+
 function indexmap(syms, ref)
     idxs = similar(syms, Int64)
     for i in eachindex(syms)
@@ -53,56 +53,47 @@ function indexmap(syms, ref)
     return idxs
 end
 
-spike_check(V,Vprev)::Float64 = V >= 10 && Vprev < 10
+spike_check(V,Vprev) = V >= 10 && Vprev < 10
 
-function spike_check_callback(integrator, Vm_idxs)
+function discrete_spike_detection_callback(integrator, Vm_idxs)::BitArray{1}
     Vm = view(integrator.u, Vm_idxs)
     Vprev = view(integrator.uprev, Vm_idxs)
     return spike_check.(Vm, Vprev)
 end
 
-function spike_propagation_callback(integrator, S)
-    topology = topology(integrator.p) # multilayered graph of weights (one layer per synapse type)
-
-    # each synaptic conductance has a parameter value OR cicular buffer of spike input
-    # by default the value is zero (no spikes) so we may need a way to reset on the time step after a spike
-    view_of_input_ps = view(integrator.p, input_ps_idxs)
-
-    Vth = 10.0 # eventually pull stored parameters for spike threshold
-
-    for layer in keys(mg)
-        adjm = mg[layer]
-        
-        rows = rowvals(adjm) # presynaptic neuron indexes for each stored value
-        vals = nonzeros(adjm) # weights
-        n = size(adjm, 1) # n columns
-        
-        for j in 1:n
-            for i in nzrange(adjm, j)
-                w = vals[i]
-                spiked = S[rows[i]] 
-                weighted_sum = sum(w[spiked])
-                # synaptic_input_parameter_of_neuron_j = weighted_sum
-            end
+# S is layer independent; graph and Isyn depend on synapse model
+function spike_propagation_callback!(Isyn, S, graph)
+    rows = rowvals(graph) # presynaptic neuron indexes for each stored value
+    vals = nonzeros(graph) # weights
+    n = size(graph, 1) # n columns
+    for i in 1:n
+        for j in nzrange(graph, i)
+            S[rows[j]] || continue
+            Isyn[i] += vals[j]
         end
     end
+end
+
+function generate_network_callbacks()
+    dvs = states(simplified)
+    ps = parameters(simplified)
+
+    # extract the indexes of somatic voltage
+    topo = get_topology(network)
+    multigraph = graph(topo)
+    neuron_Vms = voltage.(neurons(topo))
+    Vm_idxs = indexmap(neuron_Vms, dvs)
+    detect_spikes = Base.Fix2(discrete_spike_detection_callback, Vm_idxs)
+
 end
 
 function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false,
                     jac = false, sparse = false, parallel = nothing)
     t_val, simplified = simplify_simulation(network, time)
 
-    # map neuron somatic voltages
+    cb = generate_network_callbacks(network, simplified)
+    
 
-    dvs = states(simplified)
-    ps = parameters(simplified)
-    
-    # extract the indexes of somatic voltage
-    neuron_Vms = voltage.(neurons(get_topology(network)))
-    Vm_idxs = indexmap(neuron_Vms, dvs)
-    
-    # create an affect!(integrator) that returns a bit vector of spike events
-    sc_cb = Base.Fix2(spike_check_callback, Vm_idxs) # function of integrator
 
 
     # Vm_view = view(u, Vm_idxs) # add to head of callback functions
