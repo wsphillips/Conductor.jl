@@ -15,7 +15,6 @@ end
 
 function SimpleSpikeDetection(network, simplified)
     dvs = states(simplified)
-    ps = parameters(simplified)
     topo = get_topology(network)
     neuron_Vms = voltage.(neurons(topo))
     Vm_idxs = indexmap(neuron_Vms, dvs)
@@ -34,8 +33,19 @@ struct SimpleExponentialResponse
     graph
 end
 
-function SimpleExponentialResponse(network, simplified)
+function SimpleExponentialResponse(network, conductance, simplified)
     # calculate state indexes 
+    dvs = states(simplified)
+    topo = get_topology(network)
+    nrns = renamespace.(network, neurons(topo))
+    cond_name = nameof(conductance)
+    
+    for nrn in nrns
+        if hasproperty(nrn, cond_name)
+
+        end
+    end
+
     return SimpleExponentialResponse(state_indexes, graph)
 end
 
