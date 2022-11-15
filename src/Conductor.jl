@@ -15,6 +15,8 @@ using ModelingToolkit,
 
 const MTK = ModelingToolkit
 
+import SciMLBase: remake
+
 import Symbolics:
                   get_variables,
                   Symbolic,
@@ -51,7 +53,9 @@ import ModelingToolkit:
                         independent_variables,
                         get_variables!,
                         validate,
-                        CheckComponents
+                        CheckComponents,
+                        rename,
+                        namespace_variables
 
 import ModelingToolkit.SciMLBase: parameterless_type
 

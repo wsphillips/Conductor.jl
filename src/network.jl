@@ -1,8 +1,6 @@
 
 struct NeuronalMultigraph
     multigraph::Dict{Any, SparseMatrixCSC{Num, Int64}}
-    neuron_map::Dict{AbstractCompartmentSystem, UnitRange{Int64}}
-    denamespaced::Vector{Symbol}
 end
 
 struct NetworkTopology{T, F}
@@ -12,73 +10,37 @@ end
 
 function NetworkTopology(neurons::Vector{CompartmentSystem{LIF}},
                          graph = SimpleDiGraph(lenght(neurons)); default_weight = 1.0)
-    n = length(neurons)
     graph = adjacency_matrix(graph) * default_weight
     NetworkTopology(graph, neurons)
 end
 
 function NetworkTopology(neurons::Vector{<:AbstractCompartmentSystem},
                          synaptic_models::Vector{<:AbstractConductanceSystem})
-    neuron_map = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
-    start = 1
     all_compartments = []
-    denamespaced = Symbol[]
-
     for neuron in neurons
         comps = compartments(neuron)
         append!(all_compartments, comps)
-        denamespaced_comps = nameof.(compartments(neuron, namespace = false))
-        append!(denamespaced, denamespaced_comps)
-        n_comps = length(comps)
-        neuron_map[neuron] = start:(start + n_comps - 1)
-        start += n_comps
     end
-
     n = length(all_compartments)
     multigraph = Dict([x => sparse(Int64[], Int64[], Num[], n, n) for x in synaptic_models])
-    graph = NeuronalMultigraph(multigraph, neuron_map, denamespaced)
+    graph = NeuronalMultigraph(multigraph)
     return NetworkTopology(graph, [all_compartments...])
 end
 
 function NetworkTopology(g::SimpleDiGraph, neurons::Vector{<:AbstractCompartmentSystem},
                          synaptic_model::AbstractConductanceSystem,
                          default_weight = get_gbar(synaptic_model))
-    neuron_map = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
-    start = 1
     all_compartments = CompartmentSystem[]
-    denamespaced = Symbol[]
-
     for neuron in neurons
         comps = compartments(neuron)
         append!(all_compartments, comps)
-        denamespaced_comps = nameof.(compartments(neuron, namespace = false))
-        append!(denamespaced, denamespaced_comps)
-        n_comps = length(comps)
-        neuron_map[neuron] = start:(start + n_comps - 1)
-        start += n_comps
     end
-
-    n = length(all_compartments)
-    @assert length(vertices(g)) == length(neurons)
     multigraph = Dict(synaptic_model => adjacency_matrix(g) * default_weight)
-    graph = NeuronalMultigraph(multigraph, neuron_map, denamespaced)
-
+    graph = NeuronalMultigraph(multigraph)
     return NetworkTopology(graph, all_compartments)
 end
 
-function neurons(topology::NetworkTopology{NeuronalMultigraph, <: AbstractDynamics})
-    [keys(neuron_map(topology))...]
-end
-
-function denamespaced(topology::NetworkTopology{NeuronalMultigraph})
-    getfield(topology, :graph).denamespaced
-end
-
-function neuron_map(topology::NetworkTopology{NeuronalMultigraph})
-    getfield(topology, :graph).neuron_map
-end
-
-neurons(topology::NetworkTopology{T, F}) where {T, F} = vertices(topology)
+neurons(topology::NetworkTopology) = vertices(topology)
 vertices(topology::NetworkTopology) = getfield(topology, :compartments)
 graph(topology::NetworkTopology) = getfield(topology, :graph)
 graph(topology::NetworkTopology{NeuronalMultigraph}) = getfield(topology, :graph).multigraph
@@ -189,6 +151,59 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     end
 end
 
+# events are handled by callbacks and do not modify
+function connect_synapses!(gen, syn, compartments, multigraph)
+    return compartments
+end
+
+function connect_synapses!(gen, syn_model::ConductanceSystem{T}, compartments, multigraph
+    ) where {T<:IntegratedSynapse}
+
+    (; eqs, systems, defs) = gen
+    new_compartments = deepcopy(compartments)
+    g = multigraph[syn_model]   
+    rows = rowvals(g)
+    vals = nonzeros(g)
+    voltage_fwds = Set{Equation}()
+    
+    # Synaptic conductance models are duplicated here and individually connected, relying
+    # on users to specify extrinsic voltage symbols. In the future, when symbolic arrays and
+    # component types become available we will probably rewrite how this works.
+    for i in axes(g, 2) # for each set of presynaptic neurons per postsynaptic neuron
+        model_copies = []
+        pre_indexes = nzrange(g, i)
+        isempty(pre_indexes) && continue # skip neurons with no synaptic input
+
+        post_compartment = compartments[i]
+        pre_compartments = compartments[rows[pre_indexes]]
+        weights = vals[pre_indexes]
+        reversal = reversal_map[syn_model]
+        post_synapses = get_synapses(post_compartment)
+        
+        for (i, (pre_comp, weight)) in enumerate(zip(pre_compartments, weights))
+            model_copy = remake(syn_model, subscriptions = [pre_comp], gbar = weight,
+                                name = Symbol(nameof(syn_model), "_$i"))
+            push!(post_synapses, Synapse(model_copy, reversal))
+            push!(model_copies, model_copy)
+        end
+
+        post_compartment = remake(post_compartment; synapses = post_synapses)
+
+        # Directly connect Vₘ between neurons; must happen post hoc
+
+        for (model_copy, pre_comp) in zip(model_copies, pre_compartments)
+            vars = namespace_variables(getproperty(post_compartment, nameof(model_copy)))
+            Vx = find_voltage(vars, isextrinsic)
+            push!(voltage_fwds, pre.Vₘ ~ Vx)
+            push!(defs, Vx => pre.Vₘ)
+        end
+
+        new_compartments[i] = post_compartment
+    end
+    union!(eqs, voltage_fwds)
+    return new_compartments
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -202,119 +217,19 @@ function NeuronalNetworkSystem(topology::NetworkTopology{T, HodgkinHuxley}, reve
 
     reversal_map = reversal_map isa AbstractDict ? reversal_map : Dict(reversal_map)
 
-    (; eqs, dvs, ps, systems, observed, defs) = GeneratedCollections()
+    gen = GeneratedCollections()
+    (; eqs, dvs, ps, systems, observed, defs) = gen
+    multigraph = graph(topology)
+    compartments = vertices(topology)
+    
+    # FIXME: check if its a layered/Dict-based graph or not
+    for synaptic_class in keys(multigraph)
+        compartments = connect_synapses!(gen, synaptic_class, compartments, multigraph)
+    end
 
-    #voltage_fwds = Set{Equation}()
-    #multigraph = graph(topology)
-    #compartments = vertices(topology)
-
-    #for synaptic_class in keys(multigraph)
-    #    g = multigraph[synaptic_class]
-    #    rows = rowvals(g)
-    #    vals = nonzeros(g)
-    #    for i in axes(g, 2) # for each set of presynaptic neurons per postsynaptic neuron
-    #        pre_indexes = nzrange(g, i)
-    #        iszero(length(pre_indexes)) && continue
-    #        post_compartment = compartments[i]
-    #        pre_compartments = compartments[rows[pre_indexes]] # use view?
-    #        weights = vals[pre_indexes] # use view?
-#   #         new_revs = union(get_synaptic_reversals(post_compartment),
-#   #                          reversal_map[synaptic_class])
-    #        new_reversal = reversal_map[synaptic_class]
-    #        post_synapses = get_synapses(post_compartment)
-    #        if isaggregate(synaptic_class)
-    #            new_synaptic_class = ConductanceSystem(synaptic_class,
-    #                                                   subscriptions = pre_compartments)
-    #            push!(post_synapses, Synapse(new_synaptic_class, new_reversal))
-    #            post_compartment = SciMLBase.remake(post_compartment;
-    #                                                synapses = post_synapses)
-    #            vars = MTK.namespace_variables(getproperty(post_compartment,
-    #                                                       nameof(new_synaptic_class)))
-    #            Vxs = find_voltage(vars, isextrinsic)
-    #            for (Vx, pre) in zip(Vxs, pre_compartments)
-    #                push!(voltage_fwds, pre.Vₘ ~ Vx)
-    #                push!(defaults, Vx => pre.Vₘ)
-    #            end
-    #        else
-    #            class_copies = [] # clone the synapse model for each presynaptic compartment
-    #            for (x, y) in zip(pre_compartments, weights)
-    #                class_copy = ConductanceSystem(synaptic_class, subscriptions = [x],
-    #                                               gbar = y,
-    #                                               name = namegen(nameof(synaptic_class)),
-    #                                               defaults = Dict(y => getdefault(y)))
-    #                push!(class_copies, class_copy)
-    #                push!(post_synapses, Synapse(class_copy, new_reversal))
-    #            end
-    #            post_compartment = SciMLBase.remake(post_compartment;
-    #                                                synapses = post_synapses)
-    #            for (class_copy, pre) in zip(class_copies, pre_compartments)
-    #                vars = MTK.namespace_variables(getproperty(post_compartment,
-    #                                                           nameof(class_copy)))
-    #                Vx = find_voltage(vars, isextrinsic)
-    #                push!(voltage_fwds, pre.Vₘ ~ Vx)
-    #                push!(defaults, Vx => pre.Vₘ)
-    #            end
-    #        end
-    #        compartments[i] = post_compartment
-    #    end
-    #end
-
-    #union!(eqs, voltage_fwds)
-
-    #newmap = Dict{AbstractCompartmentSystem, UnitRange{Int64}}()
-    ## Construct revised neurons
-    #for neuron in neurons(topology)
-    #    idx_range = neuron_map(topology)[neuron]
-    #    if neuron isa MultiCompartmentSystem
-    #        mctop = get_topology(neuron)
-    #        # subcompartments can't be namespaced!
-    #        @set! mctop.compartments = MTK.rename.(compartments[idx_range],
-    #                                               denamespaced(topology)[idx_range])
-    #        neuron = SciMLBase.remake(neuron; topology = mctop)
-    #    else
-    #        neuron = only(compartments[idx_range])
-    #    end
-    #    newmap[neuron] = idx_range
-    #end
-    #systems::Vector{AbstractTimeDependentSystem} = union(extensions, collect(keys(newmap)))
-
-    union!(systems, neurons(topology))
+    union!(systems, extensions, compartments)
     return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
                                  defaults, topology, reversal_map, extensions;
-                                 checks = false)
-end
-
-function NeuronalNetworkSystem(topology::NetworkTopology{T, LIF},
-                               extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
-                               defaults = Dict(),
-                               name::Symbol = Base.gensym(:Network)) where {T}
-    g = graph(topology)
-    neurons = vertices(topology)
-    n = length(neurons)
-    @parameters W[1:n, 1:n] = g
-    #@variables (Syn_inp(t))[1:n] = zeros(n)
-    reversal_map = Dict()
-    gen = GeneratedCollections(systems = union(neurons, extensions),
-                               ps = Set(scalarize(W)))
-
-    (; eqs, dvs, ps, systems, observed) = gen
-
-    affect_eqs = Equation[]
-    spike_checks = [neuron.V >= neuron.V_th for neuron in neurons]
-
-    for (i, neuron) in enumerate(neurons)
-        push!(affect_eqs, neuron.I ~ neuron.I + sum(scalarize(W[:, i] .* spike_checks)))
-    end
-    # equations _are_ order-dependent here. We can do this more nicely with a generic func affect 
-    for (i, neuron) in enumerate(neurons)
-        push!(affect_eqs, neuron.V ~ ifelse(spike_checks[i], neuron.V_rest, neuron.V))
-    end
-
-    condition = reduce(|, spike_checks) # also tried with periodic callbacks--same issue
-    dcbs = [MTK.SymbolicDiscreteCallback(condition, affect_eqs)]
-    ccbs = MTK.SymbolicContinuousCallback[]
-    return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
-                                 defaults, ccbs, dcbs, topology, reversal_map, extensions;
                                  checks = false)
 end
 

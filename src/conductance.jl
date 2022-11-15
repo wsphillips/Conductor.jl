@@ -1,7 +1,22 @@
+# Model properties
+abstract type ConductanceModel end
 
+abstract type SynapticModel <: ConductanceType end
+abstract type AxialModel <: ConductanceType end
+abstract type ChannelModel <: ConductanceType end
+abstract type StimulusModel <: ConductanceType end
+
+abstract type EventBasedSynapse <: SynapticModel end
+abstract type IndependentEventsSynapse <: EventBasedSynapse end
+abstract type SummedEventsSynapse <: EventBasedSynapse end
+
+abstract type IntegratedSynapse <: SynapticModel end
+
+# returns 'g', the conductance of the system
 get_output(x::AbstractConductanceSystem) = getfield(x, :output)
+
+# used to manage systems whose state the conductance takes as input
 subscriptions(x::AbstractConductanceSystem) = getfield(x, :subscriptions)
-isaggregate(x::AbstractConductanceSystem) = getfield(x, :aggregate)
 
 function subscribe!(chan::AbstractConductanceSystem, comp)
     union!(subscriptions(chan), comp)
@@ -14,7 +29,7 @@ A model of conductance.
 
 $(FIELDS)
 """
-struct ConductanceSystem <: AbstractConductanceSystem
+struct ConductanceSystem{T<:ConductanceModel} <: AbstractConductanceSystem
     # MTK fields
     eqs::Vector{Equation}
     "Independent variable. Defaults to time, ``t``."
@@ -32,7 +47,7 @@ struct ConductanceSystem <: AbstractConductanceSystem
     gbar::Num
     "Permeability of the conductance."
     ion::IonSpecies
-    aggregate::Bool # temp until better solution
+    model::T
     "Gating variables."
     gate_vars::Vector{AbstractGatingVariable}
     "Extrinsic sources of state (e.g. presynaptic compartments)."
@@ -44,14 +59,14 @@ struct ConductanceSystem <: AbstractConductanceSystem
     extensions::Vector{ODESystem}
     inputs::Vector{Num}
     function ConductanceSystem(eqs, iv, states, ps, observed, name, systems, defaults,
-                               output, gbar, ion, aggregate, gate_vars, subscriptions,
+                               output, gbar, ion, model, gate_vars, subscriptions,
                                extensions, inputs;
                                checks = false)
         if checks
             #placeholder
         end
-        new(eqs, iv, states, ps, observed, name, systems, defaults, output, gbar, ion,
-            aggregate, gate_vars, subscriptions, extensions, inputs)
+        new{typeof(model)}(eqs, iv, states, ps, observed, name, systems, defaults, output,
+                           gbar, ion, model, gate_vars, subscriptions, extensions, inputs)
     end
 end
 
@@ -76,7 +91,6 @@ function ConductanceSystem(g::Num,
                            ion::IonSpecies,
                            gate_vars::Vector{<:AbstractGatingVariable};
                            gbar::Num,
-                           aggregate = false,
                            subscriptions = Vector{AbstractCompartmentSystem}(),
                            extensions::Vector{ODESystem} = ODESystem[],
                            defaults = Dict(),
@@ -93,8 +107,7 @@ function ConductanceSystem(g::Num,
 
     # incomplete initialization
     cond_sys = ConductanceSystem(eqs, t, Num[], Num[], observed, name, systems, defaults, g,
-                                 gbar, ion, aggregate, gate_vars, subscriptions, extensions,
-                                 Num[])
+                                 gbar, ion, gate_vars, subscriptions, extensions, Num[])
 
     gate_var_outputs = Set{Num}()
     embed_defaults = Dict()
@@ -114,7 +127,6 @@ function ConductanceSystem(g::Num,
         hasdefault(sym) && push!(embed_defaults, sym => getdefault(sym))
     end
 
-    # VALIDATE EACH EQUATION
     if isempty(gate_vars)
         eq = g ~ gbar
         validate(eq) && push!(eqs, eq)
@@ -139,14 +151,12 @@ function ConductanceSystem(x::ConductanceSystem;
                            ion = permeability(x),
                            gate_vars = get_gate_vars(x),
                            gbar = get_gbar(x),
-                           aggregate = isaggregate(x),
                            subscriptions = subscriptions(x),
                            extensions = get_extensions(x),
                            defaults = get_defaults(x),
                            name = nameof(x))
     ConductanceSystem(g, ion, gate_vars;
                       gbar = gbar,
-                      aggregate = aggregate,
                       subscriptions = subscriptions,
                       extensions = extensions,
                       defaults = defaults,
