@@ -36,25 +36,31 @@ indexof(sym, syms) = findfirst(isequal(sym), syms)
 CONSTANT_CONDITION(u, t, integrator) = true
 
 function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false,
-                    jac = false, sparse = false, parallel = nothing)
+                    jac = false, sparse = false, parallel = nothing, continuous_events = false)
     t_val, simplified = simplify_simulation(network, time)
-    if return_system
-        return simplified
+    return_system && return simplified
+    event_models = filter(x -> typeof(x) <: EventBasedSynapse, synaptic_models(network))
+    if isempty(event_models) # ie. all continuous synapses
+        return ODEProblem(simplified, [], (0.0, t_val), []; jac, sparse, parallel)
     else
-        if any(x -> typeof(x) <: EventBasedSynapse, keys(graph(topology(network))))
-            cb_affect = generate_network_callback(network, simplified)
-            dcb = DiscreteCallback(CONSTANT_CONDITION, cb_affect)
-            ODEProblem(simplified, [], (0.0, t_val), [];
-                       callback = dcb, jac, sparse, parallel)
-        else
-            ODEProblem(simplified, [], (0.0, t_val), []; jac, sparse, parallel)
+        for model in event_models
+            generate_callback(model, network, simplified; continuous_events)
         end
+        ODEProblem(simplified, [], (0.0, t_val), []; callback = cb, jac, sparse, parallel)
     end
 end
 
-function generate_network_callback(network, simplified)
-    spike_detection =
-    spike_affects = []
+# if continuous, we use a vector condition: cond(out, u, t, integrator)
+# conditions are model agnostic
+function generate_callback_condition(network, simplified; continuous_events)
+    if continuous_events
+       # return condition compatible with VectorContinuousCallback 
+    else
+        # n (# neurons) discrete conditions: cond(u, t, integrator)::Bool 
+    end
+end
+
+function generate_callback_affect(network, simplified; continuous_events)
 
     for _ in XXX
         push!(spike_affects) = YYY  
@@ -62,4 +68,10 @@ function generate_network_callback(network, simplified)
 
     tailcall = identity
     return NetworkCallbacks(spike_detection, spike_affects, tailcall)
+end
+
+function generate_callback(model, network, simplified; continuous_events)
+    cb_condition = generate_callback_condition(network, simplified; continuous_events)
+    cb_affect = generate_callback_affect(network, simplified; continuous_events)
+    return CallbackChain()   
 end

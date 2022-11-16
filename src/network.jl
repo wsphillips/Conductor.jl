@@ -8,6 +8,8 @@ struct NetworkTopology{T, F}
     compartments::Vector{CompartmentSystem{F}}
 end
 
+synaptic_models(topology::NetworkTopology) = keys(graph(topology))
+
 function NetworkTopology(neurons::Vector{CompartmentSystem{LIF}},
                          graph = SimpleDiGraph(lenght(neurons)); default_weight = 1.0)
     graph = adjacency_matrix(graph) * default_weight
@@ -150,6 +152,8 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
             extensions)
     end
 end
+
+synaptic_models(sys::NeuronalNetworkSystem) = synaptic_models(topology(sys))
 
 # events are handled by callbacks and do not modify
 function connect_synapses!(gen, syn, compartments, multigraph)

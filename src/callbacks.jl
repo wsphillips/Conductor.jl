@@ -7,7 +7,7 @@ function indexmap(syms, ref)
     return idxs
 end
 
-simple_spike_check(V,Vprev) = V >= 10. && Vprev < 10.
+simple_spike_check(V,Vprev)::Bool = V >= 10. && Vprev < 10.
 
 struct SimpleSpikeDetection
     voltage_indexes::Vector{Int}
@@ -21,24 +21,21 @@ function SimpleSpikeDetection(network, simplified)
     return SimpleSpikeDetection(Vm_idxs)
 end
 
-function (ssd::SimpleSpikeDetection)(integrator)::BitVector
-    idxs = ssd.voltage_indexes
-    V = view(integrator.u, idxs)
-    Vprev = view(integrator.uprev, idxs)
-    return simple_spike_check.(V, Vprev)
+# checks whether the i-th neuron spiked
+function (ssd::SimpleSpikeDetection)(integrator, i::Int)
+    idx = ssd.voltage_indexes[i]
+    V = integrator.u[idx]
+    Vprev = integrator.uprev[idx]
+    return simple_spike_check(V, Vprev)
 end
 
-struct SpikeAffect{G,F}
+struct SpikeAffect{M,F}
     state_indexes::Vector{Int}
-    graph::G
+    model::M
     affect!::F
 end
 
-function SpikeAffect(conductance, network, simplified)
-    SpikeAffect()
-end
-
-function SpikeAffect(conductance, network, simplified)
+function SpikeAffect(model, network, simplified)
     # calculate state indexes 
     dvs = states(simplified) # symbols in order of lowered system
     local_states = UpdatedStates(conductance) # local variable names in synapse
@@ -55,14 +52,14 @@ function SpikeAffect(conductance, network, simplified)
     
     state_indexes = indexmap()
 
-    return SpikeAffect(state_indexes, graph, affect!)
+    return SpikeAffect(state_indexes, model, affect!)
 end
 
-function (sa::SpikeAffect)(integrator, S)
+function (sa::SpikeAffect)(integrator, i)
     idxs = sa.state_indexes
-    g = sa.graph
+    g = weights(integrator.p) # needs to be correct layer for model
     states = view(integrator.u, idxs)
-    sa.affect!(states, S, g)
+    sa.affect!(states, g, i) # model-specfic affect
     return 
 end
 
