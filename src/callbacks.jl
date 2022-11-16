@@ -16,8 +16,8 @@ end
 function SimpleSpikeDetection(network, simplified)
     dvs = states(simplified)
     topo = get_topology(network)
-    neuron_Vms = voltage.(neurons(topo))
-    Vm_idxs = indexmap(neuron_Vms, dvs)
+    comp_Vms = renamespace.(network, voltage.(vertices(topo)))
+    Vm_idxs = indexmap(comp_Vms, dvs)
     return SimpleSpikeDetection(Vm_idxs)
 end
 
@@ -28,26 +28,63 @@ function (ssd::SimpleSpikeDetection)(integrator)::BitVector
     return simple_spike_check.(V, Vprev)
 end
 
-struct SimpleExponentialResponse
+struct SpikeAffect{G,F}
     state_indexes::Vector{Int}
-    graph
+    graph::G
+    affect!::F
 end
 
-function SimpleExponentialResponse(network, conductance, simplified)
+function SpikeAffect(conductance, network, simplified)
+    SpikeAffect()
+end
+
+function SpikeAffect(conductance, network, simplified)
     # calculate state indexes 
-    dvs = states(simplified)
-    topo = get_topology(network)
-    nrns = renamespace.(network, neurons(topo))
+    dvs = states(simplified) # symbols in order of lowered system
+    local_states = UpdatedStates(conductance) # local variable names in synapse
+
+    syss = get_systems(network)
+    compartments = renamespace.(network, syss)
+
     cond_name = nameof(conductance)
     
-    for nrn in nrns
-        if hasproperty(nrn, cond_name)
-
+    for comp in compartments
+        if hasproperty(comp, cond_name) # sanity check if the compartment has our syn model
         end
     end
+    
+    state_indexes = indexmap()
 
-    return SimpleExponentialResponse(state_indexes, graph)
+    return SpikeAffect(state_indexes, graph, affect!)
 end
+
+function (sa::SpikeAffect)(integrator, S)
+    idxs = sa.state_indexes
+    g = sa.graph
+    states = view(integrator.u, idxs)
+    sa.affect!(states, S, g)
+    return 
+end
+
+struct NetworkCallbacks{D,A,T}
+    spike_detection::D
+    spike_affects::Vector{A}
+    tailcall::T
+end
+
+function NetworkCallbacks(spike_detection, spike_affects, tailcall = identity)
+    return NetworkCallbacks(spike_detection, spike_affects, tailcall)
+end
+
+function (ncs::NetworkCallbacks)(integrator)
+    S = ncs.spike_detection(integrator)
+    for affect! in ncs.spike_affects
+        affect!(integrator, S)
+    end
+    ncs.tailcall(integrator)
+end
+
+############################################
 
 function simple_spike_propagation!(states, S, graph)
     rows = rowvals(graph) # presynaptic neuron indexes for each stored value
@@ -61,29 +98,4 @@ function simple_spike_propagation!(states, S, graph)
     end
 end
 
-function (ser::SimpleExponentialResponse)(integrator, S)
-    idxs = ser.state_indexes
-    g = ser.graph
-    states = view(integrator.u, idxs)
-    spike_propagation_callback!(states, S, g)
-    return 
-end
-
-struct NetworkCallbacks{D,R,V}
-    spike_detection::D
-    spike_responses::Vector{R}
-    voltage_reset::V
-end
-
-function NetworkCallbacks(spike_detection, spike_responses, voltage_reset = identity)
-    return NetworkCallbacks(spike_detection, spike_responses, voltage_reset)
-end
-
-function (ncs::NetworkCallbacks)(integrator)
-    S = ncs.spike_detection(integrator)
-    for sr! in spike_responses
-        sr!(integrator, S)
-    end
-    ncs.voltage_reset(integrator)
-end
 
