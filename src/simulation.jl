@@ -54,19 +54,25 @@ end
 # conditions are model agnostic
 function generate_callback_condition(network, simplified; continuous_events)
     if continuous_events
-       # return condition compatible with VectorContinuousCallback 
+       # return functor condition compatible with VectorContinuousCallback 
+       # cond(out, u, t, integrator)::Vector{eltype(u)}
+       # where out[i] == 0.0 for each event
+       # each neuron -> each event
     else
-        # n (# neurons) discrete conditions: cond(u, t, integrator)::Bool 
+       # n (# neurons) discrete conditions: cond(u, t, integrator)::Bool 
     end
 end
 
 function generate_callback_affect(network, simplified; continuous_events)
-
-    for _ in XXX
-        push!(spike_affects) = YYY  
+    if continuous_events
+        # return functor affect compatible with VectorContinuousCallback
+        # affect(integrator, i) where i denotes a spike from the i-th neuron
+        # applies the spike response for each synaptic model/network layer sequentially
+    else
+        # return functor  
     end
 
-    tailcall = identity
+    tailcall = identity # placeholder for 
     return NetworkCallbacks(spike_detection, spike_affects, tailcall)
 end
 
