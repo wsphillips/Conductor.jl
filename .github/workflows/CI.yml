@@ -8,6 +8,7 @@ on:
       - 'Project.toml'
       - 'Manifest.toml'
   pull_request:
+    types: ['opened', 'edited', 'reopened', 'synchronize', 'ready_for_review']
     branches: [ main ]
     paths:
       - 'src/**'
@@ -18,6 +19,7 @@ on:
   workflow_dispatch: # Allows running workflow manually from the Actions tab
 
 jobs:
+  if: ! github.event.pull_request.draft
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
