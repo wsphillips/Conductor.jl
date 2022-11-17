@@ -7,26 +7,25 @@ function indexmap(syms, ref)
     return idxs
 end
 
-simple_spike_check(V,Vprev)::Bool = V >= 10. && Vprev < 10.
+discrete_spike_check(V,Vprev)::Bool = V >= 10. && Vprev < 10.
 
-struct SimpleSpikeDetection
-    voltage_indexes::Vector{Int}
+struct DiscreteSpikeDetection
+    voltage_index::Int
 end
 
-function SimpleSpikeDetection(network, simplified)
+function voltage_indexes(network, simplified)
     dvs = states(simplified)
     topo = get_topology(network)
     comp_Vms = renamespace.(network, voltage.(vertices(topo)))
-    Vm_idxs = indexmap(comp_Vms, dvs)
-    return SimpleSpikeDetection(Vm_idxs)
+    return indexmap(comp_Vms, dvs)
 end
 
 # checks whether the i-th neuron spiked
-function (ssd::SimpleSpikeDetection)(integrator, i::Int)
-    idx = ssd.voltage_indexes[i]
-    V = integrator.u[idx]
+function (dsd::DiscreteSpikeDetection)(u, t, integrator)
+    idx = dsd.voltage_index
+    V = u[idx]
     Vprev = integrator.uprev[idx]
-    return simple_spike_check(V, Vprev)
+    return discrete_spike_check(V, Vprev)
 end
 
 struct SpikeAffect{M,F}

@@ -33,8 +33,6 @@ Base.getindex(x::NetworkParameters, i) = x.ps[i]
 topology(x::NetworkParameters) = getfield(x, :topology)
 indexof(sym, syms) = findfirst(isequal(sym), syms)
 
-CONSTANT_CONDITION(u, t, integrator) = true
-
 function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false,
                     jac = false, sparse = false, parallel = nothing, continuous_events = false)
     t_val, simplified = simplify_simulation(network, time)
@@ -51,7 +49,7 @@ function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = 
 end
 
 # if continuous, we use a vector condition: cond(out, u, t, integrator)
-# conditions are model agnostic
+# conditions should be synaptic model agnostic, but customizable (defines what a spike is)
 function generate_callback_condition(network, simplified; continuous_events)
     if continuous_events
        # return functor condition compatible with VectorContinuousCallback 
@@ -59,17 +57,22 @@ function generate_callback_condition(network, simplified; continuous_events)
        # where out[i] == 0.0 for each event
        # each neuron -> each event
     else
-       # n (# neurons) discrete conditions: cond(u, t, integrator)::Bool 
+        # callbacks
+        Vm_idxs = voltage_indexes(network, simplified)
+        return [DiscreteSpikeDetection(x) for x in Vm_idxs]
+        # n (# neurons) discrete conditions: cond(u, t, integrator)::Bool 
     end
 end
 
 function generate_callback_affect(network, simplified; continuous_events)
     if continuous_events
-        # return functor affect compatible with VectorContinuousCallback
-        # affect(integrator, i) where i denotes a spike from the i-th neuron
+        # return functor affect compatible with `VectorContinuousCallback`
+        # `affect(integrator, i)` where i denotes a spike from the i-th neuron
         # applies the spike response for each synaptic model/network layer sequentially
     else
-        # return functor  
+        # return two argument functor `affect(integrator, i)` as above, but we will apply
+        # `Base.Fix2(integrator, i)` for each neuron a priori. In the discrete case, spike
+        # event conditions and affects are applied independently in a long `CallbackChain`
     end
 
     tailcall = identity # placeholder for 
@@ -79,5 +82,10 @@ end
 function generate_callback(model, network, simplified; continuous_events)
     cb_condition = generate_callback_condition(network, simplified; continuous_events)
     cb_affect = generate_callback_affect(network, simplified; continuous_events)
-    return CallbackChain()   
+    if continuous_events
+        return VectorContinuousCallback(cb_condition, cb_affect) 
+    else
+        callbacks = DiscreteCallback.(cb_condition, cb_affect)   
+        return CallbackChain(callbacks...)
+    end
 end

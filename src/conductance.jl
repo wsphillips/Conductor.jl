@@ -12,8 +12,16 @@ abstract type SummedEventsSynapse <: EventBasedSynapse end
 
 abstract type IntegratedSynapse <: SynapticModel end
 
+# An `EventBasedSynapse` must include a field called `rule` that contains an equation of
+# the form: X ~ α
+# In the case of conductance-based models, the synaptic weight == gba
+# in the case of _current_-based models, the synaptic weight is multiplied by the update
+# value. (i.e. α is implicitly multiplied by W, the weight of that particular synapse)
+update_rule(x::EventBasedSynapse) = getfield(x, :rule)
+
 # returns 'g', the conductance of the system
 get_output(x::AbstractConductanceSystem) = getfield(x, :output)
+get_model(x::ConductanceSystem{T<:ConductanceModel}) = getfield(x, :model)
 
 # used to manage systems whose state the conductance takes as input
 subscriptions(x::AbstractConductanceSystem) = getfield(x, :subscriptions)
@@ -87,14 +95,14 @@ Main constructor for `ConductanceSystem`.
 - `defaults::Dict`: Default values for states and parameters.
 - `name::Symbol`: Name of the system.
 """
-function ConductanceSystem(g::Num,
-                           ion::IonSpecies,
-                           gate_vars::Vector{<:AbstractGatingVariable};
-                           gbar::Num,
-                           subscriptions = Vector{AbstractCompartmentSystem}(),
-                           extensions::Vector{ODESystem} = ODESystem[],
-                           defaults = Dict(),
-                           name::Symbol = Base.gensym("Conductance"))
+function ConductanceSystem(
+    model::T, g::Num, ion::IonSpecies,
+    gate_vars::Vector{<:AbstractGatingVariable};
+    gbar::Num, subscriptions = Vector{AbstractCompartmentSystem}(),
+    extensions::Vector{ODESystem} = ODESystem[], defaults = Dict(),
+    name::Symbol = Base.gensym("Conductance")
+    ) where {T<:ConductanceModel}
+
     gbar = setmetadata(gbar, ConductorMaxConductance, true)
 
     # Fields that will be generated
