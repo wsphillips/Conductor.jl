@@ -51,16 +51,12 @@ end
 # if continuous, we use a vector condition: cond(out, u, t, integrator)
 # conditions should be synaptic model agnostic, but customizable (defines what a spike is)
 function generate_callback_condition(network, simplified; continuous_events)
+    Vm_idxs = voltage_indexes(network, simplified)
     if continuous_events
-       # return functor condition compatible with VectorContinuousCallback 
-       # cond(out, u, t, integrator)::Vector{eltype(u)}
-       # where out[i] == 0.0 for each event
-       # each neuron -> each event
-    else
-        # callbacks
-        Vm_idxs = voltage_indexes(network, simplified)
+        # returns a single functor of form cond(out, u, t, integrator)::Vector{eltype(u)}
+        return ContinuousSpikeDetection(Vm_idxs)
+    else # n (# neurons) discrete conditions: cond(u, t, integrator)::Bool 
         return [DiscreteSpikeDetection(x) for x in Vm_idxs]
-        # n (# neurons) discrete conditions: cond(u, t, integrator)::Bool 
     end
 end
 

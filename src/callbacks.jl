@@ -9,18 +9,18 @@ end
 
 discrete_spike_check(V,Vprev)::Bool = V >= 10. && Vprev < 10.
 
+function voltage_indexes(network, simplified)
+    dvs = states(simplified)
+    compartments = get_systems(network)
+    comp_Vms = renamespace.(network, voltage.(compartments))
+    return indexmap(comp_Vms, dvs)
+end
+
 struct DiscreteSpikeDetection
     voltage_index::Int
 end
 
-function voltage_indexes(network, simplified)
-    dvs = states(simplified)
-    topo = get_topology(network)
-    comp_Vms = renamespace.(network, voltage.(vertices(topo)))
-    return indexmap(comp_Vms, dvs)
-end
-
-# checks whether the i-th neuron spiked
+# checks whether a pre-determined neuron spiked
 function (dsd::DiscreteSpikeDetection)(u, t, integrator)
     idx = dsd.voltage_index
     V = u[idx]
@@ -28,42 +28,80 @@ function (dsd::DiscreteSpikeDetection)(u, t, integrator)
     return discrete_spike_check(V, Vprev)
 end
 
-struct SpikeAffect{M,F}
-    state_indexes::Vector{Int}
-    model::M
-    affect!::F
+struct ContinuousSpikeDetection
+    voltage_indexex::Vector{Int}
 end
 
-function SpikeAffect(model, network, simplified)
+# checks all neurons for threshhold crossing, storing the result in `out`
+function (csd::ContinuousSpikeDetection)(out, u, t, integrator)
+    for (i, j) in enumerate(csd.voltage_indexes)
+        out[i] = u[j] - 10.0
+    end
+    return nothing
+end
+
+struct SpikeAffect{F,S}
+    state_indexes::Vector{Int} # the index of the modified state in every compartment
+    quantity_indexes::Vector{Tuple{Vector{Int},Vector{Int}}}
+    model_system::S
+    quantity::F # function that computes the 
+end
+
+function SpikeAffect(model_system, network, simplified)
     # calculate state indexes 
     dvs = states(simplified) # symbols in order of lowered system
-    local_states = UpdatedStates(conductance) # local variable names in synapse
+    ps = parameters(simplified)
+    rule = update_rule(model_system)
 
-    syss = get_systems(network)
-    compartments = renamespace.(network, syss)
-
-    cond_name = nameof(conductance)
+    # symbol for state namespaced wrt the conductance model
+    tmp = renamespace(model_system, updated_state)
     
-    for comp in compartments
-        if hasproperty(comp, cond_name) # sanity check if the compartment has our syn model
-        end
+    # fetches the state from every compartment
+    states_to_update = []
+    for sys in systems(network)
+        push!(states_to_update, renamespace(network, renamespace(sys, tmp)))
     end
-    
-    state_indexes = indexmap()
 
-    return SpikeAffect(state_indexes, model, affect!)
+    state_indexes = indexmap(states_to_update, dvs)
+    ############################################
+    updated_state = rule.lhs
+    update_quantity = rule.rhs
+
+    q_dvs, q_ps = [], []
+    collect_vars!(q_dvs, q_ps, update_quantity, t)
+
+    calc_quantity = @RuntimeGeneratedFunction(build_function(update_quantity, q_dvs, q_ps))
+    
+    # we have to map the indexes of the states and parameters used by the quantity calculation
+    # and order them the same as our compartments
+    # if the model is current based, we scale the synaptic weight by the update quantity
+
+    # 
+    q_dvs, q_ps = renamespace.(model_system, q_dvs), renamespace.(model_system, q_ps)
+    q_idx_pairs = []
+    for sys in systems(network)
+        idxs_dvs = indexmap(renamespace.(sys, q_dvs), dvs)
+        idxs_ps = indexmap(renamespace.(sys, q_ps), ps)
+        push!(q_idx_pairs, (indxs_dvs, idxs_ps))            
+    end
+
+    return SpikeAffect(state_indexes, q_idx_pairs, model_system, calc_quantity)
 end
 
-function (sa::SpikeAffect)(integrator, i)
-    idxs = sa.state_indexes
-    g = weights(integrator.p) # needs to be correct layer for model
+# for discrete callbacks, use Base.Fix2(sa, i)
+function (sa::SpikeAffect{F,S})(integrator, i) where {S<:ConductanceSystem{SummedEventsSynapse}}
+    state_idxs = sa.state_indexes
+    q_idx_pairs = quantity_indexes
+    multigraph = weights(integrator.p) # needs to be correct layer for model
+    g = multigraph[sa.model_system]
     states = view(integrator.u, idxs)
-    sa.affect!(states, g, i) # model-specfic affect
+    q_ps, q_dvs =  
+    
+
     return 
 end
 
-struct NetworkCallbacks{D,A,T}
-    spike_detection::D
+struct NetworkCallbacks{A,T}
     spike_affects::Vector{A}
     tailcall::T
 end

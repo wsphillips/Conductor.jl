@@ -18,7 +18,7 @@ abstract type IntegratedSynapse <: SynapticModel end
 # in the case of _current_-based models, the synaptic weight is multiplied by the update
 # value. (i.e. α is implicitly multiplied by W, the weight of that particular synapse)
 update_rule(x::EventBasedSynapse) = getfield(x, :rule)
-
+update_rule(x::ConductanceSystem{T<:EventBasedSynapse}) = update_rule(get_model(x))
 # returns 'g', the conductance of the system
 get_output(x::AbstractConductanceSystem) = getfield(x, :output)
 get_model(x::ConductanceSystem{T<:ConductanceModel}) = getfield(x, :model)
