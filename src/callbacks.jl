@@ -40,18 +40,21 @@ function (csd::ContinuousSpikeDetection)(out, u, t, integrator)
     return nothing
 end
 
-struct SpikeAffect{F,S}
+struct SymbolicSpikeAffect{F,S}
     state_indexes::Vector{Int} # the index of the modified state in every compartment
-    quantity_indexes::Vector{Tuple{Vector{Int},Vector{Int}}}
+    update_indexes::Vector{Tuple{Vector{Int},Vector{Int}}} # stencils for dvs and ps used by update function
     model_system::S
-    quantity::F # function that computes the 
+    update::F # function that computes the amount to perturb the synaptic state
 end
 
-function SpikeAffect(model_system, network, simplified)
+function SymbolicSpikeAffect(model_system::SymbolicUpdateSynapse, network, simplified)
     # calculate state indexes 
+    ###########################################
     dvs = states(simplified) # symbols in order of lowered system
     ps = parameters(simplified)
     rule = update_rule(model_system)
+    updated_state = rule.lhs
+    update_expr = rule.rhs
 
     # symbol for state namespaced wrt the conductance model
     tmp = renamespace(model_system, updated_state)
@@ -59,45 +62,48 @@ function SpikeAffect(model_system, network, simplified)
     # fetches the state from every compartment
     states_to_update = []
     for sys in systems(network)
-        push!(states_to_update, renamespace(network, renamespace(sys, tmp)))
+        push!(states_to_update, renamespace(sys, tmp))
     end
 
     state_indexes = indexmap(states_to_update, dvs)
     ############################################
-    updated_state = rule.lhs
-    update_quantity = rule.rhs
+    # update rule RGF
 
-    q_dvs, q_ps = [], []
-    collect_vars!(q_dvs, q_ps, update_quantity, t)
-
-    calc_quantity = @RuntimeGeneratedFunction(build_function(update_quantity, q_dvs, q_ps))
+    update_dvs, update_ps = [], []
+    collect_vars!(update_dvs, update_ps, update_expr, t)
     
-    # we have to map the indexes of the states and parameters used by the quantity calculation
-    # and order them the same as our compartments
-    # if the model is current based, we scale the synaptic weight by the update quantity
+    # returns RGF of form: update(dvs, ps) -> (new value of synaptic state)
+    update_function = @RuntimeGeneratedFunction(build_function(update_expr, update_dvs, update_ps))
+    
+    # renamespace to the current/conductance system
+    update_dvs, update_ps = renamespace.(model_system, update_dvs), renamespace.(model_system, update_ps)
 
-    # 
-    q_dvs, q_ps = renamespace.(model_system, q_dvs), renamespace.(model_system, q_ps)
-    q_idx_pairs = []
+    # vector of tuples containing the index stencil for dvs and ps of each compartment
+    update_idx_pairs = []
     for sys in systems(network)
-        idxs_dvs = indexmap(renamespace.(sys, q_dvs), dvs)
-        idxs_ps = indexmap(renamespace.(sys, q_ps), ps)
-        push!(q_idx_pairs, (indxs_dvs, idxs_ps))            
+        idxs_dvs = indexmap(renamespace.(sys, update_dvs), dvs)
+        idxs_ps = indexmap(renamespace.(sys, update_ps), ps)
+        push!(update_idx_pairs, (idxs_dvs, idxs_ps))            
     end
 
-    return SpikeAffect(state_indexes, q_idx_pairs, model_system, calc_quantity)
+    return SpikeAffect(state_indexes, update_idx_pairs, model_system, update_function)
 end
 
 # for discrete callbacks, use Base.Fix2(sa, i)
-function (sa::SpikeAffect{F,S})(integrator, i) where {S<:ConductanceSystem{SummedEventsSynapse}}
-    state_idxs = sa.state_indexes
-    q_idx_pairs = quantity_indexes
-    multigraph = weights(integrator.p) # needs to be correct layer for model
-    g = multigraph[sa.model_system]
-    states = view(integrator.u, idxs)
-    q_ps, q_dvs =  
-    
-
+# weights matrix should be a column-wise presynaptic neurons (transpose of standard form)
+# this is a sparse update; it might be simpler (but potentially expensive) to do dense?
+function (sa::SymbolicSpikeAffect{F,S})(integrator, i)
+    g = weights(integrator.p)[sa.model_system] # layer-specific adjacency matrix
+    update = sa.update 
+    rows = rowvals(g)
+    vals = nonzeros(g)
+    for j in nzrange(g, i) # index range of the nonzero values in the ith column
+        post = rows[j] # each post synaptic target
+        W = vals[j] # weight of connection
+        state_index, update_indexes = sa.state_indexes[post], sa.update_indexes[post]
+        dvs, ps = view(integrator.u, update_indexes[1]), view(integrator.p, update_indexes[2])
+        integrator.u[post] += update(dvs, ps) * W
+    end
     return 
 end
 
@@ -119,7 +125,7 @@ function (ncs::NetworkCallbacks)(integrator)
 end
 
 ############################################
-
+#=
 function simple_spike_propagation!(states, S, graph)
     rows = rowvals(graph) # presynaptic neuron indexes for each stored value
     vals = nonzeros(graph) # weights
@@ -131,5 +137,5 @@ function simple_spike_propagation!(states, S, graph)
         end
     end
 end
-
+=#
 
