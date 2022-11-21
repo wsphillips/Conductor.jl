@@ -40,6 +40,49 @@ function (csd::ContinuousSpikeDetection)(out, u, t, integrator)
     return nothing
 end
 
+struct AlphaSynapse <: SummedEventSynapse end
+
+function AlphaSynapse()
+    
+    return AlphaSynapse()
+end
+
+function (as::AlphaSynapse)(integrator, i)
+    
+    return nothing
+end
+
+struct NetworkAffects{A,T}
+    spike_affects::Vector{A}
+    tailcall::T
+end
+
+function NetworkAffects(spike_affects, tailcall = identity)
+    return NetworkAffects(spike_affects, tailcall)
+end
+
+function (net::NetworkAffects)(integrator, i)
+    for affect! in ncs.spike_affects
+        affect!(integrator, i)
+    end
+    ncs.tailcall(integrator, i)
+end
+
+############################################
+#=
+function simple_spike_propagation!(states, S, graph)
+    rows = rowvals(graph) # presynaptic neuron indexes for each stored value
+    vals = nonzeros(graph) # weights
+    n = size(graph, 1) # n columns
+    for i in 1:n
+        for j in nzrange(graph, i)
+            S[rows[j]] || continue
+            states[i] += vals[j]
+        end
+    end
+end
+=#
+
 struct SymbolicSpikeAffect{F,S}
     state_indexes::Vector{Int} # the index of the modified state in every compartment
     update_indexes::Vector{Tuple{Vector{Int},Vector{Int}}} # stencils for dvs and ps used by update function
@@ -66,8 +109,7 @@ function SymbolicSpikeAffect(model_system::SymbolicUpdateSynapse, network, simpl
     end
 
     state_indexes = indexmap(states_to_update, dvs)
-    ############################################
-    # update rule RGF
+    ###########################################
 
     update_dvs, update_ps = [], []
     collect_vars!(update_dvs, update_ps, update_expr, t)
@@ -107,35 +149,4 @@ function (sa::SymbolicSpikeAffect{F,S})(integrator, i)
     return 
 end
 
-struct NetworkCallbacks{A,T}
-    spike_affects::Vector{A}
-    tailcall::T
-end
-
-function NetworkCallbacks(spike_detection, spike_affects, tailcall = identity)
-    return NetworkCallbacks(spike_detection, spike_affects, tailcall)
-end
-
-function (ncs::NetworkCallbacks)(integrator)
-    S = ncs.spike_detection(integrator)
-    for affect! in ncs.spike_affects
-        affect!(integrator, S)
-    end
-    ncs.tailcall(integrator)
-end
-
-############################################
-#=
-function simple_spike_propagation!(states, S, graph)
-    rows = rowvals(graph) # presynaptic neuron indexes for each stored value
-    vals = nonzeros(graph) # weights
-    n = size(graph, 1) # n columns
-    for i in 1:n
-        for j in nzrange(graph, i)
-            S[rows[j]] || continue
-            states[i] += vals[j]
-        end
-    end
-end
-=#
 
