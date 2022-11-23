@@ -1,4 +1,8 @@
 
+iseventbased(x) = false
+iseventbased(x::ConductanceSystem{<:EventBasedSynapse}) = true
+iseventbased(x::CurrentSystem{<:EventBasedSynapse}) = true
+
 function indexmap(syms, ref)
     idxs = similar(syms, Int64)
     for i in eachindex(syms)
@@ -75,14 +79,20 @@ function (net::NetworkAffects{A,T})(integrator, i) where {A,T}
     ncs.tailcall(integrator, i)
 end
 
+struct SpikeAffect{M}
+    model_system::M
+    state_indices::Vector{Int}
+end
+
 ############################################################################################
 
 struct ConstantUpdate{T} <: SummedEventSynapse
     alpha::T
 end
 
-struct SpikeAffect{M}
-    model_system::M
-    state_indexes::Vector{Int}
+function (cu::SpikeAffect{ConstantUpdate})(integrator, i)
+    index = cu.state_indices[i]
+    alpha = cu.model_system.alpha
+    integrator.u[index] += alpha
 end
 
