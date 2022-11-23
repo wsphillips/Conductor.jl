@@ -9,7 +9,7 @@ end
 
 discrete_spike_check(V,Vprev)::Bool = V >= 10. && Vprev < 10.
 
-function voltage_indexes(network, simplified)
+function map_voltage_indices(network, simplified)
     dvs = states(simplified)
     compartments = get_systems(network)
     comp_Vms = renamespace.(network, voltage.(compartments))
@@ -29,28 +29,32 @@ function (dsd::DiscreteSpikeDetection)(u, t, integrator)
 end
 
 struct ContinuousSpikeDetection
-    voltage_indexex::Vector{Int}
+    voltage_indices::Vector{Int}
 end
 
 # checks all neurons for threshhold crossing, storing the result in `out`
 function (csd::ContinuousSpikeDetection)(out, u, t, integrator)
-    for (i, j) in enumerate(csd.voltage_indexes)
+    for (i, j) in enumerate(csd.voltage_indices)
         out[i] = u[j] - 10.0
     end
     return nothing
 end
 
-struct AlphaSynapse <: SummedEventSynapse end
-
-function AlphaSynapse()
-    
-    return AlphaSynapse()
+# voltage reset optional; determined by _compartment model_ not synapse
+struct VoltageReset{T}
+    voltage_indices::Vector{Int}
+    V_rest::T
 end
 
-function (as::AlphaSynapse)(integrator, i)
-    
-    return nothing
+function VoltageReset(network, simplified, resting)
+    VoltageReset(network, simplified, resting) 
 end
+
+function (vr::VoltageReset)(integrator, i)
+    idx = vr.voltage_indices[i]
+    integrator.u[idx] = vr.V_rest
+end
+
 
 struct NetworkAffects{A,T}
     spike_affects::Vector{A}
@@ -68,6 +72,17 @@ function (net::NetworkAffects)(integrator, i)
     ncs.tailcall(integrator, i)
 end
 
+############################################################################################
+
+struct ConstantUpdate{T} <: SummedEventSynapse
+    alpha::T
+end
+
+struct SpikeAffect{M}
+    model_system::M
+    state_indexes::Vector{Int}
+end
+
 ############################################
 #=
 function simple_spike_propagation!(states, S, graph)
@@ -83,14 +98,12 @@ function simple_spike_propagation!(states, S, graph)
 end
 =#
 
-struct SymbolicSpikeAffect{F,S}
-    state_indexes::Vector{Int} # the index of the modified state in every compartment
-    update_indexes::Vector{Tuple{Vector{Int},Vector{Int}}} # stencils for dvs and ps used by update function
-    model_system::S
-    update::F # function that computes the amount to perturb the synaptic state
+struct SymbolicUpdate{F} <: SummedEventSynapse
+    update_indexes::Vector{Tuple{Vector{Int},Vector{Int}}}
+    update::F
 end
 
-function SymbolicSpikeAffect(model_system::SymbolicUpdateSynapse, network, simplified)
+function SymbolicSpikeAffect(system::ConductanceSystem{SymbolicUpdate}, network, simplified)
     # calculate state indexes 
     ###########################################
     dvs = states(simplified) # symbols in order of lowered system

@@ -51,7 +51,7 @@ end
 # if continuous, we use a vector condition: cond(out, u, t, integrator)
 # conditions should be synaptic model agnostic, but customizable (defines what a spike is)
 function generate_callback_condition(network, simplified; continuous_events)
-    Vm_idxs = voltage_indexes(network, simplified)
+    Vm_idxs = map_voltage_indices(network, simplified)
     if continuous_events
         # returns a single functor of form cond(out, u, t, integrator)::Vector{eltype(u)}
         return ContinuousSpikeDetection(Vm_idxs)
@@ -61,17 +61,30 @@ function generate_callback_condition(network, simplified; continuous_events)
 end
 
 function generate_callback_affect(network, simplified; continuous_events)
+    spike_affects = Dict() 
     if continuous_events
-        # return functor affect compatible with `VectorContinuousCallback`
+        # return single functor affect compatible with `VectorContinuousCallback`
         # `affect(integrator, i)` where i denotes a spike from the i-th neuron
         # applies the spike response for each synaptic model/network layer sequentially
+        for model in layers(network)
+            spike_affects[model] = SpikeAffect(model, network, simplified)
+        end
     else
+        # return vector of affects
         # return two argument functor `affect(integrator, i)` as above, but we will apply
         # `Base.Fix2(integrator, i)` for each neuron a priori. In the discrete case, spike
         # event conditions and affects are applied independently in a long `CallbackChain`
-    end
 
-    tailcall = identity # placeholder for 
+        nrn_affects = []
+        for model in layers(network)
+            for (i, neuron) in neurons(network)
+                push!(nrn_affects,
+                      Base.Fix2(SpikeAffect(model, network, simplified), i))
+            end
+        end
+        spike_affects[model] = nrn_affects
+    end
+    tailcall = identity # placeholder for voltage reset
     return NetworkCallbacks(spike_detection, spike_affects, tailcall)
 end
 
