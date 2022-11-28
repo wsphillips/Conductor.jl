@@ -3,14 +3,6 @@ iseventbased(x) = false
 iseventbased(x::ConductanceSystem{<:EventBasedSynapse}) = true
 iseventbased(x::CurrentSystem{<:EventBasedSynapse}) = true
 
-function indexmap(syms, ref)
-    idxs = similar(syms, Int64)
-    for i in eachindex(syms)
-        idxs[i] = indexof(syms[i], ref)
-    end
-    return idxs
-end
-
 discrete_spike_check(V,Vprev)::Bool = V >= 10. && Vprev < 10.
 
 function map_voltage_indices(network, simplified)
@@ -79,20 +71,44 @@ function (net::NetworkAffects{A,T})(integrator, i) where {A,T}
     ncs.tailcall(integrator, i)
 end
 
+const SynapticSystem{M} = Union{ConductanceSystem{M},CurrentSystem{M}} where {M<:SynapticModel}
+
 struct SpikeAffect{M}
-    model_system::M
+    synaptic_system::SynapticSystem{M}
     state_indices::Vector{Int}
 end
 
+get_model(sa::SpikeAffect) = get_model(sa.synaptic_system)
+
 ############################################################################################
 
-struct ConstantUpdate{T} <: SummedEventSynapse
+struct ConstantValueEvent{T} <: SummedEventSynapse
+    alpha::T # amount (real value) to perturb by
+    state::Num # symbolic state in (each) postsynaptic compartment to perturb
+    # weighted_events::Bool # apply weights to alpha or not
+    # saturation::T # events ignored when state ≥ saturation
+end
+
+function SpikeAffect(synsys::SynapticSystem{ConstantValueEvent}, network, simplified)
+    model = get_model(synsys)
+    comps = compartments(topology(network))
+    syn_states = renamespace.(comps, model.state)
+    state_indices = indexmap(syn_states, states(simplified))
+    return SpikeAffect{ConstantValueEvent}(synsys, state_indices)
+end
+
+function (cv::SpikeAffect{ConstantValueEvent})(integrator, i)
+    model = get_model(cv)
+    # retrieve model-specific graph layer from multigraph
+    g = get_weights(integrator, model)
+    # row numbers of non-zero values from the ith column of the sparse matrix
+    rows = view(rowvals(g), nzrange(g,i)) # i.e. indexes of post_synaptic compartment(s)
+    for i in view(cv.state_indices, rows)
+        integrator.u[i] += model.alpha
+    end
+end
+
+struct WeightedValueEvent{T} <: SummedEventSynapse
     alpha::T
+    state::Num
 end
-
-function (cu::SpikeAffect{ConstantUpdate})(integrator, i)
-    index = cu.state_indices[i]
-    alpha = cu.model_system.alpha
-    integrator.u[index] += alpha
-end
-

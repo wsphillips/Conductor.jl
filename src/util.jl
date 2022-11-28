@@ -25,6 +25,18 @@ end
 
 import Symbolics: unwrap, symtype, getindex_posthook
 
+indexof(sym, syms) = findfirst(isequal(sym), syms)
+
+function indexmap(syms, ref)
+    idxs = Int64[]
+    for sym in syms
+        idx = indexof(sym, ref)
+        isnothing(idx) && continue # drop symbols that dont exist
+        push!(idxs, idx)
+    end
+    return idxs
+end
+
 namegen(name) = Symbol(filter(x -> x !== '#', String(Base.gensym(name))))
 
 function replicate(x::Union{AbstractCompartmentSystem, AbstractConductanceSystem})
@@ -61,3 +73,4 @@ function set_symarray_metadata(x, ctx, val)
         setmetadata(x, ctx, val)
     end
 end
+

@@ -190,6 +190,6 @@ function ModelingToolkit.get_eqs(var::Gate{HeavisideSum}, chan)
     #    sat_sym = Symbol(getname(out), "₊sat")
     #    sat = only(@parameters $sat_sym=sat_val [unit = NoUnits])
     #    # out cannot continue to grow past the saturation limit
-    #    return [D(out) ~ (out < sat) * sum(Vₓ .>= thold) .- (out / decay)]
+    #    return [D(out) ~ (out < sat) * sum(Vₓ .>= thold) - (out / decay)]
     #end
 end

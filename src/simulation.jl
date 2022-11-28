@@ -31,13 +31,12 @@ end
 
 Base.getindex(x::NetworkParameters, i) = x.ps[i]
 topology(x::NetworkParameters) = getfield(x, :topology)
-indexof(sym, syms) = findfirst(isequal(sym), syms)
 
 function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false,
                     jac = false, sparse = false, parallel = nothing, continuous_events = false)
     t_val, simplified = simplify_simulation(network, time)
     return_system && return simplified
-    if !any(iseventbased.(synaptic_models(network)))
+    if !any(iseventbased.(synaptic_systems(network)))
         return ODEProblem(simplified, [], (0.0, t_val), []; jac, sparse, parallel)
     else
         cb = generate_callback(network, simplified; continuous_events)
@@ -57,8 +56,8 @@ end
 
 function generate_callback_affects(network, simplified)
     spike_affects = []
-    for model in synaptic_models(network)
-        push!(spike_affects, SpikeAffect(model, network, simplified))
+    for sys in synaptic_systems(network)
+        push!(spike_affects, SpikeAffect(sys, network, simplified))
     end
     tailcall = nothing # placeholder for voltage reset
     return NetworkAffects(spike_affects, tailcall)
@@ -70,8 +69,8 @@ function generate_callback(network, simplified; continuous_events)
     if continuous_events
         return VectorContinuousCallback(cb_condition, cb_affect) 
     else
-        affects_vector = [Base.Fix2(cb_affect, i) for i in length(compartments(network))]
-        callbacks = DiscreteCallback.(cb_condition, cb_affect)
+        affects = [Base.Fix2(cb_affect, i) for i in length(compartments(network))]
+        callbacks = DiscreteCallback.(cb_condition, affects)
         return CallbackChain(callbacks...)
     end
 end

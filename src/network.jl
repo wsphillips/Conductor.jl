@@ -4,18 +4,18 @@ struct NetworkTopology
     neurons::Vector{Vector{CompartmentSystem}}
 end
 
-synaptic_models(topology::NetworkTopology) = keys(graph(topology))
+synaptic_systems(topology::NetworkTopology) = keys(graph(topology))
 
-function NetworkTopology(neurons, synaptic_models)
+function NetworkTopology(neurons, synaptic_systems)
     m = length(neurons)
     n = sum(length(neuron) for neuron in neurons)
-    multigraph = Dict(x => sparse(Int64[], Int64[], Float64[], m, n) for x in synaptic_models)
+    multigraph = Dict(x => sparse(Int64[], Int64[], Float64[], m, n) for x in synaptic_systems)
     return NetworkTopology(multigraph, neurons)
 end
 
-function NetworkTopology(g::SimpleDiGraph, neurons, synaptic_model,
-                         default_weight = get_gbar(synaptic_model))
-    multigraph = Dict(synaptic_model => adjacency_matrix(g) * default_weight)
+function NetworkTopology(g::SimpleDiGraph, neurons, synaptic_system,
+                         default_weight = get_gbar(synaptic_system))
+    multigraph = Dict(synaptic_system => adjacency_matrix(g) * default_weight)
     return NetworkTopology(multigraph, neurons)
 end
 
@@ -24,26 +24,26 @@ compartments(topology::NetworkTopology) = vcat(neurons(topology))
 root_compartments(topology::NetworkTopology) = [first(neuron) for neuron in neurons(topology)]
 graph(topology::NetworkTopology) = getfield(topology, :multigraph)
 
-function add_synapse!(topology, pre, post, synaptic_model, weight)
+function add_synapse!(topology, pre, post, synaptic_system, weight)
     src = find_source(pre, topology)
     dst = find_target(post, topology)
-    g = graph(topology)[synaptic_model]
+    g = graph(topology)[synaptic_system]
     g[src, dst] = weight
 end
 
-function remove_synapse!(topology, pre, post, synaptic_model)
+function remove_synapse!(topology, pre, post, synaptic_system)
     src = find_source(pre, topology)
     dst = find_target(post, topology)
-    g = graph(topology)[synaptic_model]
+    g = graph(topology)[synaptic_system]
     g[src, dst] = zero(Num)
     dropzeros!(g)
 end
 
 # FIXME: needs update
-function add_layer!(topology, synaptic_model::ConductanceSystem,
+function add_layer!(topology, synaptic_system::ConductanceSystem,
                     g = SimpleDiGraph(length(vertices(topology))),
-                    default_weight = get_gbar(synaptic_model))
-    push!(graph(topology), synaptic_model => adjacency_matrix(g) * default_weight)
+                    default_weight = get_gbar(synaptic_system))
+    push!(graph(topology), synaptic_system => adjacency_matrix(g) * default_weight)
 end
 
 Base.eltype(nt::NetworkTopology) = AbstractCompartmentSystem
@@ -61,8 +61,12 @@ function Base.iterate(rev_nt::Iterators.Reverse{NetworkTopology},
     return (neurons(nt)[state], state - 1)
 end
 
-function Base.getindex(nt::NetworkTopology, i)
+function Base.getindex(nt::NetworkTopology, i::Int64)
     return neurons(nt)[i]
+end
+
+function Base.getindex(nt::NetworkTopology, sys::AbstractSystem)
+    return nt.multigraph[sys]
 end
 
 Base.firstindex(nt::NetworkTopology) = 1
@@ -120,7 +124,7 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     end
 end
 
-synaptic_models(sys::NeuronalNetworkSystem) = synaptic_models(topology(sys))
+synaptic_systems(sys::NeuronalNetworkSystem) = synaptic_systems(topology(sys))
 
 # events are handled by callbacks and do not modify
 function connect_synapses!(gen, syn_model, compartments, topology)
@@ -193,8 +197,8 @@ function NeuronalNetworkSystem(topology::NetworkTopology, reversal_map,
     (; eqs, dvs, ps, systems, observed, defs) = gen
     comps = compartments(topology) 
     multigraph = graph(topology)
-    for synaptic_model in synaptic_models(topology)
-        comps = connect_synapses!(gen, synaptic_model, comps, multigraph)
+    for sys in synaptic_systems(topology)
+        comps = connect_synapses!(gen, sys, comps, multigraph)
     end
 
     union!(systems, extensions, compartments)
