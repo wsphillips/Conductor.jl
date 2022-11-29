@@ -1,7 +1,5 @@
 
-abstract type Stimulus end
-
-struct Bias{T} <: Stimulus
+struct Bias{T} <: StimulusModel
     val::Any
     name::Symbol
 end
@@ -10,7 +8,7 @@ function Bias(amplitude::T; name = Base.gensym("bias")) where {T <: Current}
     return Bias{T}(ustrip(µA, amplitude), name)
 end
 
-struct PulseTrain{U} <: Stimulus
+struct PulseTrain{U} <: StimulusModel
     interval::Any
     duration::Any
     delay::Any

@@ -6,7 +6,7 @@ end
 
 synaptic_systems(topology::NetworkTopology) = keys(graph(topology))
 
-function NetworkTopology(neurons, synaptic_systems)
+function NetworkTopology(neurons::Vector, synaptic_systems::Vector)
     m = length(neurons)
     n = sum(length(neuron) for neuron in neurons)
     multigraph = Dict(x => sparse(Int64[], Int64[], Float64[], m, n) for x in synaptic_systems)
@@ -189,7 +189,7 @@ Basic constructor for a `NeuronalNetworkSystem`.
 function NeuronalNetworkSystem(topology::NetworkTopology, reversal_map,
                                extensions::Vector{<:AbstractTimeDependentSystem} = AbstractTimeDependentSystem[];
                                defaults = Dict(),
-                               name::Symbol = Base.gensym(:Network)) where {T}
+                               name::Symbol = Base.gensym(:Network))
 
     reversal_map = reversal_map isa AbstractDict ? reversal_map : Dict(reversal_map)
 

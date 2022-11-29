@@ -116,6 +116,19 @@ abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
 abstract type AbstractNeuronalNetworkSystem <: AbstractTimeDependentSystem end
 
+# Model properties
+abstract type ConductanceModel end
+
+abstract type SynapticModel <: ConductanceModel end
+struct AxialModel <: ConductanceModel end
+struct ChannelModel <: ConductanceModel end
+abstract type StimulusModel <: ConductanceModel end
+
+abstract type EventBasedSynapse <: SynapticModel end
+abstract type IndependentEventsSynapse <: EventBasedSynapse end
+abstract type SummedEventsSynapse <: EventBasedSynapse end
+abstract type IntegratedSynapse <: SynapticModel end
+
 include("util.jl")
 include("primitives.jl")
 include("stimulus.jl")

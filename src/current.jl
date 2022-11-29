@@ -95,12 +95,12 @@ ion(x::CurrentSystem) = getfield(x, :ion)
 get_extensions(x::AbstractCurrentSystem) = getfield(x, :extensions)
 get_inputs(x::CurrentSystem) = getfield(x, :inputs)
 get_output(x::CurrentSystem) = getfield(x, :output)
-get_model(x::CurrentSystem{T<:ConductanceModel}) = getfield(x, :model)
+get_model(x::CurrentSystem{<:ConductanceModel}) = getfield(x, :model)
 output(x::CurrentSystem) = renamespace(x, get_output(x))
 inputs(x::CurrentSystem) = renamespace.(x, get_inputs(x))
 
 # Main method for conductance based construction
-function CurrentSystem(Vₘ::Num, cond::ConductanceSystem, Erev::Num;
+function CurrentSystem(Vₘ::Num, cond::ConductanceSystem{<:ConductanceModel}, Erev::Num;
                        aₘ = 1, extensions::Vector{ODESystem} = ODESystem[],
                        defaults = Dict(), name::Symbol = nameof(cond))
     
@@ -128,7 +128,7 @@ function CurrentSystem(Vₘ::Num, stimulus::Bias{T};
     Iₑ = IonCurrent(stimulus) # creates symbolic with stored default/metadata
     push!(ps, Iₑ)
     return CurrentSystem(eqs, t, collect(dvs), collect(ps), observed, stimulus.name, [],
-                         defs, Iₑ, Set{Num}(), NonIonic, false; checks = false)
+                         defs, Iₑ, Set{Num}(), NonIonic, stimulus; checks = false)
 end
 
 # stimulus (pulse train)
@@ -138,7 +138,7 @@ function CurrentSystem(Vₘ::Num, stimulus::PulseTrain{T}) where {T <: Current}
     push!(dvs, Iₑ)
     push!(eqs, Iₑ ~ current_pulses(t, stimulus))
     return CurrentSystem(eqs, t, collect(dvs), collect(ps), observed, stimulus.name, [],
-                         defs, Iₑ, Set{Num}(), NonIonic, false; checks = false)
+                         defs, Iₑ, Set{Num}(), NonIonic, stimulus; checks = false)
 end
 
 function Base.convert(::Type{ODESystem}, currsys::CurrentSystem)

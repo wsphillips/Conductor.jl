@@ -29,7 +29,7 @@ struct CompartmentSystem{T <: AbstractDynamics} <: AbstractCompartmentSystem
     extensions::Vector{ODESystem}
     synapses::Vector{Synapse{<:AbstractSystem}}
     arbor::Arborization
-    stimuli::Vector{<:Stimulus}
+    stimuli::Vector{<:StimulusModel}
     "Morphological geometry of the compartment."
     geometry::Geometry
     function CompartmentSystem(voltage, dynamics::T, capacitance, eqs, iv, states, ps,
@@ -110,7 +110,7 @@ end
 function CompartmentSystem(Vₘ::Num, dynamics::T; defaults = Dict(),
                            capacitance = 1µF/cm^2,
                            geometry::Geometry = Point(),
-                           stimuli::Vector{<:Stimulus} = Stimulus[],
+                           stimuli::Vector{<:StimulusModel} = StimulusModel[],
                            extensions::Vector{ODESystem} = ODESystem[],
                            name::Symbol = Base.gensym("Compartment"),
                           ) where {T <: AbstractDynamics}
@@ -124,7 +124,7 @@ function CompartmentSystem(Vₘ::Num, dynamics::T; defaults = Dict(),
 end
 
 function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses::Vector{<:Synapse}, arbor, cₘ,
-        geometry::Geometry, stimuli::Vector{<:Stimulus}, defaults, extensions, name)
+        geometry::Geometry, stimuli::Vector{<:StimulusModel}, defaults, extensions, name)
     Vₘ = LocalScope(Vₘ)
     @parameters aₘ=area(geometry) [unit = cm^2]
     gen = GeneratedCollections(dvs = Set(Vₘ), ps = Set((aₘ, cₘ)))

@@ -61,7 +61,7 @@ function generate_currents!(currents, current_systems, gen, dynamics::Arborizati
 end
 
 
-function generate_currents!(currents, current_systems, gen, stimuli::Vector{<:Stimulus}, Vₘ, aₘ)
+function generate_currents!(currents, current_systems, gen, stimuli::Vector{<:StimulusModel}, Vₘ, aₘ)
     for stimulus in stimuli
         sys = CurrentSystem(ParentScope(Vₘ), stimulus)
         push!(current_systems, sys)

@@ -1,28 +1,3 @@
-# Model properties
-abstract type ConductanceModel end
-
-abstract type SynapticModel <: ConductanceType end
-abstract type AxialModel <: ConductanceType end
-abstract type ChannelModel <: ConductanceType end
-abstract type StimulusModel <: ConductanceType end
-
-abstract type EventBasedSynapse <: SynapticModel end
-abstract type IndependentEventsSynapse <: EventBasedSynapse end
-abstract type SummedEventsSynapse <: EventBasedSynapse end
-
-abstract type IntegratedSynapse <: SynapticModel end
-
-# An `EventBasedSynapse` must include a field called `rule` that contains an equation of
-# the form: X ~ α
-# In the case of conductance-based models, the synaptic weight == gba
-# in the case of _current_-based models, the synaptic weight is multiplied by the update
-# value. (i.e. α is implicitly multiplied by W, the weight of that particular synapse)
-update_rule(x::EventBasedSynapse) = getfield(x, :rule)
-update_rule(x::ConductanceSystem{T<:EventBasedSynapse}) = update_rule(get_model(x))
-# returns 'g', the conductance of the system
-get_output(x::AbstractConductanceSystem) = getfield(x, :output)
-get_model(x::ConductanceSystem{T<:ConductanceModel}) = getfield(x, :model)
-
 # used to manage systems whose state the conductance takes as input
 subscriptions(x::AbstractConductanceSystem) = getfield(x, :subscriptions)
 
@@ -83,6 +58,17 @@ const Conductance = ConductanceSystem
 permeability(x::ConductanceSystem) = getfield(x, :ion)
 get_gbar(x::ConductanceSystem) = getfield(x, :gbar)
 get_gate_vars(x::ConductanceSystem) = getfield(x, :gate_vars)
+# An `EventBasedSynapse` must include a field called `rule` that contains an equation of
+# the form: X ~ α
+# In the case of conductance-based models, the synaptic weight == gba
+# in the case of _current_-based models, the synaptic weight is multiplied by the update
+# value. (i.e. α is implicitly multiplied by W, the weight of that particular synapse)
+update_rule(x::EventBasedSynapse) = getfield(x, :rule)
+update_rule(x::ConductanceSystem{<:EventBasedSynapse}) = update_rule(get_model(x))
+# returns 'g', the conductance of the system
+get_output(x::AbstractConductanceSystem) = getfield(x, :output)
+get_model(x::ConductanceSystem{<:ConductanceModel}) = getfield(x, :model)
+
 """
     ConductanceSystem(g, ion, gate_vars; <keyword arguments>)
 
@@ -115,7 +101,7 @@ function ConductanceSystem(
 
     # incomplete initialization
     cond_sys = ConductanceSystem(eqs, t, Num[], Num[], observed, name, systems, defaults, g,
-                                 gbar, ion, gate_vars, subscriptions, extensions, Num[])
+                                 gbar, ion, model, gate_vars, subscriptions, extensions, Num[])
 
     gate_var_outputs = Set{Num}()
     embed_defaults = Dict()
@@ -149,12 +135,13 @@ function ConductanceSystem(
     merge!(embed_defaults, defaults)
 
     cond_sys = ConductanceSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
-                                 embed_defaults, g, gbar, ion, aggregate, gate_vars,
+                                 embed_defaults, g, gbar, ion, model, gate_vars,
                                  subscriptions, extensions, collect(inputs))
     return cond_sys
 end
 
 function ConductanceSystem(x::ConductanceSystem;
+                           model = get_model(x),
                            g = get_output(x),
                            ion = permeability(x),
                            gate_vars = get_gate_vars(x),
@@ -163,7 +150,7 @@ function ConductanceSystem(x::ConductanceSystem;
                            extensions = get_extensions(x),
                            defaults = get_defaults(x),
                            name = nameof(x))
-    ConductanceSystem(g, ion, gate_vars;
+    ConductanceSystem(model, g, ion, gate_vars;
                       gbar = gbar,
                       subscriptions = subscriptions,
                       extensions = extensions,
@@ -199,6 +186,26 @@ function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
         all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end
 
+function parse_max_conductance(max_g)
+    if max_g isa SpecificConductance
+        gbar_val = ustrip(mS / cm^2, max_g)
+        @parameters gbar=gbar_val [unit = mS / cm^2]
+    else # it's a Num
+        gbar = max_g
+        gbar_units = get_unit(gbar)
+        if 1gbar_units isa SpecificConductance && gbar_units !== mS / cm^2 &&
+           hasdefault(gbar)
+            gbar_val = ustrip(mS / cm^2, getdefault(gbar) * gbar_units)
+            gbar_units = mS / cm^2
+        elseif hasdefault(gbar)
+            gbar_val = getdefault(gbar)
+        end
+        gbar = setmetadata(gbar, VariableUnit, gbar_units)
+        gbar = setdefault(gbar, gbar_val)
+    end
+    return gbar
+end
+
 """
     IonChannel(ion, gate_vars; <keyword arguments>)
 
@@ -217,26 +224,9 @@ function IonChannel(ion::IonSpecies,
                     extensions::Vector{ODESystem} = ODESystem[],
                     name::Symbol = Base.gensym("IonChannel"),
                     defaults = Dict())
-    if max_g isa SpecificConductance
-        gbar_val = ustrip(mS / cm^2, max_g)
-        @parameters gbar=gbar_val [unit = mS / cm^2]
-    else # it's a Num
-        gbar = max_g
-        gbar_units = get_unit(gbar)
-        if 1gbar_units isa SpecificConductance && gbar_units !== mS / cm^2 &&
-           hasdefault(gbar)
-            gbar_val = ustrip(mS / cm^2, getdefault(gbar) * gbar_units)
-            gbar_units = mS / cm^2
-        elseif hasdefault(gbar)
-            gbar_val = getdefault(gbar)
-        end
-        gbar = setmetadata(gbar, VariableUnit, gbar_units)
-        gbar = setdefault(gbar, gbar_val)
-    end
-
+    gbar = parse_max_conductance(max_g)
     @variables g(t) [unit = mS / cm^2]
-    ConductanceSystem(g, ion, gate_vars; gbar = gbar, name = name, defaults = defaults,
-                      extensions = extensions)
+    ConductanceSystem(ChannelModel(), g, ion, gate_vars; gbar, name, defaults, extensions)
 end
 
 """
@@ -254,8 +244,9 @@ A non-specific conductance between morphologically contiguous compartments.
 function AxialConductance(gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
                           max_g = 0mS / cm^2, extensions::Vector{ODESystem} = ODESystem[],
                           name::Symbol = Base.gensym("Axial"), defaults = Dict())
-    IonChannel(Leak, gate_vars, max_g = max_g, extensions = extensions, name = name,
-               defaults = defaults)
+    gbar = parse_max_conductance(max_g)
+    @variables g(t) [unit = mS / cm^2]
+    ConductanceSystem(AxialModel(), g, Leak, gate_vars; gbar, name, defaults, extensions)
 end
 
 """
