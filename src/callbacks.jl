@@ -82,7 +82,7 @@ get_model(sa::SpikeAffect) = get_model(sa.synaptic_system)
 
 ############################################################################################
 
-struct ConstantValueEvent{T} <: SummedEventSynapse
+struct ConstantValueEvent{T} <: SummedEventsSynapse
     alpha::T # amount (real value) to perturb by
     state::Num # symbolic state in (each) postsynaptic compartment to perturb
     # weighted_events::Bool # apply weights to alpha

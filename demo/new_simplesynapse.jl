@@ -39,19 +39,21 @@ dynamics_2 = HodgkinHuxley(channels, reversals);
                             geometry = Cylinder(radius = 25µm, height = 400µm))
 
 # Synaptic model
-Vₓ = ExtrinsicPotential()
-syn∞ = 1 / (1 + exp((-35 - Vₓ) / 5))
-τsyn = (1 - syn∞) / (1 / 40)
-syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
-EGlut = Equilibrium(Cation, 0mV, name = :Glut)
+#Vₓ = ExtrinsicPotential()
+#syn∞ = 1 / (1 + exp((-35 - Vₓ) / 5))
+#τsyn = (1 - syn∞) / (1 / 40)
+#syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
 
+EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @variables m(t)
 @parameters τsyn = 0.02 # 20 ms
 syn_eqs = [D(m) ~ -m/τsyn]
 syn_kinetics = Gate(SimpleGate, m, syn_eqs)
-@named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
+
+@named Glut = SynapticChannel(ConstantValueEvent(1.0, m), Cation, [syn_kinetics]; max_s = 30nS);
 
 topology = NetworkTopology([neuron1, neuron2], [Glut]);
+
 topology[neuron1, neuron2] = Glut
 reversal_map = Dict([Glut => EGlut])
 

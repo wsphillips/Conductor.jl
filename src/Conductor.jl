@@ -129,6 +129,8 @@ abstract type IndependentEventsSynapse <: EventBasedSynapse end
 abstract type SummedEventsSynapse <: EventBasedSynapse end
 abstract type IntegratedSynapse <: SynapticModel end
 
+export ConstantValueEvent
+
 include("util.jl")
 include("primitives.jl")
 include("stimulus.jl")
@@ -141,4 +143,5 @@ include("multicompartment.jl")
 include("network.jl")
 include("simulation.jl")
 include("populations.jl")
+include("callbacks.jl")
 end # module

@@ -128,10 +128,14 @@ $(TYPEDSIGNATURES)
 
 Accepts any symbolic expression as an explicit definition of the gate dynamics.
 """
-function Gate(form::Type{SimpleGate}, rhs; default = rhs, name = Base.gensym("GateVar"),
+function Gate(form::Type{SimpleGate}, rhs::Num; default = rhs, name = Base.gensym("GateVar"),
               kwargs...)
     x = only(@variables $name(t)=default [unit = NoUnits])
     return Gate{SimpleGate}(form, x, [x ~ rhs]; kwargs...) # rhs must return NoUnits
+end
+
+function Gate(form::Type{SimpleGate}, output::Num, eqs, kwargs...)
+    Gate{SimpleGate}(form, output, eqs, Dict(kwargs))
 end
 
 """

@@ -263,11 +263,12 @@ A synaptically activated conductance. Depends on extrinsic (i.e. presynaptic) st
 - `defaults::Dict`: Default values for states and parameters.
 - `name::Symbol`: Name of the system.
 """
-function SynapticChannel(ion::IonSpecies,
+function SynapticChannel(model::T, ion::IonSpecies,
                          gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
                          max_s::Union{Num, ElectricalConductance} = 0mS,
                          extensions::Vector{ODESystem} = ODESystem[], aggregate = false,
-                         name::Symbol = Base.gensym("SynapticChannel"), defaults = Dict())
+                         name::Symbol = Base.gensym("SynapticChannel"),
+                         defaults = Dict()) where {T<:SynapticModel}
     if max_s isa ElectricalConductance
         sbar_val = ustrip(Float64, mS, max_s)
         @parameters sbar=sbar_val [unit = mS]
@@ -284,8 +285,8 @@ function SynapticChannel(ion::IonSpecies,
     end
 
     @variables s(t) [unit = mS]
-    ConductanceSystem(s, ion, gate_vars; gbar = sbar, name = name, defaults = defaults,
-                      aggregate = aggregate, extensions = extensions)
+    ConductanceSystem(model, s, ion, gate_vars; gbar = sbar, name = name, defaults = defaults,
+                      extensions = extensions)
 end
 
 function (cond::AbstractConductanceSystem)(newgbar::Num)
