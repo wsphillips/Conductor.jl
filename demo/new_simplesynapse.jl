@@ -38,19 +38,13 @@ dynamics_2 = HodgkinHuxley(channels, reversals);
 @named neuron2 = Compartment(Vₘ, dynamics_2;
                             geometry = Cylinder(radius = 25µm, height = 400µm))
 
-# Synaptic model
-#Vₓ = ExtrinsicPotential()
-#syn∞ = 1 / (1 + exp((-35 - Vₓ) / 5))
-#τsyn = (1 - syn∞) / (1 / 40)
-#syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
-
+# Event-based Synaptic model
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
-@variables m(t)
-@parameters τsyn = 0.02 # 20 ms
-syn_eqs = [D(m) ~ -m/τsyn]
-syn_kinetics = Gate(SimpleGate, m, syn_eqs)
-
-@named Glut = SynapticChannel(ConstantValueEvent(1.0, m), Cation, [syn_kinetics]; max_s = 30nS);
+@variables m(t) = 0.0
+@parameters τsyn = 20 # 20 ms
+syn_kinetics = Gate(SimpleGate, m, [D(m) ~ -m/τsyn])
+event_model = ConstantValueEvent(1.0, m) # increment `m` gate by 1 for each incoming AP
+@named Glut = SynapticChannel(event_model, Cation, [syn_kinetics]; max_s = 30nS);
 
 topology = NetworkTopology([neuron1, neuron2], [Glut]);
 

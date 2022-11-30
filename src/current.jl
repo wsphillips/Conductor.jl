@@ -12,8 +12,8 @@ function Synapse(x::ConductanceSystem, rev::Num)
     return Synapse{typeof(x)}(x, metadata)
 end
 
-conductance(x::Synapse{ConductanceSystem}) = x.system
-reversal(x::Synapse{ConductanceSystem}) = x.metadata[:reversal]
+conductance(x::Synapse) = x.system
+reversal(x::Synapse) = x.metadata[:reversal]
 conductances(x::Vector{<:Synapse}) = conductance.(x)
 reversals(x::Vector{<:Synapse}) = reversal.(x)
 
@@ -29,8 +29,8 @@ function Junction(x::ConductanceSystem, rev::Num)
     return Junction{typeof(x)}(x, metadata)
 end
 
-conductance(x::Junction{ConductanceSystem}) = x.system
-reversal(x::Junction{ConductanceSystem}) = x.metadata[:reversal]
+conductance(x::Junction) = x.system
+reversal(x::Junction) = x.metadata[:reversal]
 
 struct Arborization
     parent::Union{Nothing, Junction}

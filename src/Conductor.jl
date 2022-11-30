@@ -15,7 +15,8 @@ using ModelingToolkit,
 
 const MTK = ModelingToolkit
 
-import SciMLBase: remake
+import SciMLBase: remake, VectorContinuousCallback, DiscreteCallback, ContinuousCallback,
+                  CallbackSet
 
 import Symbolics:
     get_variables,

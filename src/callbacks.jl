@@ -5,10 +5,14 @@ iseventbased(x::CurrentSystem{<:EventBasedSynapse}) = true
 
 discrete_spike_check(V,Vprev)::Bool = V >= 10. && Vprev < 10.
 
-function map_voltage_indices(network, simplified)
+function map_voltage_indices(network, simplified; roots_only = false)
     dvs = states(simplified)
-    compartments = get_systems(network)
-    comp_Vms = renamespace.(network, voltage.(compartments))
+    if roots_only
+        comps = root_compartments(get_topology(network))
+    else
+        comps = compartments(get_topology(network))
+    end
+    comp_Vms = voltage.(comps)
     return indexmap(comp_Vms, dvs)
 end
 
@@ -58,17 +62,17 @@ end
 
 # default when we have no voltage reset
 function (net::NetworkAffects{A,Nothing})(integrator, i) where {A}
-    for affect! in ncs.spike_affects
+    for affect! in net.spike_affects
         affect!(integrator, i)
     end
 end
 
 # with voltage reset
 function (net::NetworkAffects{A,T})(integrator, i) where {A,T}
-    for affect! in ncs.spike_affects
+    for affect! in net.spike_affects
         affect!(integrator, i)
     end
-    ncs.tailcall(integrator, i)
+    net.tailcall(integrator, i)
 end
 
 const SynapticSystem{M} = Union{ConductanceSystem{M},CurrentSystem{M}} where {M<:SynapticModel}
@@ -78,7 +82,7 @@ struct SpikeAffect{M}
     state_indices::Vector{Int}
 end
 
-get_model(sa::SpikeAffect) = get_model(sa.synaptic_system)
+get_system(sa::SpikeAffect) = sa.synaptic_system
 
 ############################################################################################
 
@@ -89,22 +93,26 @@ struct ConstantValueEvent{T} <: SummedEventsSynapse
     # saturation::T # events ignored when state ≥ saturation
 end
 
-function SpikeAffect(synsys::SynapticSystem{ConstantValueEvent}, network, simplified)
+function SpikeAffect(synsys::SynapticSystem{T}, network, simplified) where {T<:ConstantValueEvent}
     model = get_model(synsys)
-    comps = compartments(topology(network))
-    syn_states = renamespace.(comps, model.state)
+    comps = compartments(get_topology(network))
+    state = renamespace(synsys, model.state)
+    syn_states = renamespace.(comps, state)
     state_indices = indexmap(syn_states, states(simplified))
-    return SpikeAffect{ConstantValueEvent}(synsys, state_indices)
+    return SpikeAffect{T}(synsys, state_indices)
 end
 
-function (cv::SpikeAffect{ConstantValueEvent})(integrator, i)
-    model = get_model(cv)
+function (cv::SpikeAffect{<:ConstantValueEvent})(integrator, i)
+    sys = get_system(cv)
     # retrieve model-specific graph layer from multigraph
-    g = get_weights(integrator, model)
+    g = get_weights(integrator, sys)
     # row numbers of non-zero values from the ith column of the sparse matrix
-    rows = view(rowvals(g), nzrange(g,i)) # i.e. indexes of post_synaptic compartment(s)
+    rng = nzrange(g,i)
+    #iszero(length(rng)) && return nothing
+    rows = view(rowvals(g), rng) # i.e. indexes of post_synaptic compartment(s)
     for i in view(cv.state_indices, rows)
-        integrator.u[i] += model.alpha
+        integrator.u[i] += get_model(sys).alpha
     end
+    return nothing
 end
 

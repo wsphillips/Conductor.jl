@@ -9,8 +9,12 @@ synaptic_systems(topology::NetworkTopology) = keys(graph(topology))
 function NetworkTopology(neurons::Vector, synaptic_systems::Vector)
     m = length(neurons)
     n = sum(length(neuron) for neuron in neurons)
-    multigraph = Dict(x => sparse(Int64[], Int64[], Float64[], m, n) for x in synaptic_systems)
-    return NetworkTopology(multigraph, neurons)
+    multigraph = Dict(x => sparse(Int64[], Int64[], Float64[], n, m) for x in synaptic_systems)
+    expanded = []
+    for neuron in neurons
+        push!(expanded, [neuron...])
+    end
+    return NetworkTopology(multigraph, expanded)
 end
 
 function NetworkTopology(g::SimpleDiGraph, neurons, synaptic_system,
@@ -20,22 +24,25 @@ function NetworkTopology(g::SimpleDiGraph, neurons, synaptic_system,
 end
 
 neurons(topology::NetworkTopology) = getfield(topology, :neurons)
-compartments(topology::NetworkTopology) = vcat(neurons(topology))
+compartments(topology::NetworkTopology) = vcat(neurons(topology)...)
 root_compartments(topology::NetworkTopology) = [first(neuron) for neuron in neurons(topology)]
 graph(topology::NetworkTopology) = getfield(topology, :multigraph)
+
+find_source(pre, topology) = findfirst(isequal(first(pre)), root_compartments(topology))
+find_target(post, topology) = findfirst(isequal(post), compartments(topology))
 
 function add_synapse!(topology, pre, post, synaptic_system, weight)
     src = find_source(pre, topology)
     dst = find_target(post, topology)
     g = graph(topology)[synaptic_system]
-    g[src, dst] = weight
+    g[dst, src] = weight # underlying matrix is transposed
 end
 
 function remove_synapse!(topology, pre, post, synaptic_system)
     src = find_source(pre, topology)
     dst = find_target(post, topology)
     g = graph(topology)[synaptic_system]
-    g[src, dst] = zero(Num)
+    g[dst, src] = zero(Num)
     dropzeros!(g)
 end
 
@@ -79,7 +86,8 @@ end
 function Base.setindex!(nt::NetworkTopology, cond::ConductanceSystem, pre::T1,
                         post::T2) where {T1 <: AbstractCompartmentSystem,
                                          T2 <: AbstractCompartmentSystem}
-    add_synapse!(nt, pre, post, cond)
+    gbar = get_gbar(cond)
+    add_synapse!(nt, pre, post, cond, getdefault(gbar))
 end
 
 function Base.setindex!(nt::NetworkTopology, weight::Real, pre, post)
@@ -124,18 +132,27 @@ struct NeuronalNetworkSystem <: AbstractNeuronalNetworkSystem
     end
 end
 
-synaptic_systems(sys::NeuronalNetworkSystem) = synaptic_systems(topology(sys))
-
+synaptic_systems(sys::NeuronalNetworkSystem) = synaptic_systems(get_topology(sys))
+compartments(sys::NeuronalNetworkSystem) = compartments(get_topology(sys))
 # events are handled by callbacks and do not modify
-function connect_synapses!(gen, syn_model, compartments, topology)
-    return compartments
+function connect_synapses!(gen, syn_model, comps, multigraph, reversal_map)
+    new_compartments = deepcopy(comps)
+    reversal = reversal_map[syn_model]
+    for (i,comp) in enumerate(new_compartments)
+        post_synapses = get_synapses(comp)
+        @show post_synapses
+        # FIXME!!! need to set gbar appropriately similar to method below
+        push!(post_synapses, Synapse(syn_model, reversal))
+        new_compartments[i] = remake(comp; synapses = post_synapses)
+    end
+    return new_compartments
 end
 
 function connect_synapses!(gen, syn_model::Union{CurrentSystem{T},ConductanceSystem{T}},
-                           compartments, topology) where {T<:IntegratedSynapse}
+                           comps, multigraph, reversal_map) where {T<:IntegratedSynapse}
 
     (; eqs, systems, defs) = gen
-    new_compartments = deepcopy(compartments)
+    new_compartments = deepcopy(comps)
     roots = root_compartments
     g = multigraph[syn_model]   
     rows = rowvals(g)
@@ -198,10 +215,10 @@ function NeuronalNetworkSystem(topology::NetworkTopology, reversal_map,
     comps = compartments(topology) 
     multigraph = graph(topology)
     for sys in synaptic_systems(topology)
-        comps = connect_synapses!(gen, sys, comps, multigraph)
+        comps = connect_synapses!(gen, sys, comps, multigraph, reversal_map)
     end
 
-    union!(systems, extensions, compartments)
+    union!(systems, extensions, comps)
     return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
                                  defaults, topology, reversal_map, extensions;
                                  checks = false)

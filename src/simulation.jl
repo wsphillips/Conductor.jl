@@ -31,7 +31,10 @@ end
 
 Base.getindex(x::NetworkParameters, i) = x.ps[i]
 topology(x::NetworkParameters) = getfield(x, :topology)
-
+function get_weights(integrator, model)
+    topo = topology(integrator.p)
+    return graph(topo)[model]
+end
 function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false,
                     jac = false, sparse = false, parallel = nothing, continuous_events = false)
     t_val, simplified = simplify_simulation(network, time)
@@ -40,13 +43,15 @@ function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = 
         return ODEProblem(simplified, [], (0.0, t_val), []; jac, sparse, parallel)
     else
         cb = generate_callback(network, simplified; continuous_events)
-        ODEProblem(simplified, [], (0.0, t_val), []; callback = cb, jac, sparse, parallel)
+        prob = ODEProblem(simplified, [], (0.0, t_val), []; callback = cb, jac, sparse, parallel)
+        remake(prob; p = NetworkParameters(prob.p, get_topology(network) ))
     end
 end
 
 # if continuous, condition has vector cb signature: cond(out, u, t, integrator)
 function generate_callback_condition(network, simplified; continuous_events)
-    voltage_indices = map_voltage_indices(network, simplified)
+    voltage_indices = map_voltage_indices(network, simplified; roots_only = true)
+    @show voltage_indices
     if continuous_events
         return ContinuousSpikeDetection(voltage_indices)
     else # discrete condition for each compartment
@@ -69,8 +74,12 @@ function generate_callback(network, simplified; continuous_events)
     if continuous_events
         return VectorContinuousCallback(cb_condition, cb_affect) 
     else
-        affects = [Base.Fix2(cb_affect, i) for i in length(compartments(network))]
-        callbacks = DiscreteCallback.(cb_condition, affects)
-        return CallbackChain(callbacks...)
+        affects = []
+        for i in 1:length(root_compartments(get_topology(network)))
+            println("Creating affect $i ...")
+            push!(affects, Base.Fix2(cb_affect, i))
+        end
+        callbacks = [DiscreteCallback(x,y) for (x,y) in zip(cb_condition, affects)]
+        return CallbackSet(callbacks...)
     end
 end
