@@ -219,8 +219,9 @@ function NeuronalNetworkSystem(topology::NetworkTopology, reversal_map,
     end
 
     union!(systems, extensions, comps)
+    merge!(defs, defaults)
     return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
-                                 defaults, topology, reversal_map, extensions;
+                                 defs, topology, reversal_map, extensions;
                                  checks = false)
 end
 
