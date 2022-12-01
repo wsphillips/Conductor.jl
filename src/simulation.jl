@@ -12,7 +12,7 @@ duration, `time`.
 
 If `return_system == true`, returns a simplified `ODESystem` instead.
 """
-function Simulation(neuron::AbstractCompartmentSystem; time::Time, return_system = false,
+function Simulation(neuron::AbstractCompartmentSystem, time::Time; return_system = false,
                     jac = false, sparse = false,
                     parallel = nothing)
     t_val, simplified = simplify_simulation(neuron, time)
@@ -35,7 +35,7 @@ function get_weights(integrator, model)
     topo = topology(integrator.p)
     return graph(topo)[model]
 end
-function Simulation(network::NeuronalNetworkSystem; time::Time, return_system = false,
+function Simulation(network::NeuronalNetworkSystem, time::Time; return_system = false,
                     jac = false, sparse = false, parallel = nothing, continuous_events = false)
     t_val, simplified = simplify_simulation(network, time)
     return_system && return simplified
@@ -51,7 +51,6 @@ end
 # if continuous, condition has vector cb signature: cond(out, u, t, integrator)
 function generate_callback_condition(network, simplified; continuous_events)
     voltage_indices = map_voltage_indices(network, simplified; roots_only = true)
-    @show voltage_indices
     if continuous_events
         return ContinuousSpikeDetection(voltage_indices)
     else # discrete condition for each compartment
@@ -72,11 +71,11 @@ function generate_callback(network, simplified; continuous_events)
     cb_condition = generate_callback_condition(network, simplified; continuous_events)
     cb_affect = generate_callback_affects(network, simplified)
     if continuous_events
-        return VectorContinuousCallback(cb_condition, cb_affect) 
+        return VectorContinuousCallback(cb_condition, cb_affect,
+                                        length(cb_condition.voltage_indices)) 
     else
         affects = []
         for i in 1:length(root_compartments(get_topology(network)))
-            println("Creating affect $i ...")
             push!(affects, Base.Fix2(cb_affect, i))
         end
         callbacks = [DiscreteCallback(x,y) for (x,y) in zip(cb_condition, affects)]

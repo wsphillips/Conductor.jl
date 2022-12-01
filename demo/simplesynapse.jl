@@ -45,10 +45,6 @@ syn∞ = 1 / (1 + exp((-35 - Vₓ) / 5))
 syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 
-@variables m(t)
-@parameters τsyn = 0.02 # 20 ms
-syn_eqs = [D(m) ~ -m/τsyn]
-syn_kinetics = Gate(SimpleGate, m, syn_eqs)
 @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
 
 topology = NetworkTopology([neuron1, neuron2], [Glut]);

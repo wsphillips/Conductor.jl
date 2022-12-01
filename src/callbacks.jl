@@ -108,7 +108,7 @@ function (cv::SpikeAffect{<:ConstantValueEvent})(integrator, i)
     g = get_weights(integrator, sys)
     # row numbers of non-zero values from the ith column of the sparse matrix
     rng = nzrange(g,i)
-    #iszero(length(rng)) && return nothing
+    iszero(length(rng)) && return nothing
     rows = view(rowvals(g), rng) # i.e. indexes of post_synaptic compartment(s)
     for i in view(cv.state_indices, rows)
         integrator.u[i] += get_model(sys).alpha

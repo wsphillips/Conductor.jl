@@ -58,14 +58,6 @@ const Conductance = ConductanceSystem
 permeability(x::ConductanceSystem) = getfield(x, :ion)
 get_gbar(x::ConductanceSystem) = getfield(x, :gbar)
 get_gate_vars(x::ConductanceSystem) = getfield(x, :gate_vars)
-# An `EventBasedSynapse` must include a field called `rule` that contains an equation of
-# the form: X ~ α
-# In the case of conductance-based models, the synaptic weight == gba
-# in the case of _current_-based models, the synaptic weight is multiplied by the update
-# value. (i.e. α is implicitly multiplied by W, the weight of that particular synapse)
-update_rule(x::EventBasedSynapse) = getfield(x, :rule)
-update_rule(x::ConductanceSystem{<:EventBasedSynapse}) = update_rule(get_model(x))
-# returns 'g', the conductance of the system
 get_output(x::AbstractConductanceSystem) = getfield(x, :output)
 get_model(x::ConductanceSystem{<:ConductanceModel}) = getfield(x, :model)
 
@@ -140,7 +132,7 @@ function ConductanceSystem(
     return cond_sys
 end
 
-function ConductanceSystem(x::ConductanceSystem;
+function SciMLBase.remake(x::ConductanceSystem;
                            model = get_model(x),
                            g = get_output(x),
                            ion = permeability(x),

@@ -128,9 +128,9 @@ abstract type StimulusModel <: ConductanceModel end
 abstract type EventBasedSynapse <: SynapticModel end
 abstract type IndependentEventsSynapse <: EventBasedSynapse end
 abstract type SummedEventsSynapse <: EventBasedSynapse end
-abstract type IntegratedSynapse <: SynapticModel end
+struct IntegratedSynapse <: SynapticModel end
 
-export ConstantValueEvent
+export ConstantValueEvent, IntegratedSynapse
 
 include("util.jl")
 include("primitives.jl")

@@ -135,12 +135,11 @@ end
 synaptic_systems(sys::NeuronalNetworkSystem) = synaptic_systems(get_topology(sys))
 compartments(sys::NeuronalNetworkSystem) = compartments(get_topology(sys))
 # events are handled by callbacks and do not modify
-function connect_synapses!(gen, syn_model, comps, multigraph, reversal_map)
+function connect_synapses!(gen, syn_model, comps, topology, reversal_map)
     new_compartments = deepcopy(comps)
     reversal = reversal_map[syn_model]
     for (i,comp) in enumerate(new_compartments)
         post_synapses = get_synapses(comp)
-        @show post_synapses
         # FIXME!!! need to set gbar appropriately similar to method below
         push!(post_synapses, Synapse(syn_model, reversal))
         new_compartments[i] = remake(comp; synapses = post_synapses)
@@ -149,12 +148,12 @@ function connect_synapses!(gen, syn_model, comps, multigraph, reversal_map)
 end
 
 function connect_synapses!(gen, syn_model::Union{CurrentSystem{T},ConductanceSystem{T}},
-                           comps, multigraph, reversal_map) where {T<:IntegratedSynapse}
+                           comps, topology, reversal_map) where {T<:IntegratedSynapse}
 
     (; eqs, systems, defs) = gen
     new_compartments = deepcopy(comps)
-    roots = root_compartments
-    g = multigraph[syn_model]   
+    roots = root_compartments(topology)
+    g = permutedims(graph(topology)[syn_model]) # easier to do with rows = pre, cols = post
     rows = rowvals(g)
     vals = nonzeros(g)
     voltage_fwds = Set{Equation}()
@@ -164,17 +163,19 @@ function connect_synapses!(gen, syn_model::Union{CurrentSystem{T},ConductanceSys
     # component types become available we will probably rewrite how this works.
     for i in axes(g, 2) # for each set of presynaptic neurons per postsynaptic neuron
         model_copies = []
-        pre_indexes = nzrange(g, i)
+        pre_indexes = rows[nzrange(g, i)]
         isempty(pre_indexes) && continue # skip neurons with no synaptic input
 
-        post_compartment = compartments[i]
+        post_compartment = new_compartments[i]
         pre_compartments = roots[rows[pre_indexes]]
         weights = vals[pre_indexes]
         reversal = reversal_map[syn_model]
-        post_synapses = get_synapses(post_compartment)
+        post_synapses = get_synapses(post_compartment) # currently, this gets mutated
         
         for (i, (pre_comp, weight)) in enumerate(zip(pre_compartments, weights))
-            model_copy = remake(syn_model, subscriptions = [pre_comp], gbar = weight,
+            gbar = get_gbar(syn_model)
+            gbar = setdefault(gbar, weight)
+            model_copy = remake(syn_model, subscriptions = [pre_comp], gbar = gbar,
                                 name = Symbol(nameof(syn_model), "_$i"))
             push!(post_synapses, Synapse(model_copy, reversal))
             push!(model_copies, model_copy)
@@ -184,11 +185,11 @@ function connect_synapses!(gen, syn_model::Union{CurrentSystem{T},ConductanceSys
 
         # Directly connect Vₘ between neurons; must happen post hoc
 
-        for (model_copy, pre_comp) in zip(model_copies, pre_compartments)
-            vars = namespace_variables(getproperty(post_compartment, nameof(model_copy)))
+        for (mcopy, pre_comp) in zip(model_copies, pre_compartments)
+            vars = namespace_variables(getproperty(post_compartment, nameof(mcopy)))
             Vx = find_voltage(vars, isextrinsic)
-            push!(voltage_fwds, pre.Vₘ ~ Vx)
-            push!(defs, Vx => pre.Vₘ)
+            push!(voltage_fwds, pre_comp.Vₘ ~ Vx)
+            push!(defs, Vx => pre_comp.Vₘ)
         end
 
         new_compartments[i] = post_compartment
@@ -213,9 +214,8 @@ function NeuronalNetworkSystem(topology::NetworkTopology, reversal_map,
     gen = GeneratedCollections()
     (; eqs, dvs, ps, systems, observed, defs) = gen
     comps = compartments(topology) 
-    multigraph = graph(topology)
     for sys in synaptic_systems(topology)
-        comps = connect_synapses!(gen, sys, comps, multigraph, reversal_map)
+        comps = connect_synapses!(gen, sys, comps, topology, reversal_map)
     end
 
     union!(systems, extensions, comps)
