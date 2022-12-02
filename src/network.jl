@@ -38,6 +38,8 @@ function add_synapse!(topology, pre, post, synaptic_system, weight)
     g[dst, src] = weight # underlying matrix is transposed
 end
 
+# FIXME: need updates
+#=
 function remove_synapse!(topology, pre, post, synaptic_system)
     src = find_source(pre, topology)
     dst = find_target(post, topology)
@@ -46,12 +48,12 @@ function remove_synapse!(topology, pre, post, synaptic_system)
     dropzeros!(g)
 end
 
-# FIXME: needs update
 function add_layer!(topology, synaptic_system::ConductanceSystem,
                     g = SimpleDiGraph(length(vertices(topology))),
                     default_weight = get_gbar(synaptic_system))
     push!(graph(topology), synaptic_system => adjacency_matrix(g) * default_weight)
 end
+=#
 
 Base.eltype(nt::NetworkTopology) = AbstractCompartmentSystem
 Base.length(nt::NetworkTopology) = length(neurons(nt))
@@ -90,8 +92,15 @@ function Base.setindex!(nt::NetworkTopology, cond::ConductanceSystem, pre::T1,
     add_synapse!(nt, pre, post, cond, getdefault(gbar))
 end
 
-function Base.setindex!(nt::NetworkTopology, weight::Real, pre, post)
-    add_synapse!(nt, pre, post, weight)
+function Base.setindex!(nt::NetworkTopology, cw::Tuple{ConductanceSystem, Any}, pre, post)
+    cond, new_weight = cw
+    maxval = getdefault(get_gbar(cond))
+    val = new_weight/maxval
+    add_synapse!(nt, pre, post, cond, val)
+end
+
+function Base.setindex!(nt::NetworkTopology, cond::ConductanceSystem, pre, post)
+    add_synapse!(nt, pre, post, cond, 1.0)
 end
 
 """
@@ -134,13 +143,13 @@ end
 
 synaptic_systems(sys::NeuronalNetworkSystem) = synaptic_systems(get_topology(sys))
 compartments(sys::NeuronalNetworkSystem) = compartments(get_topology(sys))
-# events are handled by callbacks and do not modify
+
 function connect_synapses!(gen, syn_model, comps, topology, reversal_map)
+    # this method assumes weights scale the size of the event/alpha)
     new_compartments = deepcopy(comps)
     reversal = reversal_map[syn_model]
     for (i,comp) in enumerate(new_compartments)
         post_synapses = get_synapses(comp)
-        # FIXME!!! need to set gbar appropriately similar to method below
         push!(post_synapses, Synapse(syn_model, reversal))
         new_compartments[i] = remake(comp; synapses = post_synapses)
     end
@@ -157,26 +166,25 @@ function connect_synapses!(gen, syn_model::Union{CurrentSystem{T},ConductanceSys
     rows = rowvals(g)
     vals = nonzeros(g)
     voltage_fwds = Set{Equation}()
-    
+    @parameters W 
     # Synaptic conductance models are duplicated here and individually connected, relying
     # on users to specify extrinsic voltage symbols. In the future, when symbolic arrays and
     # component types become available we will probably rewrite how this works.
     for i in axes(g, 2) # for each set of presynaptic neurons per postsynaptic neuron
-        model_copies = []
         pre_indexes = rows[nzrange(g, i)]
         isempty(pre_indexes) && continue # skip neurons with no synaptic input
 
+        model_copies = []
         post_compartment = new_compartments[i]
         pre_compartments = roots[rows[pre_indexes]]
         weights = vals[pre_indexes]
         reversal = reversal_map[syn_model]
         post_synapses = get_synapses(post_compartment) # currently, this gets mutated
         
+        # duplicate to allow for multiple presynaptic inputs of the same type
         for (i, (pre_comp, weight)) in enumerate(zip(pre_compartments, weights))
-            gbar = get_gbar(syn_model)
-            gbar = setdefault(gbar, weight)
-            model_copy = remake(syn_model, subscriptions = [pre_comp], gbar = gbar,
-                                name = Symbol(nameof(syn_model), "_$i"))
+            model_copy = remake(syn_model, name = Symbol(nameof(syn_model), "_$i"),
+                                defaults = Dict(W => weight))
             push!(post_synapses, Synapse(model_copy, reversal))
             push!(model_copies, model_copy)
         end

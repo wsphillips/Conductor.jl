@@ -1,10 +1,3 @@
-# used to manage systems whose state the conductance takes as input
-subscriptions(x::AbstractConductanceSystem) = getfield(x, :subscriptions)
-
-function subscribe!(chan::AbstractConductanceSystem, comp)
-    union!(subscriptions(chan), comp)
-end
-
 """
 $(TYPEDEF)
 
@@ -33,8 +26,6 @@ struct ConductanceSystem{T<:ConductanceModel} <: AbstractConductanceSystem
     model::T
     "Gating variables."
     gate_vars::Vector{AbstractGatingVariable}
-    "Extrinsic sources of state (e.g. presynaptic compartments)."
-    subscriptions::Vector{AbstractCompartmentSystem}
     """
     Additional systems to extend dynamics. Extensions are composed with the parent system
     during conversion to `ODESystem`.
@@ -42,14 +33,14 @@ struct ConductanceSystem{T<:ConductanceModel} <: AbstractConductanceSystem
     extensions::Vector{ODESystem}
     inputs::Vector{Num}
     function ConductanceSystem(eqs, iv, states, ps, observed, name, systems, defaults,
-                               output, gbar, ion, model, gate_vars, subscriptions,
+                               output, gbar, ion, model, gate_vars,
                                extensions, inputs;
                                checks = false)
         if checks
             #placeholder
         end
         new{typeof(model)}(eqs, iv, states, ps, observed, name, systems, defaults, output,
-                           gbar, ion, model, gate_vars, subscriptions, extensions, inputs)
+                           gbar, ion, model, gate_vars, extensions, inputs)
     end
 end
 
@@ -76,7 +67,7 @@ Main constructor for `ConductanceSystem`.
 function ConductanceSystem(
     model::T, g::Num, ion::IonSpecies,
     gate_vars::Vector{<:AbstractGatingVariable};
-    gbar::Num, subscriptions = Vector{AbstractCompartmentSystem}(),
+    gbar::Num,
     extensions::Vector{ODESystem} = ODESystem[], defaults = Dict(),
     name::Symbol = Base.gensym("Conductance")
     ) where {T<:ConductanceModel}
@@ -93,7 +84,7 @@ function ConductanceSystem(
 
     # incomplete initialization
     cond_sys = ConductanceSystem(eqs, t, Num[], Num[], observed, name, systems, defaults, g,
-                                 gbar, ion, model, gate_vars, subscriptions, extensions, Num[])
+                                 gbar, ion, model, gate_vars, extensions, Num[])
 
     gate_var_outputs = Set{Num}()
     embed_defaults = Dict()
@@ -128,7 +119,7 @@ function ConductanceSystem(
 
     cond_sys = ConductanceSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
                                  embed_defaults, g, gbar, ion, model, gate_vars,
-                                 subscriptions, extensions, collect(inputs))
+                                 extensions, collect(inputs))
     return cond_sys
 end
 
@@ -138,13 +129,11 @@ function SciMLBase.remake(x::ConductanceSystem;
                            ion = permeability(x),
                            gate_vars = get_gate_vars(x),
                            gbar = get_gbar(x),
-                           subscriptions = subscriptions(x),
                            extensions = get_extensions(x),
                            defaults = get_defaults(x),
                            name = nameof(x))
     ConductanceSystem(model, g, ion, gate_vars;
                       gbar = gbar,
-                      subscriptions = subscriptions,
                       extensions = extensions,
                       defaults = defaults,
                       name = name)
@@ -296,6 +285,17 @@ function (cond::ConductanceSystem)(newgbar::Quantity)
     gbar_val = ustrip(Float64, outunits, newgbar)
     return cond(gbar_val)
 end
+
+function (cond::ConductanceSystem{IntegratedSynapse})(new_weight::Quantity)
+    gbar = get_gbar(cond)
+    outunits = get_unit(gbar)
+    if dimension(outunits) !== dimension(new_weight)
+        @error "Input Dimensions do not match gbar of ConductanceSystem"
+    end
+    weight_val = ustrip(Float64, outunits, new_weight)
+    return cond, weight_val
+end
+
 
 function (cond::ConductanceSystem)(gbar_val::Real)
     gbar_sym = setdefault(get_gbar(cond), gbar_val)

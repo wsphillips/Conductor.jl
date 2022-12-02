@@ -100,22 +100,26 @@ output(x::CurrentSystem) = renamespace(x, get_output(x))
 inputs(x::CurrentSystem) = renamespace.(x, get_inputs(x))
 
 # Main method for conductance based construction
-function CurrentSystem(Vₘ::Num, cond::ConductanceSystem{<:ConductanceModel}, Erev::Num;
+function CurrentSystem(Vₘ::Num, cond::ConductanceSystem{T}, Erev::Num;
                        aₘ = 1, extensions::Vector{ODESystem} = ODESystem[],
-                       defaults = Dict(), name::Symbol = nameof(cond))
+                       defaults = Dict(), name::Symbol = nameof(cond)) where {T}
     
     # Extend the conductance system to a current system
     (; eqs, dvs, ps, systems, observed, defs) = copy_collections(cond)
     push!(ps, aₘ)
     push!(isparameter(Erev) ? ps : dvs, Erev)
-    push!(dvs, Vₘ)
     inps = Set(get_inputs(cond))
     push!(inps, Vₘ)
     I = IonCurrent(cond)
     g = get_output(cond)
     eq = I ~ g * (Vₘ - Erev) * (1 * get_unit(g) isa SpecificConductance ? aₘ : 1)
+    if T <: IntegratedSynapse
+        @parameters W # NOTE: we do NOT provide default weight values here; do it post hoc 
+        push!(ps, W)
+        eq = eq.lhs ~ eq.rhs * W
+    end
     validate(eq) && push!(eqs, eq)
-    push!(dvs, I)
+    push!(dvs, Vₘ, I)
     merge!(defs, defaults)
     return CurrentSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems, defs,
                          I, inps, permeability(cond), get_model(cond); checks = false)

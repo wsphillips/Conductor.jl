@@ -50,11 +50,11 @@ EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @parameters τsyn = 25 # 25 ms
 syn_kinetics = Gate(SimpleGate, m, [D(m) ~ -m/τsyn])
 event_model = ConstantValueEvent(1.0, m) # increment `m` gate by 1 for each incoming AP
-@named ExpAMPA = SynapticChannel(event_model, Cation, [syn_kinetics]; max_s = 12nS)
+@named ExpAMPA = SynapticChannel(event_model, Cation, [syn_kinetics]; max_s = 30nS)
 
 top = NetworkTopology([neuron1, neuron2], [ExpAMPA]);
 
-top[neuron1, neuron2] = ExpAMPA
+top[neuron1, neuron2] = ExpAMPA(10nS)
 rev_map = Dict([ExpAMPA => EGlut])
 
 @named net = NeuronalNetworkSystem(top, rev_map)
@@ -76,11 +76,11 @@ syn∞ = 1 / (1 + exp((-35 - Vₓ) / 5))
 tausyn = (1 - syn∞) / (1 / 40)
 syn_kinetics2 = Gate(SteadyStateTau, syn∞, tausyn, name = :z)
 
-@named IntAMPA = SynapticChannel(IntegratedSynapse(), Cation, [syn_kinetics2]; max_s = 12nS)
+@named IntAMPA = SynapticChannel(IntegratedSynapse(), Cation, [syn_kinetics2]; max_s = 30nS)
 
 top2 = NetworkTopology([neuron1, neuron2], [IntAMPA]);
 
-top2[neuron1, neuron2] = IntAMPA
+top2[neuron1, neuron2] = IntAMPA(30nS)
 rev_map2 = Dict([IntAMPA => EGlut])
 
 @named net2 = NeuronalNetworkSystem(top2, rev_map2)
