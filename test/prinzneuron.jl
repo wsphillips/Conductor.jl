@@ -13,7 +13,7 @@ include(normpath(@__DIR__, "..", "demo", "prinz_kinetics.jl"))
         KCa(15mS / cm^2),
         Kdr(50mS / cm^2),
         H(0.02mS / cm^2),
-        leak(0.03mS / cm^2)]
+        leak(0.03mS / cm^2)];
 
     dynamics = HodgkinHuxley(channels, gradients);
 
@@ -25,7 +25,7 @@ include(normpath(@__DIR__, "..", "demo", "prinz_kinetics.jl"))
                       parameters(neuron)]) == [31, 31, 17]
 
     time = 2000
-    simul_sys = Simulation(neuron, time = time * ms, return_system = true)
+    simul_sys = Simulation(neuron, time * ms; return_system = true)
 
     @test length.([equations(simul_sys),
                       states(simul_sys),

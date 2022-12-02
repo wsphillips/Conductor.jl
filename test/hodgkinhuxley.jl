@@ -55,7 +55,7 @@ using Unitful: mV, mS, cm, µm, µA, ms, pA
                       parameters(neuron)]) == [11, 11, 8]
 
     time = 300.0
-    sim_sys = Simulation(neuron, time = time * ms, return_system = true)
+    sim_sys = Simulation(neuron, time * ms; return_system = true)
 
     @test length.([equations(sim_sys),
                       states(sim_sys),

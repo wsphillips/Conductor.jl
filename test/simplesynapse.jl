@@ -35,13 +35,12 @@ import Conductor: Na, K
 
     geo = Cylinder(radius = 25µm, height = 400µm)
 
-    dynamics_1 = HodgkinHuxley(channels, reversals)
-    dynamics_2 = HodgkinHuxley(channels, reversals)
+    dynamics = HodgkinHuxley(channels, reversals)
 
-    @named neuron1 = Compartment(Vₘ, dynamics_1;
+    @named neuron1 = Compartment(Vₘ, dynamics;
                                  geometry = Cylinder(radius = 25µm, height = 400µm),
                                  stimuli = [holding_current]);
-    @named neuron2 = Compartment(Vₘ, dynamics_2;
+    @named neuron2 = Compartment(Vₘ, dynamics;
                                  geometry = Cylinder(radius = 25µm, height = 400µm))
 
     # Synaptic model
@@ -50,7 +49,7 @@ import Conductor: Na, K
     τsyn = (1 - syn∞) / (1 / 40)
     syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
     EGlut = Equilibrium(Cation, 0mV, name = :Glut)
-    @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS)
+    @named Glut = SynapticChannel(IntegratedSynapse(), Cation, [syn_kinetics]; max_s = 30nS)
 
     @test length.([equations(Glut),
                       states(Glut),
@@ -67,7 +66,7 @@ import Conductor: Na, K
                       parameters(network)]) == [24, 24, 19]
 
     ttot = 250.0
-    simul_sys = Simulation(network, time = ttot * ms, return_system = true)
+    simul_sys = Simulation(network, ttot * ms; return_system = true)
 
     @test length.([equations(simul_sys),
                       states(simul_sys),

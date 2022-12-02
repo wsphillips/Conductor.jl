@@ -281,13 +281,13 @@ function SynapticChannel(model::T, ion::IonSpecies,
                       extensions = extensions)
 end
 
-function (cond::AbstractConductanceSystem)(newgbar::Num)
+function (cond::ConductanceSystem)(newgbar::Num)
     hasdefault(newgbar) || throw("Symbolic has no default value")
     gbar_val = getdefault(newgbar)
     return cond(gbar_val)
 end
 
-function (cond::AbstractConductanceSystem)(newgbar::Quantity)
+function (cond::ConductanceSystem)(newgbar::Quantity)
     g = get_output(cond)
     outunits = get_unit(g)
     if dimension(outunits) !== dimension(newgbar)
@@ -297,10 +297,9 @@ function (cond::AbstractConductanceSystem)(newgbar::Quantity)
     return cond(gbar_val)
 end
 
-function (cond::AbstractConductanceSystem)(gbar_val::Real)
+function (cond::ConductanceSystem)(gbar_val::Real)
     gbar_sym = setdefault(get_gbar(cond), gbar_val)
-    newcond = ConductanceSystem(cond; gbar = gbar_sym,
-                                defaults = Dict(get_defaults(cond)...,
-                                                gbar_sym => gbar_val))
+    newcond = remake(cond; gbar = gbar_sym, defaults = Dict(get_defaults(cond)...,
+                     gbar_sym => gbar_val))
     return newcond
 end
