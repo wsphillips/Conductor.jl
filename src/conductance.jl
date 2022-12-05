@@ -171,6 +171,9 @@ function parse_max_conductance(max_g)
     if max_g isa SpecificConductance
         gbar_val = ustrip(mS / cm^2, max_g)
         @parameters gbar=gbar_val [unit = mS / cm^2]
+    elseif max_g isa ElectricalConductance
+        gbar_val = ustrip(mS, max_g)
+        @parameters gbar=gbar_val [unit = mS]
     else # it's a Num
         gbar = max_g
         gbar_units = get_unit(gbar)
@@ -201,7 +204,7 @@ An ionic membrane conductance.
 """
 function IonChannel(ion::IonSpecies,
                     gate_vars::Vector{<:AbstractGatingVariable} = AbstractGatingVariable[];
-                    max_g::Union{Num, SpecificConductance} = 0mS / cm^2,
+                    max_g = 0mS / cm^2,
                     extensions::Vector{ODESystem} = ODESystem[],
                     name::Symbol = Base.gensym("IonChannel"),
                     defaults = Dict())

@@ -89,8 +89,11 @@ get_system(sa::SpikeAffect) = sa.synaptic_system
 struct ConstantValueEvent{T} <: SummedEventsSynapse
     alpha::T # amount (real value) to perturb by
     state::Num # symbolic state in (each) postsynaptic compartment to perturb
+    saturation::T # events ignored when state ≥ saturation
     # weighted_events::Bool # apply weights to alpha
-    # saturation::T # events ignored when state ≥ saturation
+    function ConstantValueEvent(alpha::T, state, saturation::T = Inf) where {T}
+        new{T}(alpha, state, saturation)
+    end
 end
 
 function SpikeAffect(synsys::SynapticSystem{T}, network, simplified) where {T<:ConstantValueEvent}
@@ -104,6 +107,8 @@ end
 
 function (cv::SpikeAffect{<:ConstantValueEvent})(integrator, i)
     sys = get_system(cv)
+    model = get_model(sys)
+    α, sat = model.alpha, model.saturation
     # retrieve model-specific graph layer from multigraph
     g = get_weights(integrator, sys)
     # row numbers of non-zero values from the ith column of the sparse matrix
@@ -111,7 +116,7 @@ function (cv::SpikeAffect{<:ConstantValueEvent})(integrator, i)
     iszero(length(rng)) && return nothing
     rows = view(rowvals(g), rng) # i.e. indexes of post_synaptic compartment(s)
     for i in view(cv.state_indices, rows)
-        integrator.u[i] += get_model(sys).alpha
+        integrator.u[i] += ifelse(integrator.u[i] < sat, α, zero(α))
     end
     return nothing
 end
