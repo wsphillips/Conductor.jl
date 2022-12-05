@@ -52,21 +52,21 @@ PY # display
 topology = NetworkTopology([ABPD, LP, PY], [Glut, Chol]);
 reversal_map = Dict([Glut => EGlut, Chol => EChol])
 
-topology[ABPD, LP] = Glut(30nS)
-topology[ABPD, LP] = Chol(30nS)
-topology[ABPD, PY] = Glut(10nS)
-topology[ABPD, PY] = Chol(3nS)
-topology[LP, ABPD] = Glut(30nS)
-topology[LP, PY] = Glut(1nS)
-topology[PY, LP] = Glut(30nS)
+add_synapse!(topology, ABPD, LP, Glut, 30nS)
+add_synapse!(topology, ABPD, LP, Chol, 30nS)
+add_synapse!(topology, ABPD, PY, Glut, 10nS)
+add_synapse!(topology, ABPD, PY, Chol, 3nS)
+add_synapse!(topology, LP, ABPD, Glut, 30nS)
+add_synapse!(topology, LP, PY, Glut, 1nS)
+add_synapse!(topology, PY, LP, Glut, 30nS)
 
 network = NeuronalNetworkSystem(topology, reversal_map)
 t_total = 10000
 sim = Simulation(network, t_total * ms);
-solution = solve(sim, RadauIIA5());
-plot(plot(solution, idxs = [ABPD.Vₘ]),
-     plot(solution, idxs = [LP.Vₘ]),
-     plot(solution, idxs = [PY.Vₘ]),
-     layout=(3,1),
-     size = (1200, 800))
+solution = solve(sim, RadauIIA5(), reltol = 1e-5, abstol = 1e-5);
+# Plot at 5kHz sampling
+fig = plot(solution(0.0:0.2:t_total; idxs = [ABPD.Vₘ, LP.Vₘ, PY.Vₘ]), size = (1200, 800))
+fig
 
+# Uncomment and eval `png(...)` to save as PNG
+# png(fig, "figure3e_simulated")

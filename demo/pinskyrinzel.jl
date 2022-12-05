@@ -26,9 +26,8 @@ dendrite_dynamics = HodgkinHuxley([KAHP(0.8mS / cm^2), CaS(10mS / cm^2), KCa(15m
                               stimuli = [Id_holding],
                               extensions = [calcium_conversion])
 
-@named gc_soma = AxialConductance([Gate(SimpleGate, inv(p), name = :ps)], max_g = gc_val)
-@named gc_dendrite = AxialConductance([Gate(SimpleGate, inv(1 - p), name = :pd)],
-                                      max_g = gc_val)
+@named gc_soma = AxialConductance([Gate(inv(p), name = :ps)], max_g = gc_val)
+@named gc_dendrite = AxialConductance([Gate(inv(1 - p), name = :pd)], max_g = gc_val)
 
 topology = MultiCompartmentTopology([soma, dendrite]);
 add_junction!(topology, soma, dendrite, (gc_soma, gc_dendrite))
@@ -49,8 +48,8 @@ add_junction!(topology, soma, dendrite, (gc_soma, gc_dendrite))
 ############################################################################################
 import Conductor: NMDA
 @named NMDAChan = IonChannel(NMDA,
-                             [Gate(SimpleGate, inv(1 + 0.28 * exp(-0.062(Vₘ - 60.0))); name = :e),
-                              Gate(SimpleGate, 125.0*inv(1 - p), name = :pnmda)],
+                             [Gate(inv(1 + 0.28 * exp(-0.062(Vₘ - 60.0))); name = :e),
+                              Gate(125.0*inv(1 - p), name = :pnmda)],
                               max_g = 4μS/cm^2)
 
 ESyn = EquilibriumPotential(NMDA, 60mV, name = :syn)

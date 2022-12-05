@@ -137,6 +137,12 @@ function Gate(form::Type{SimpleGate}, output::Num, eqs, kwargs...)
     Gate{SimpleGate}(form, output, eqs, Dict(kwargs))
 end
 
+Gate(rhs::Num; default = rhs, name = Base.gensym("GateVar"), kwargs...) = 
+Gate(SimpleGate, rhs; default, name, kwargs...)
+
+Gate(output::Num, eqs::Vector{Equation}, kwargs...) = Gate(SimpleGate, output, eqs, kwargs...)
+
+
 """
 $(TYPEDSIGNATURES)
 

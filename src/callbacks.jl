@@ -90,10 +90,13 @@ struct ConstantValueEvent{T} <: SummedEventsSynapse
     alpha::T # amount (real value) to perturb by
     state::Num # symbolic state in (each) postsynaptic compartment to perturb
     saturation::T # events ignored when state ≥ saturation
+    threshold::T # threshold for AP event
     # weighted_events::Bool # apply weights to alpha
-    function ConstantValueEvent(alpha::T, state, saturation::T = Inf) where {T}
-        new{T}(alpha, state, saturation)
-    end
+end
+
+function ConstantValueEvent(state::Num; alpha::T = 1.0, saturation::T = floatmax(T), threshold = 10.0mV) where {T}
+    thold = ustrip(T, mV, threshold)
+    ConstantValueEvent{T}(alpha, state, saturation, thold)
 end
 
 function SpikeAffect(synsys::SynapticSystem{T}, network, simplified) where {T<:ConstantValueEvent}

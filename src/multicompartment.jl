@@ -154,13 +154,13 @@ Base.length(M::MultiCompartmentSystem) = length(get_compartments(M))
 
 function Base.iterate(M::MultiCompartmentSystem, state = 1)
     state > length(M) && return nothing
-    return (get_compartments(M)[state], state + 1)
+    return (renamespace(M, get_compartments(M)[state]), state + 1)
 end
 
 function Base.iterate(rM::Iterators.Reverse{MultiCompartmentSystem}, state = length(rM.itr))
     state < 1 && return nothing
     mc = rM.itr
-    return (get_compartments(mc)[state], state - 1)
+    return (renamespace(M, get_compartments(mc)[state]), state - 1)
 end
 
 function Base.getindex(M::MultiCompartmentSystem, i; namespace = true)

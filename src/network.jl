@@ -152,6 +152,7 @@ function connect_synapses!(gen, syn_model, comps, topology, reversal_map)
         post_synapses = get_synapses(comp)
         push!(post_synapses, Synapse(syn_model, reversal))
         new_compartments[i] = remake(comp; synapses = post_synapses)
+        @show states(new_compartments[i])
     end
     return new_compartments
 end
