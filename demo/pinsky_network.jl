@@ -31,11 +31,8 @@ dendrite_dynamics = HodgkinHuxley([KAHP(0.8mS / cm^2),
                               capacitance = capacitance,
                               stimuli = [I_d_holding])
 
-@named gc_soma = AxialConductance([Gate(inv(p), name = :ps)],
-                                  max_g = gc_val)
-@named gc_dendrite = AxialConductance([Gate(inv(1 - p), name = :pd)],
-                                      max_g = gc_val)
-
+@named gc_soma = AxialConductance([Gate(inv(p), name = :ps)], max_g = gc_val)
+@named gc_dendrite = AxialConductance([Gate(inv(1 - p), name = :pd)], max_g = gc_val)
 topology = MultiCompartmentTopology([soma, dendrite]);
 add_junction!(topology, soma, dendrite, (gc_soma, gc_dendrite))
 @named mcneuron = MultiCompartment(topology)
@@ -43,7 +40,7 @@ add_junction!(topology, soma, dendrite, (gc_soma, gc_dendrite))
 ###########################################################################################
 # Synapse models
 ###########################################################################################
-import Conductor: NMDA, AMPA, HeavisideSum
+import Conductor: NMDA, AMPA
 
 @parameters τNMDA = 150.0 τAMPA = 2.0
 @variables S(t) = 0.0
@@ -80,12 +77,12 @@ add_junction!(mcstim_topology, soma_stimulated, dendrite, (gc_soma, gc_dendrite)
 # Need to introduce 10% gca variance as per Pinsky/Rinzel
 neuronpopulation = [Conductor.replicate(mcneuron) for _ in 1:2];
 neuronpopulation[1] = mcneuron_stim
-topology = NetworkTopology(neuronpopulation, [NMDAChan]);
+topology = NetworkTopology(neuronpopulation, [AMPAChan]);
 add_synapse!(topology, neuronpopulation[1].soma, neuronpopulation[2].dendrite,
-                 NMDAChan, 1.0)
+                 AMPAChan, 1.0)
 
 @named net = NeuronalNetworkSystem(topology, revmap)
-
+#=
 #using Graphs
 #nmda_g = random_regular_digraph(4, 2, dir = :in)
 #ampa_g = random_regular_digraph(4, 2, dir = :in)
@@ -119,3 +116,5 @@ using Statistics
 final = mean(abovethold, dims = 1)'
 using Plots
 plot(final) # looks correct but only for less than 1 second of simulation time.
+
+=#

@@ -94,7 +94,7 @@ struct ConstantValueEvent{T} <: SummedEventsSynapse
     # weighted_events::Bool # apply weights to alpha
 end
 
-function ConstantValueEvent(state::Num; alpha::T = 1.0, saturation::T = floatmax(T), threshold = 10.0mV) where {T}
+function ConstantValueEvent(state::Num; alpha::T = 1.0, saturation::T = floatmax(Float64), threshold = 10.0mV) where {T}
     thold = ustrip(T, mV, threshold)
     ConstantValueEvent{T}(alpha, state, saturation, thold)
 end

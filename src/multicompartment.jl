@@ -98,16 +98,9 @@ Basic constructor for a `MultiCompartmentSystem`.
 """
 function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESystem[],
                           name = Base.gensym("MultiCompartment"), defaults = Dict())
-    compartments = topology.compartments
 
-    # As a precaution, wipe any pre-existing axial currents from compartments
-    for (i, comp) in enumerate(compartments)
-        isempty(conductances(get_arbor(comp))) && continue
-        compartments[i] = SciMLBase.remake(comp, arbor = Arborization())
-    end
-
+    compartments = deepcopy(topology.compartments)
     observed = Equation[]
-    eqs = Set{Equation}()
 
     for e in edges(topology.g)
         axial = topology.conductances[e]
@@ -115,8 +108,11 @@ function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESy
         branch = compartments[dst(e)]
 
         trunk_arbor = get_arbor(trunk)
+        branchVm = LocalScope(Num(renamespace(branch, get_voltage(branch))))
+        #branchVm = get_voltage(branch)
+
         push!(trunk_arbor.children,
-              Junction(axial, Num(renamespace(branch, get_voltage(branch)))))
+              Junction(axial, branchVm))
 
         trunk = SciMLBase.remake(trunk, arbor = trunk_arbor)
         compartments[src(e)] = trunk
@@ -124,7 +120,7 @@ function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESy
 
     systems = union(extensions, compartments)
 
-    return MultiCompartmentSystem(collect(eqs), t, [], [], observed, name, systems,
+    return MultiCompartmentSystem(Equation[], t, [], [], observed, name, systems,
                                   defaults,
                                   topology, compartments, extensions)
 end

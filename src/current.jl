@@ -119,7 +119,8 @@ function CurrentSystem(Vₘ::Num, cond::ConductanceSystem{T}, Erev::Num;
         eq = eq.lhs ~ eq.rhs * W
     end
     validate(eq) && push!(eqs, eq)
-    push!(dvs, Vₘ, I)
+    #push!(dvs, Vₘ, I)
+    push!(dvs, I)
     merge!(defs, defaults)
     return CurrentSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems, defs,
                          I, inps, permeability(cond), get_model(cond); checks = false)

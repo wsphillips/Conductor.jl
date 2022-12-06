@@ -1,7 +1,7 @@
 
 struct NetworkTopology
     multigraph::Dict{Any, SparseMatrixCSC{Float64, Int64}}
-    neurons::Vector{Vector{CompartmentSystem}}
+    neurons::Vector
 end
 
 synaptic_systems(topology::NetworkTopology) = keys(graph(topology))
@@ -10,11 +10,7 @@ function NetworkTopology(neurons::Vector, synaptic_systems::Vector)
     m = length(neurons)
     n = sum(length(neuron) for neuron in neurons)
     multigraph = Dict(x => sparse(Int64[], Int64[], Float64[], n, m) for x in synaptic_systems)
-    expanded = []
-    for neuron in neurons
-        push!(expanded, [neuron...])
-    end
-    return NetworkTopology(multigraph, expanded)
+    return NetworkTopology(multigraph, neurons)
 end
 
 function NetworkTopology(g::SimpleDiGraph, neurons, synaptic_system,
@@ -24,7 +20,7 @@ function NetworkTopology(g::SimpleDiGraph, neurons, synaptic_system,
 end
 
 neurons(topology::NetworkTopology) = getfield(topology, :neurons)
-compartments(topology::NetworkTopology) = vcat(neurons(topology)...)
+compartments(topology::NetworkTopology) = vcat(([neuron...] for neuron in neurons(topology))...)
 root_compartments(topology::NetworkTopology) = [first(neuron) for neuron in neurons(topology)]
 graph(topology::NetworkTopology) = getfield(topology, :multigraph)
 
@@ -146,13 +142,14 @@ compartments(sys::NeuronalNetworkSystem) = compartments(get_topology(sys))
 
 function connect_synapses!(gen, syn_model, comps, topology, reversal_map)
     # this method assumes weights scale the size of the event/alpha)
-    new_compartments = deepcopy(comps)
+    new_neurons = deepcopy(comps)
     reversal = reversal_map[syn_model]
     for (i,comp) in enumerate(new_compartments)
         post_synapses = get_synapses(comp)
         push!(post_synapses, Synapse(syn_model, reversal))
+        display(get_voltage(comp).val.metadata)
         new_compartments[i] = remake(comp; synapses = post_synapses)
-        @show states(new_compartments[i])
+        #display(new_compartments[i])
     end
     return new_compartments
 end
@@ -222,11 +219,11 @@ function NeuronalNetworkSystem(topology::NetworkTopology, reversal_map,
 
     gen = GeneratedCollections()
     (; eqs, dvs, ps, systems, observed, defs) = gen
-    comps = compartments(topology) 
+    nrns = neurons(topology) 
     for sys in synaptic_systems(topology)
-        comps = connect_synapses!(gen, sys, comps, topology, reversal_map)
+        nrns = connect_synapses!(gen, sys, nrns, topology, reversal_map)
     end
-
+    comps = vcat(([neuron...] for neuron in nrns))
     union!(systems, extensions, comps)
     merge!(defs, defaults)
     return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
