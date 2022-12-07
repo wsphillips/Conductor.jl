@@ -36,9 +36,9 @@ add_junction!(topology, soma, dendrite, (gc_soma, gc_dendrite))
 # Note: Pinsky & Rinzel originally solved using RK4 and _fixed_ dt=0.05
 # Here we let the solver use adaptive stepping, because its about 10X faster
 # NOTE: To see activity, adjust the somatic/dendritic bias currents.
-# prob = Simulation(mcneuron, sim_time*ms)
-# sol = solve(prob, RK4())
-# plot(sol, idxs=[soma.Vₘ], size=(1440,900))
+ prob = Simulation(mcneuron, sim_time*ms)
+ sol = solve(prob, RK4())
+ plot(sol, idxs=[soma.Vₘ], size=(1440,900))
 
 # Published initial values
 # prob = remake(prob; u0 = [-4.6, 0.999, 0.001, 0.2, -4.5, 0.01, 0.009, .007])

@@ -20,7 +20,12 @@ function NetworkTopology(g::SimpleDiGraph, neurons, synaptic_system,
 end
 
 neurons(topology::NetworkTopology) = getfield(topology, :neurons)
-compartments(topology::NetworkTopology) = vcat(([neuron...] for neuron in neurons(topology))...)
+
+# returns the _individual_ compartments as a single concatenated vector
+function compartments(topology::NetworkTopology; namespace = true)
+    foldl(vcat, compartments(neuron; namespace) for neuron in neurons(topology))
+end
+
 root_compartments(topology::NetworkTopology) = [first(neuron) for neuron in neurons(topology)]
 graph(topology::NetworkTopology) = getfield(topology, :multigraph)
 
@@ -141,15 +146,13 @@ synaptic_systems(sys::NeuronalNetworkSystem) = synaptic_systems(get_topology(sys
 compartments(sys::NeuronalNetworkSystem) = compartments(get_topology(sys))
 
 function connect_synapses!(gen, syn_model, comps, topology, reversal_map)
-    # this method assumes weights scale the size of the event/alpha)
-    new_neurons = deepcopy(comps)
+        # this method assumes weights scale the size of the event/alpha)
+    new_compartments = deepcopy(comps)
     reversal = reversal_map[syn_model]
     for (i,comp) in enumerate(new_compartments)
         post_synapses = get_synapses(comp)
         push!(post_synapses, Synapse(syn_model, reversal))
-        display(get_voltage(comp).val.metadata)
         new_compartments[i] = remake(comp; synapses = post_synapses)
-        #display(new_compartments[i])
     end
     return new_compartments
 end
@@ -219,12 +222,23 @@ function NeuronalNetworkSystem(topology::NetworkTopology, reversal_map,
 
     gen = GeneratedCollections()
     (; eqs, dvs, ps, systems, observed, defs) = gen
-    nrns = neurons(topology) 
+    comps = compartments(topology; namespace = false)
     for sys in synaptic_systems(topology)
-        nrns = connect_synapses!(gen, sys, nrns, topology, reversal_map)
+        comps = connect_synapses!(gen, sys, comps, topology, reversal_map)
     end
-    comps = vcat(([neuron...] for neuron in nrns))
-    union!(systems, extensions, comps)
+
+    for neuron in neurons(topology)
+        if typeof(neuron) <: MultiCompartmentSystem
+            mctop = get_topology(neuron)
+            @set! mctop.compartments = comps[1:length(neuron)]
+            push!(systems, remake(neuron, topology = mctop))
+            length(comps) == length(neuron) && break
+            comps = comps[length(neuron)+1:end]
+        else
+            push!(systems, popfirst!(comps))
+        end
+    end
+    union!(systems, extensions)
     merge!(defs, defaults)
     return NeuronalNetworkSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems,
                                  defs, topology, reversal_map, extensions;

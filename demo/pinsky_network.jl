@@ -48,12 +48,12 @@ import Conductor: NMDA, AMPA
                                   [Gate(inv(1 + 0.28 * exp(-0.062(Vₘ - 60.0))); name = :e),
                                    Gate(S, [D(S) ~ -S/τNMDA]),
                                    Gate(inv(1 - p), name = :pnmda)],
-                                  max_s = 0.028mS)
+                                  max_s = 0.014mS)
 
 @named AMPAChan = SynapticChannel(ConstantValueEvent(S; threshold = 20mV), AMPA,
                                   [Gate(S, [D(S) ~ -S/τAMPA]),
                                    Gate(inv(1 - p), name = :pampa)],
-                                  max_s = 0.018mS)
+                                  max_s = 0.0045mS)
 
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
@@ -61,7 +61,7 @@ revmap = Dict([NMDAChan => ENMDA, AMPAChan => EAMPA])
 
 # A single neuron was "briefly" stimulated to trigger the network
 @named I_pulse = PulseTrain(amplitude = 5.0µA / 0.5,
-                            duration = 25ms,
+                            duration = 50ms,
                             delay = 150.0ms,
                             offset = -0.5µA / 0.5)
 
@@ -75,31 +75,29 @@ add_junction!(mcstim_topology, soma_stimulated, dendrite, (gc_soma, gc_dendrite)
 @named mcneuron_stim = MultiCompartment(mcstim_topology)
 
 # Need to introduce 10% gca variance as per Pinsky/Rinzel
-neuronpopulation = [Conductor.replicate(mcneuron) for _ in 1:2];
-neuronpopulation[1] = mcneuron_stim
-topology = NetworkTopology(neuronpopulation, [AMPAChan]);
-add_synapse!(topology, neuronpopulation[1].soma, neuronpopulation[2].dendrite,
-                 AMPAChan, 1.0)
+neuronpopulation = [Conductor.replicate(mcneuron) for _ in 1:50];
+neuronpopulation[4] = mcneuron_stim
+topology = NetworkTopology(neuronpopulation, [NMDAChan, AMPAChan]);
 
-@named net = NeuronalNetworkSystem(topology, revmap)
-#=
-#using Graphs
-#nmda_g = random_regular_digraph(4, 2, dir = :in)
-#ampa_g = random_regular_digraph(4, 2, dir = :in)
-#
-## We could allow users to supply a lambda/function to map in order to get this behavior
-#for (i, e) in enumerate(edges(nmda_g))
-#    add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite,
-#                 NMDAChan, 1.0)
-#end
-#
-#for (i, e) in enumerate(edges(ampa_g))
-#    add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite,
+#add_synapse!(topology, neuronpopulation[1].soma, neuronpopulation[2].dendrite,
 #                 AMPAChan, 1.0)
-#end
+#add_synapse!(topology, neuronpopulation[2].soma, neuronpopulation[1].dendrite,
+#                 NMDAChan, 1.0)
 
-add_synapse!(topology, neuronpopulation[1].soma, neuronpopulation[2].dendrite,
+using Graphs
+nmda_g = random_regular_digraph(50, 10, dir = :in)
+ampa_g = random_regular_digraph(50, 10, dir = :in)
+
+# We could allow users to supply a lambda/function to map in order to get this behavior
+for (i, e) in enumerate(edges(nmda_g))
+    add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite,
                  NMDAChan, 1.0)
+end
+
+for (i, e) in enumerate(edges(ampa_g))
+    add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite,
+                 AMPAChan, 1.0)
+end
 
 @named net = NeuronalNetworkSystem(topology, revmap);
 simp = Simulation(net, 2000.0ms, return_system = true)
@@ -117,4 +115,3 @@ final = mean(abovethold, dims = 1)'
 using Plots
 plot(final) # looks correct but only for less than 1 second of simulation time.
 
-=#

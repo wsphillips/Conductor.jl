@@ -102,6 +102,12 @@ function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESy
     compartments = deepcopy(topology.compartments)
     observed = Equation[]
 
+    # As a precaution, wipe any pre-existing axial currents from compartments
+    for (i, comp) in enumerate(compartments)
+        isempty(conductances(get_arbor(comp))) && continue
+        compartments[i] = SciMLBase.remake(comp, arbor = Arborization())
+    end
+
     for e in edges(topology.g)
         axial = topology.conductances[e]
         trunk = compartments[src(e)]
@@ -175,7 +181,7 @@ function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
     ps = get_ps(mcsys)
     eqs = get_eqs(mcsys)
     defs = get_defaults(mcsys)
-    systems = map(x -> convert(ODESystem, x), get_systems(mcsys))
+    systems = convert.(ODESystem, get_systems(mcsys))
     odesys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(mcsys),
                        systems = systems, checks = CheckComponents)
     return odesys
