@@ -52,10 +52,8 @@ end
 function generate_callback_condition(network, simplified; continuous_events)
     voltage_indices = map_voltage_indices(network, simplified; roots_only = true)
     if continuous_events
-        println("Continuous events")
         return ContinuousSpikeDetection(voltage_indices)
     else # discrete condition for each compartment
-        println("Discrete Events")
         return [DiscreteSpikeDetection(voltage_index) for voltage_index in voltage_indices]
     end
 end

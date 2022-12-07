@@ -80,8 +80,8 @@ neuronpopulation[4] = mcneuron_stim
 topology = NetworkTopology(neuronpopulation, [NMDAChan, AMPAChan]);
 
 using Graphs
-nmda_g = random_regular_digraph(50, 10, dir = :in)
-ampa_g = random_regular_digraph(50, 10, dir = :in)
+nmda_g = random_regular_digraph(100, 20, dir = :in)
+ampa_g = random_regular_digraph(100, 20, dir = :in)
 
 # We could allow users to supply a lambda/function to map in order to get this behavior
 for (i, e) in enumerate(edges(nmda_g))
