@@ -75,14 +75,9 @@ add_junction!(mcstim_topology, soma_stimulated, dendrite, (gc_soma, gc_dendrite)
 @named mcneuron_stim = MultiCompartment(mcstim_topology)
 
 # Need to introduce 10% gca variance as per Pinsky/Rinzel
-neuronpopulation = [Conductor.replicate(mcneuron) for _ in 1:50];
+neuronpopulation = [Conductor.replicate(mcneuron) for _ in 1:100];
 neuronpopulation[4] = mcneuron_stim
 topology = NetworkTopology(neuronpopulation, [NMDAChan, AMPAChan]);
-
-#add_synapse!(topology, neuronpopulation[1].soma, neuronpopulation[2].dendrite,
-#                 AMPAChan, 1.0)
-#add_synapse!(topology, neuronpopulation[2].soma, neuronpopulation[1].dendrite,
-#                 NMDAChan, 1.0)
 
 using Graphs
 nmda_g = random_regular_digraph(50, 10, dir = :in)

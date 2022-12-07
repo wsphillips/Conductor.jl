@@ -14,7 +14,7 @@ If `return_system == true`, returns a simplified `ODESystem` instead.
 """
 function Simulation(neuron::AbstractCompartmentSystem, time::Time; return_system = false,
                     jac = false, sparse = false,
-                    parallel = nothing)
+                    parallel = SerialForm())
     t_val, simplified = simplify_simulation(neuron, time)
     if return_system
         return simplified
@@ -36,7 +36,7 @@ function get_weights(integrator, model)
     return graph(topo)[model]
 end
 function Simulation(network::NeuronalNetworkSystem, time::Time; return_system = false,
-                    jac = false, sparse = false, parallel = nothing, continuous_events = false)
+        jac = false, sparse = false, parallel = Symbolics.SerialForm(), continuous_events = false)
     t_val, simplified = simplify_simulation(network, time)
     return_system && return simplified
     if !any(iseventbased.(synaptic_systems(network)))
