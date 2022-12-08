@@ -33,6 +33,6 @@ dynamics = HodgkinHuxley(channels, reversals);
 @named neuron = Compartment(Vₘ, dynamics; geometry = Sphere(radius = 20µm),
                          stimuli = [pulse_stim])
 
-sim = Simulation(neuron, time = 300ms)
+sim = Simulation(neuron, 300ms)
 solution = solve(sim, Rosenbrock23(), abstol = 0.01, reltol = 0.01, dtmax = 100.0);
 plot(solution; size = (1200, 800))

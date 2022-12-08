@@ -98,7 +98,9 @@ Basic constructor for a `MultiCompartmentSystem`.
 """
 function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESystem[],
                           name = Base.gensym("MultiCompartment"), defaults = Dict())
-    compartments = topology.compartments
+
+    compartments = deepcopy(topology.compartments)
+    observed = Equation[]
 
     # As a precaution, wipe any pre-existing axial currents from compartments
     for (i, comp) in enumerate(compartments)
@@ -106,17 +108,17 @@ function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESy
         compartments[i] = SciMLBase.remake(comp, arbor = Arborization())
     end
 
-    observed = Equation[]
-    eqs = Set{Equation}()
-
     for e in edges(topology.g)
         axial = topology.conductances[e]
         trunk = compartments[src(e)]
         branch = compartments[dst(e)]
 
         trunk_arbor = get_arbor(trunk)
+        branchVm = LocalScope(Num(renamespace(branch, get_voltage(branch))))
+        #branchVm = get_voltage(branch)
+
         push!(trunk_arbor.children,
-              Junction(axial, Num(renamespace(branch, get_voltage(branch)))))
+              Junction(axial, branchVm))
 
         trunk = SciMLBase.remake(trunk, arbor = trunk_arbor)
         compartments[src(e)] = trunk
@@ -124,7 +126,7 @@ function MultiCompartment(topology::MultiCompartmentTopology; extensions = ODESy
 
     systems = union(extensions, compartments)
 
-    return MultiCompartmentSystem(collect(eqs), t, [], [], observed, name, systems,
+    return MultiCompartmentSystem(Equation[], t, [], [], observed, name, systems,
                                   defaults,
                                   topology, compartments, extensions)
 end
@@ -154,13 +156,13 @@ Base.length(M::MultiCompartmentSystem) = length(get_compartments(M))
 
 function Base.iterate(M::MultiCompartmentSystem, state = 1)
     state > length(M) && return nothing
-    return (get_compartments(M)[state], state + 1)
+    return (renamespace(M, get_compartments(M)[state]), state + 1)
 end
 
 function Base.iterate(rM::Iterators.Reverse{MultiCompartmentSystem}, state = length(rM.itr))
     state < 1 && return nothing
     mc = rM.itr
-    return (get_compartments(mc)[state], state - 1)
+    return (renamespace(M, get_compartments(mc)[state]), state - 1)
 end
 
 function Base.getindex(M::MultiCompartmentSystem, i; namespace = true)
@@ -179,7 +181,7 @@ function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
     ps = get_ps(mcsys)
     eqs = get_eqs(mcsys)
     defs = get_defaults(mcsys)
-    systems = map(x -> convert(ODESystem, x), get_systems(mcsys))
+    systems = convert.(ODESystem, get_systems(mcsys))
     odesys = ODESystem(eqs, t, dvs, ps; defaults = defs, name = nameof(mcsys),
                        systems = systems, checks = CheckComponents)
     return odesys

@@ -13,5 +13,5 @@ chol_kinetics = Gate(SteadyStateTau,
 EGlut = Equilibrium(Glutamatergic, -70mV, name = :Glut) # NOTE: -70mV reversal => IPSP
 EChol = Equilibrium(Cholinergic, -80mV, name = :Chol) # Leak as alias for non-specific ion current
 
-@named Glut = SynapticChannel(Glutamatergic, [glut_kinetics]);
-@named Chol = SynapticChannel(Cholinergic, [chol_kinetics]);
+@named Glut = SynapticChannel(IntegratedSynapse(), Glutamatergic, [glut_kinetics], max_s = 100nS);
+@named Chol = SynapticChannel(IntegratedSynapse(), Cholinergic, [chol_kinetics], max_s = 100nS);

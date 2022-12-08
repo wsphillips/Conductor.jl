@@ -1,5 +1,5 @@
 
-using LinearAlgebra, OrdinaryDiffEq
+using LinearAlgebra, OrdinaryDiffEq, ModelingToolkit
 LinearAlgebra.BLAS.set_num_threads(6)
 
 include(joinpath(@__DIR__, "traub_kinetics.jl"))
@@ -12,7 +12,7 @@ include(joinpath(@__DIR__, "pinsky_setup.jl"))
 soma_dynamics = HodgkinHuxley([NaV(30mS / cm^2),
                                Kdr(15mS / cm^2),
                                leak(0.1mS / cm^2)],
-                              reversals[1:3])
+                              reversals[1:3]);
 
 @named soma = Compartment(Vₘ, soma_dynamics;
                           geometry = Unitless(0.5), # FIXME: should take p param
@@ -23,7 +23,7 @@ dendrite_dynamics = HodgkinHuxley([KAHP(0.8mS / cm^2),
                                    CaS(10mS / cm^2),
                                    KCa(15mS / cm^2),
                                    leak(0.1mS / cm^2)],
-                                  reversals[2:4])
+                                  reversals[2:4]);
 
 @named dendrite = Compartment(Vₘ, dendrite_dynamics;
                               extensions = [calcium_conversion],
@@ -31,11 +31,8 @@ dendrite_dynamics = HodgkinHuxley([KAHP(0.8mS / cm^2),
                               capacitance = capacitance,
                               stimuli = [I_d_holding])
 
-@named gc_soma = AxialConductance([Gate(SimpleGate, inv(p), name = :ps)],
-                                  max_g = gc_val)
-@named gc_dendrite = AxialConductance([Gate(SimpleGate, inv(1 - p), name = :pd)],
-                                      max_g = gc_val)
-
+@named gc_soma = AxialConductance([Gate(inv(p), name = :ps)], max_g = gc_val)
+@named gc_dendrite = AxialConductance([Gate(inv(1 - p), name = :pd)], max_g = gc_val)
 topology = MultiCompartmentTopology([soma, dendrite]);
 add_junction!(topology, soma, dendrite, (gc_soma, gc_dendrite))
 @named mcneuron = MultiCompartment(topology)
@@ -43,24 +40,20 @@ add_junction!(topology, soma, dendrite, (gc_soma, gc_dendrite))
 ###########################################################################################
 # Synapse models
 ###########################################################################################
-import Conductor: NMDA, AMPA, HeavisideSum
+import Conductor: NMDA, AMPA
 
-@named NMDAChan = SynapticChannel(NMDA,
-                                  [
-                                      Gate(SimpleGate,
-                                           inv(1 + 0.28 * exp(-0.062(Vₘ - 60.0)));
-                                           name = :e),
-                                      Gate(HeavisideSum; threshold = 10mV, decay = 150,
-                                           saturation = 125, name = :S),
-                                      Gate(SimpleGate, inv(1 - p), name = :pnmda)],
-                                  max_s = 0.028mS, aggregate = true)
+@parameters τNMDA = 150.0 τAMPA = 2.0
+@variables S(t) = 0.0
+@named NMDAChan = SynapticChannel(ConstantValueEvent(S; saturation = 125.0), NMDA,
+                                  [Gate(inv(1 + 0.28 * exp(-0.062(Vₘ - 60.0))); name = :e),
+                                   Gate(S, [D(S) ~ -S/τNMDA]),
+                                   Gate(inv(1 - p), name = :pnmda)],
+                                  max_s = 0.025mS)
 
-@named AMPAChan = SynapticChannel(AMPA,
-                                  [
-                                      Gate(HeavisideSum, threshold = 20mV, decay = 2;
-                                           name = :u),
-                                      Gate(SimpleGate, inv(1 - p), name = :pampa)],
-                                  max_s = 0.018mS, aggregate = true)
+@named AMPAChan = SynapticChannel(ConstantValueEvent(S; threshold = 20mV), AMPA,
+                                  [Gate(S, [D(S) ~ -S/τAMPA]),
+                                   Gate(inv(1 - p), name = :pampa)],
+                                  max_s = 0.01mS)
 
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
@@ -68,7 +61,7 @@ revmap = Dict([NMDAChan => ENMDA, AMPAChan => EAMPA])
 
 # A single neuron was "briefly" stimulated to trigger the network
 @named I_pulse = PulseTrain(amplitude = 5.0µA / 0.5,
-                            duration = 25ms,
+                            duration = 50ms,
                             delay = 150.0ms,
                             offset = -0.5µA / 0.5)
 
@@ -93,17 +86,17 @@ ampa_g = random_regular_digraph(100, 20, dir = :in)
 # We could allow users to supply a lambda/function to map in order to get this behavior
 for (i, e) in enumerate(edges(nmda_g))
     add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite,
-                 NMDAChan)
+                 NMDAChan, 1.0)
 end
 
 for (i, e) in enumerate(edges(ampa_g))
     add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite,
-                 AMPAChan)
+                 AMPAChan, 1.0)
 end
 
 @named net = NeuronalNetworkSystem(topology, revmap);
-simp = Simulation(net, time = 2000.0ms, return_system = true)
-prob = Simulation(net, time = 2000.0ms)
+simp = Simulation(net, 2000.0ms, return_system = true)
+prob = Simulation(net, 2000.0ms)
 @time sol = solve(prob, RK4());
 
 # Pinsky and Rinzel displayed their results as a plot of N neurons over 20mV
@@ -116,3 +109,4 @@ using Statistics
 final = mean(abovethold, dims = 1)'
 using Plots
 plot(final) # looks correct but only for less than 1 second of simulation time.
+

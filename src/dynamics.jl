@@ -37,9 +37,25 @@ end
 function generate_currents!(currents, current_systems, gen, dynamics, Vₘ, aₘ)
     paired_conductances = zip(conductances(dynamics), reversals(dynamics))
     for (cond, Erev) in paired_conductances
-        filter_reversal!(gen, LocalScope(Erev))
+        Erev = LocalScope(Erev)
+        filter_reversal!(gen, Erev)
         sys = CurrentSystem(ParentScope(Vₘ),
-                            cond, ParentScope(LocalScope(Erev)); aₘ = ParentScope(aₘ))
+                            cond, ParentScope(Erev); aₘ = ParentScope(aₘ))
+        push!(current_systems, sys) 
+        push!(gen.systems, sys)
+        push!(currents, output(sys))
+    end
+    return
+end
+
+function generate_currents!(currents, current_systems, gen, dynamics::Synapse, Vₘ, aₘ)
+    paired_conductances = zip(conductances(dynamics), reversals(dynamics))
+    for (cond, Erev) in paired_conductances
+        Erev = LocalScope(Erev)
+        display(Erev)
+        filter_reversal!(gen, Erev)
+        sys = CurrentSystem(ParentScope(Vₘ),
+                            cond, ParentScope(Erev); aₘ = ParentScope(aₘ))
         push!(current_systems, sys) 
         push!(gen.systems, sys)
         push!(currents, output(sys))
@@ -50,9 +66,10 @@ end
 function generate_currents!(currents, current_systems, gen, dynamics::Arborization, Vₘ, aₘ)
     paired_conductances = zip(conductances(dynamics), reversals(dynamics))
     for (cond, Erev) in paired_conductances
-        push!(gen.dvs, ParentScope(LocalScope(Erev)))
+        Erev = LocalScope(Erev)
+        #push!(gen.dvs, ParentScope(Erev))
         sys = CurrentSystem(ParentScope(Vₘ),
-                            cond, ParentScope(ParentScope(LocalScope(Erev))); aₘ = ParentScope(aₘ))
+                            cond, ParentScope(ParentScope(Erev)); aₘ = ParentScope(aₘ))
         push!(current_systems, sys) 
         push!(gen.systems, sys)
         push!(currents, output(sys))
@@ -61,7 +78,7 @@ function generate_currents!(currents, current_systems, gen, dynamics::Arborizati
 end
 
 
-function generate_currents!(currents, current_systems, gen, stimuli::Vector{<:Stimulus}, Vₘ, aₘ)
+function generate_currents!(currents, current_systems, gen, stimuli::Vector{<:StimulusModel}, Vₘ, aₘ)
     for stimulus in stimuli
         sys = CurrentSystem(ParentScope(Vₘ), stimulus)
         push!(current_systems, sys)

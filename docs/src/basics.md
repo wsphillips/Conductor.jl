@@ -54,16 +54,13 @@ kdr_kinetics = [
 
 channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
+dynamics = HodgkinHuxley(channels, reversals)
 
 @named holding_current = Bias(5000pA)
-
-dynamics_1 = HodgkinHuxley(channels, reversals)
-dynamics_2 = HodgkinHuxley(channels, reversals)
-
-@named neuron1 = Compartment(Vₘ, dynamics_1;
+@named neuron1 = Compartment(Vₘ, dynamics;
                              geometry = Cylinder(radius = 25µm, height = 400µm),
                              stimuli = [holding_current]);
-@named neuron2 = Compartment(Vₘ, dynamics_2;
+@named neuron2 = Compartment(Vₘ, dynamics;
                             geometry = Cylinder(radius = 25µm, height = 400µm))
 
 # Synaptic model
@@ -72,18 +69,18 @@ syn∞ = 1/(1 + exp((-35 - Vₓ)/5))
 τsyn = (1 - syn∞)/(1/40)
 syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
-@named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
+@named Glut = SynapticChannel(IntegratedSynapse(), Cation, [syn_kinetics]; max_s = 30nS);
 
 topology = NetworkTopology([neuron1, neuron2], [Glut]);
-topology[neuron1, neuron2] = Glut
+topology[neuron1, neuron2] = Glut(30nS)
 reversal_map = Dict([Glut => EGlut])
 
 @named net = NeuronalNetworkSystem(topology, reversal_map)
 total_time = 250
-sim = Simulation(net, time = total_time*ms)
+sim = Simulation(net, total_time*ms)
 
-solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
-plot(solution; vars=[neuron1.Vₘ, neuron2.Vₘ])
+solution = solve(sim, Rosenbrock23())
+plot(solution, idxs=[neuron1.Vₘ, neuron2.Vₘ])
 ```
 
 ## Step-by-step explanation
@@ -160,13 +157,12 @@ Finally, we construct our two neurons, providing the holding current stimulus to
 which will be our presynaptic neuron.
 
 ```@example gate_example
-dynamics_1 = HodgkinHuxley(channels, reversals)
-dynamics_2 = HodgkinHuxley(channels, reversals)
+dynamics = HodgkinHuxley(channels, reversals)
 
-@named neuron1 = Compartment(Vₘ, dynamics_1;
+@named neuron1 = Compartment(Vₘ, dynamics;
                              geometry = Cylinder(radius = 25µm, height = 400µm),
                              stimuli = [holding_current]);
-@named neuron2 = Compartment(Vₘ, dynamics_2;
+@named neuron2 = Compartment(Vₘ, dynamics;
                             geometry = Cylinder(radius = 25µm, height = 400µm))
 nothing # hide
 ``` 
@@ -199,14 +195,14 @@ We'll then build a `SynapticChannel` and define an equilibrium potential.
 
 ```@example gate_example; continued=true
 EGlut = Equilibrium(Cation, 0mV, name = :Glut)
-@named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS);
+@named Glut = SynapticChannel(IntegratedSynapse(), Cation, [syn_kinetics]; max_s = 30nS);
 ```
 Given our two neurons and a synaptic channel, we can model a miniature circuit by defining
 a synapse between the neurons and then constructing a `NeuronalNetworkSystem`:
 
 ```@example gate_example; continued=true
 topology = NetworkTopology([neuron1, neuron2], [Glut]);
-add_synapse!(topology, neuron1, neuron2, Glut)
+topology[neuron1, neuron2] = Glut(30nS)
 reversal_map = Dict([Glut => EGlut])
 
 @named net = NeuronalNetworkSystem(topology, reversal_map)
@@ -216,7 +212,7 @@ Now we're ready to run our simulation.
 
 ```@example gate_example
 total_time = 250
-sim = Simulation(net, time = total_time*ms)
-solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
-plot(solution; vars=[neuron1.Vₘ, neuron2.Vₘ])
+sim = Simulation(net, total_time*ms)
+solution = solve(sim, Rosenbrock23())
+plot(solution, idxs=[neuron1.Vₘ, neuron2.Vₘ])
 ```

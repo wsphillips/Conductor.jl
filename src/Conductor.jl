@@ -15,64 +15,69 @@ using ModelingToolkit,
 
 const MTK = ModelingToolkit
 
+import SciMLBase: remake, VectorContinuousCallback, DiscreteCallback, ContinuousCallback,
+                  CallbackSet
+
 import Symbolics:
-                  get_variables,
-                  Symbolic,
-                  value,
-                  tosymbol,
-                  VariableDefaultValue,
-                  wrap, unwrap, Arr,
-                  scalarize,
-                  getname
+    get_variables,
+    Symbolic,
+    value,
+    tosymbol,
+    VariableDefaultValue,
+    wrap, unwrap, Arr,
+    scalarize,
+    getname
 
 import ModelingToolkit:
-                        toparam,
-                        isparameter,
-                        Equation,
-                        defaults,
-                        AbstractSystem,
-                        get_eqs,
-                        get_iv,
-                        get_ivs,
-                        get_states,
-                        get_observed,
-                        get_defaults,
-                        get_ps,
-                        get_systems,
-                        get_continuous_events,
-                        get_discrete_events,
-                        get_unit,
-                        _merge,
-                        renamespace,
-                        hasdefault,
-                        getdefault,
-                        setdefault,
-                        AbstractTimeDependentSystem,
-                        independent_variables,
-                        get_variables!,
-                        validate,
-                        CheckComponents
+    toparam,
+    isparameter,
+    Equation,
+    defaults,
+    AbstractSystem,
+    get_eqs,
+    get_iv,
+    get_ivs,
+    get_states,
+    get_observed,
+    get_defaults,
+    get_ps,
+    get_systems,
+    get_continuous_events,
+    get_discrete_events,
+    get_unit,
+    _merge,
+    renamespace,
+    hasdefault,
+    getdefault,
+    setdefault,
+    AbstractTimeDependentSystem,
+    independent_variables,
+    get_variables!,
+    validate,
+    CheckComponents,
+    rename,
+    namespace_variables
 
 import ModelingToolkit.SciMLBase: parameterless_type
 
 import Unitful:
-                Time,
-                TimeUnits,
-                Voltage,
-                VoltageUnits,
-                Current,
-                CurrentUnits,
-                Molarity,
-                ElectricalConductance,
-                ElectricalConductanceUnits
+    Time,
+    TimeUnits,
+    Voltage,
+    VoltageUnits,
+    Current,
+    CurrentUnits,
+    Molarity,
+    ElectricalConductance,
+    ElectricalConductanceUnits
 
 import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 
 import SymbolicUtils:
-                      FnType,
-                      symtype,
-                      operation,
-                      arguments
+    FnType,
+    symtype,
+    operation,
+    arguments
 
 import Base: show, display
 
@@ -112,6 +117,21 @@ abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
 abstract type AbstractNeuronalNetworkSystem <: AbstractTimeDependentSystem end
 
+# Model properties
+abstract type ConductanceModel end
+
+abstract type SynapticModel <: ConductanceModel end
+struct AxialModel <: ConductanceModel end
+struct ChannelModel <: ConductanceModel end
+abstract type StimulusModel <: ConductanceModel end
+
+abstract type EventBasedSynapse <: SynapticModel end
+abstract type IndependentEventsSynapse <: EventBasedSynapse end
+abstract type SummedEventsSynapse <: EventBasedSynapse end
+struct IntegratedSynapse <: SynapticModel end
+
+export ConstantValueEvent, IntegratedSynapse
+
 include("util.jl")
 include("primitives.jl")
 include("stimulus.jl")
@@ -124,4 +144,5 @@ include("multicompartment.jl")
 include("network.jl")
 include("simulation.jl")
 include("populations.jl")
+include("callbacks.jl")
 end # module

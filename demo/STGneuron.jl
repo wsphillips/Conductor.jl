@@ -19,7 +19,7 @@ channels = [NaV(100mS / cm^2),
     KCa(15mS / cm^2),
     Kdr(50mS / cm^2),
     H(0.02mS / cm^2),
-    leak(0.03mS / cm^2)]
+    leak(0.03mS / cm^2)];
 
 dynamics = HodgkinHuxley(channels, gradients);
 
@@ -27,11 +27,11 @@ dynamics = HodgkinHuxley(channels, gradients);
                                   geometry = geo,
                                   extensions = [calcium_conversion]);
 t_total = 5000.0
-sim = Simulation(neuron, time = t_total * ms)
-solution = solve(sim, Rosenbrock23(), abstol = 1e-6, reltol = 1e-6, saveat = 0.2);
+sim = Simulation(neuron, t_total * ms)
+solution = solve(sim, Rosenbrock23());
 
 # Plot at 5kHz sampling
-fig = plot(solution(0.0:0.5:t_total; idxs = [Vₘ]); size = (1200, 800));
+fig = plot(solution, idxs = [Vₘ], size = (1200, 800));
 gui(fig)
 
 # Uncomment and eval `png(...)` to save as PNG
@@ -49,7 +49,7 @@ channels = [NaV(400mS/cm^2),
             KCa(20mS/cm^2),
             Kdr(50mS/cm^2),
             H(.04mS/cm^2),
-            leak(0mS/cm^2)]
+            leak(0mS/cm^2)];
 =#
 
 #=
@@ -61,7 +61,7 @@ channels = [NaV(200mS/cm^2),
             KCa(15mS/cm^2),
             Kdr(0mS/cm^2),
             H(.03mS/cm^2),
-            leak(.04mS/cm^2)]
+            leak(.04mS/cm^2)];
 =#
 
 #=
@@ -73,7 +73,7 @@ channels = [NaV(100mS/cm^2),
             KCa(10mS/cm^2),
             Kdr(50mS/cm^2),
             H(.03mS/cm^2),
-            leak(.05mS/cm^2)]
+            leak(.05mS/cm^2)];
 =#
 
 #=
@@ -85,7 +85,7 @@ channels = [NaV(400mS/cm^2),
             KCa(5mS/cm^2),
             Kdr(25mS/cm^2),
             H(.04mS/cm^2),
-            leak(.03mS/cm^2)]
+            leak(.03mS/cm^2)];
 =#
 
 #=
@@ -97,7 +97,7 @@ channels = [NaV(100mS/cm^2),
             KCa(10mS/cm^2),
             Kdr(50mS/cm^2),
             H(.03mS/cm^2),
-            leak(.05mS/cm^2)]
+            leak(.05mS/cm^2)];
 =#
 
 #=
@@ -109,7 +109,7 @@ channels = [NaV(500mS/cm^2),
             KCa(15mS/cm^2),
             Kdr(75mS/cm^2),
             H(.05mS/cm^2),
-            leak(0mS/cm^2)]
+            leak(0mS/cm^2)];
 =#
 
 ############################################################################################
@@ -125,7 +125,7 @@ channels = [NaV(200mS/cm^2),
             KCa(5mS/cm^2),
             Kdr(100mS/cm^2),
             H(.01mS/cm^2),
-            leak(.01mS/cm^2)]
+            leak(.01mS/cm^2)];
 =#
 
 #=
@@ -137,7 +137,7 @@ channels = [NaV(200mS/cm^2),
             KCa(10mS/cm^2),
             Kdr(125mS/cm^2),
             H(.05mS/cm^2),
-            leak(.04mS/cm^2)]
+            leak(.04mS/cm^2)];
 =#
 
 ############################################################################################
@@ -153,7 +153,7 @@ channels = [NaV(400mS/cm^2),
             KCa(10mS/cm^2),
             Kdr(100mS/cm^2),
             H(.01mS/cm^2),
-            leak(0mS/cm^2)]
+            leak(0mS/cm^2)];
 =#
 
 #=
@@ -165,7 +165,7 @@ channels = [NaV(100mS/cm^2),
             KCa(5mS/cm^2),
             Kdr(100mS/cm^2),
             H(.01mS/cm^2),
-            leak(0mS/cm^2)]
+            leak(0mS/cm^2)];
 =#
 
 #=
@@ -177,7 +177,7 @@ channels = [NaV(200mS/cm^2),
             KCa(5mS/cm^2),
             Kdr(50mS/cm^2),
             H(.01mS/cm^2),
-            leak(0mS/cm^2)]
+            leak(0mS/cm^2)];
 =#
 
 #=
@@ -189,7 +189,7 @@ channels = [NaV(200mS/cm^2),
             KCa(5mS/cm^2),
             Kdr(125mS/cm^2),
             H(.01mS/cm^2),
-            leak(0mS/cm^2)]
+            leak(0mS/cm^2)];
 =#
 
 #=
@@ -201,5 +201,5 @@ channels = [NaV(300mS/cm^2),
             KCa(5mS/cm^2),
             Kdr(125mS/cm^2),
             H(.01mS/cm^2),
-            leak(0mS/cm^2)]
+            leak(0mS/cm^2)];
 =#

@@ -12,8 +12,8 @@ function Synapse(x::ConductanceSystem, rev::Num)
     return Synapse{typeof(x)}(x, metadata)
 end
 
-conductance(x::Synapse{ConductanceSystem}) = x.system
-reversal(x::Synapse{ConductanceSystem}) = x.metadata[:reversal]
+conductance(x::Synapse) = x.system
+reversal(x::Synapse) = x.metadata[:reversal]
 conductances(x::Vector{<:Synapse}) = conductance.(x)
 reversals(x::Vector{<:Synapse}) = reversal.(x)
 
@@ -29,8 +29,8 @@ function Junction(x::ConductanceSystem, rev::Num)
     return Junction{typeof(x)}(x, metadata)
 end
 
-conductance(x::Junction{ConductanceSystem}) = x.system
-reversal(x::Junction{ConductanceSystem}) = x.metadata[:reversal]
+conductance(x::Junction) = x.system
+reversal(x::Junction) = x.metadata[:reversal]
 
 struct Arborization
     parent::Union{Nothing, Junction}
@@ -40,7 +40,6 @@ end
 Arborization() = Arborization(nothing, Junction[])
 
 # LOCAL / 1st degree connected nodes
-
 function conductances(x::Arborization)
     out = []
     conductances!(out, x)
@@ -66,7 +65,7 @@ function reversals!(out::Vector, x::Arborization)
 end
 
 # CurrentSystem + methods
-struct CurrentSystem <: AbstractCurrentSystem
+struct CurrentSystem{T<:ConductanceModel} <: AbstractCurrentSystem
     eqs::Vector{Equation}
     "Independent variable. Defaults to time, ``t``."
     iv::Num
@@ -81,14 +80,14 @@ struct CurrentSystem <: AbstractCurrentSystem
     output::Num
     inputs::Set{Num}
     ion::IonSpecies
-    aggregate::Bool
+    model::T
     function CurrentSystem(eqs, iv, states, ps, observed, name, systems, defaults,
-                           output, inputs, ion, aggregate; checks = false)
+                           output, inputs, ion, model; checks = false)
         if checks
             # placeholder
         end
-        new(eqs, iv, states, ps, observed, name, systems, defaults, output, inputs, ion,
-            aggregate)
+        new{typeof(model)}(eqs, iv, states, ps, observed, name, systems, defaults, output,
+                           inputs, ion, model)
     end
 end
 
@@ -96,41 +95,37 @@ ion(x::CurrentSystem) = getfield(x, :ion)
 get_extensions(x::AbstractCurrentSystem) = getfield(x, :extensions)
 get_inputs(x::CurrentSystem) = getfield(x, :inputs)
 get_output(x::CurrentSystem) = getfield(x, :output)
+get_model(x::CurrentSystem{<:ConductanceModel}) = getfield(x, :model)
 output(x::CurrentSystem) = renamespace(x, get_output(x))
 inputs(x::CurrentSystem) = renamespace.(x, get_inputs(x))
+
 # Main method for conductance based construction
-function CurrentSystem(Vₘ::Num, cond::ConductanceSystem, Erev::Num;
+function CurrentSystem(Vₘ::Num, cond::ConductanceSystem{T}, Erev::Num;
                        aₘ = 1, extensions::Vector{ODESystem} = ODESystem[],
-                       defaults = Dict(), name::Symbol = nameof(cond))
+                       defaults = Dict(), name::Symbol = nameof(cond)) where {T}
     
     # Extend the conductance system to a current system
     (; eqs, dvs, ps, systems, observed, defs) = copy_collections(cond)
-    
     push!(ps, aₘ)
     push!(isparameter(Erev) ? ps : dvs, Erev)
-    push!(dvs, Vₘ)
     inps = Set(get_inputs(cond))
     push!(inps, Vₘ)
     I = IonCurrent(cond)
     g = get_output(cond)
     eq = I ~ g * (Vₘ - Erev) * (1 * get_unit(g) isa SpecificConductance ? aₘ : 1)
+    if T <: IntegratedSynapse
+        @parameters W # NOTE: we do NOT provide default weight values here; do it post hoc 
+        push!(ps, W)
+        eq = eq.lhs ~ eq.rhs * W
+    end
     validate(eq) && push!(eqs, eq)
+    #push!(dvs, Vₘ, I)
     push!(dvs, I)
     merge!(defs, defaults)
-    return CurrentSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems, defs, I, inps,
-                         permeability(cond), isaggregate(cond); checks = false)
+    return CurrentSystem(eqs, t, collect(dvs), collect(ps), observed, name, systems, defs,
+                         I, inps, permeability(cond), get_model(cond); checks = false)
 end
 
-#function CurrentSystem(Vₘ::Num, syn::AbstractSynapse; kwargs...)
-#    synaptic_cond, synaptic_rev = conductance(syn), reversal(syn)
-#    return CurrentSystem(Vₘ, synaptic_cond, synaptic_rev; kwargs...)
-#end
-#
-#function CurrentSystem(Vₘ::Num, jxn::AbstractJunction; kwargs...)
-#    axial_cond, branch_Vm = conductance(jxn), reversal(jxn) 
-#    return CurrentSystem(Vₘ, axial_cond, branch_Vm; kwargs...)
-#end
-#
 # Specializations for stimuli
 function CurrentSystem(Vₘ::Num, stimulus::Bias{T};
                        name::Symbol = Base.gensym("electrode")) where {T <: Current}
@@ -138,7 +133,7 @@ function CurrentSystem(Vₘ::Num, stimulus::Bias{T};
     Iₑ = IonCurrent(stimulus) # creates symbolic with stored default/metadata
     push!(ps, Iₑ)
     return CurrentSystem(eqs, t, collect(dvs), collect(ps), observed, stimulus.name, [],
-                         defs, Iₑ, Set{Num}(), NonIonic, false; checks = false)
+                         defs, Iₑ, Set{Num}(), NonIonic, stimulus; checks = false)
 end
 
 # stimulus (pulse train)
@@ -148,7 +143,7 @@ function CurrentSystem(Vₘ::Num, stimulus::PulseTrain{T}) where {T <: Current}
     push!(dvs, Iₑ)
     push!(eqs, Iₑ ~ current_pulses(t, stimulus))
     return CurrentSystem(eqs, t, collect(dvs), collect(ps), observed, stimulus.name, [],
-                         defs, Iₑ, Set{Num}(), NonIonic, false; checks = false)
+                         defs, Iₑ, Set{Num}(), NonIonic, stimulus; checks = false)
 end
 
 function Base.convert(::Type{ODESystem}, currsys::CurrentSystem)

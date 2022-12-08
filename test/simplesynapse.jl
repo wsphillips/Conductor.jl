@@ -30,18 +30,16 @@ import Conductor: Na, K
 
     channels = [NaV, Kdr, leak]
     reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
-
+    dynamics = HodgkinHuxley(channels, reversals)
     @named holding_current = Bias(5000pA)
 
     geo = Cylinder(radius = 25µm, height = 400µm)
 
-    dynamics_1 = HodgkinHuxley(channels, reversals)
-    dynamics_2 = HodgkinHuxley(channels, reversals)
 
-    @named neuron1 = Compartment(Vₘ, dynamics_1;
+    @named neuron1 = Compartment(Vₘ, dynamics;
                                  geometry = Cylinder(radius = 25µm, height = 400µm),
                                  stimuli = [holding_current]);
-    @named neuron2 = Compartment(Vₘ, dynamics_2;
+    @named neuron2 = Compartment(Vₘ, dynamics;
                                  geometry = Cylinder(radius = 25µm, height = 400µm))
 
     # Synaptic model
@@ -50,28 +48,28 @@ import Conductor: Na, K
     τsyn = (1 - syn∞) / (1 / 40)
     syn_kinetics = Gate(SteadyStateTau, syn∞, τsyn, name = :z)
     EGlut = Equilibrium(Cation, 0mV, name = :Glut)
-    @named Glut = SynapticChannel(Cation, [syn_kinetics]; max_s = 30nS)
+    @named Glut = SynapticChannel(IntegratedSynapse(), Cation, [syn_kinetics]; max_s = 30nS)
 
     @test length.([equations(Glut),
                       states(Glut),
                       parameters(Glut)]) == [2, 3, 1]
 
     topology = NetworkTopology([neuron1, neuron2], [Glut])
-    topology[neuron1, neuron2] = Glut
+    topology[neuron1, neuron2] = Glut(30nS)
     reversal_map = Dict([Glut => EGlut])
 
     @named network = NeuronalNetworkSystem(topology, reversal_map)
 
     @test length.([equations(network),
                       states(network),
-                      parameters(network)]) == [24, 24, 19]
+                      parameters(network)]) == [24, 24, 20]
 
     ttot = 250.0
-    simul_sys = Simulation(network, time = ttot * ms, return_system = true)
+    simul_sys = Simulation(network, ttot * ms; return_system = true)
 
     @test length.([equations(simul_sys),
                       states(simul_sys),
-                      parameters(simul_sys)]) == [9, 9, 19]
+                      parameters(simul_sys)]) == [9, 9, 20]
 
     # Skipped because synaptic systems generated via Base.gensym
     #expect_syms = [:neuron1₊Isyn] # just take one for now
@@ -238,10 +236,10 @@ import Conductor: Na, K
 
     # Solve and check for invariance
     byhand_prob = ODEProblem{true}(simple_synapse!, u0, (0.0, ttot), p)
-    mtk_prob = ODEProblem(simul_sys, [], (0.0, ttot), [])
+    sim = Simulation(network, ttot * ms)
     byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol = 1e-9, abstol = 1e-9,
                        saveat = 0.025)
-    current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol = 1e-9, abstol = 1e-9,
+    current_mtk_sol = solve(sim, Rosenbrock23(), reltol = 1e-9, abstol = 1e-9,
                             saveat = 0.025)
 
     tsteps = 0.0:0.025:ttot
