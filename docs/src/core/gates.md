@@ -8,7 +8,7 @@ explicitly define the symbolic expression that models the output of a gate:
 using Conductor, ModelingToolkit
 # Voltage-dependent sigmoid activation
 Vₘ = ParentScope(MembranePotential())
-@named sigmoid = Gate(SimpleGate, inv(1 + exp(-Vₘ)))
+@named sigmoid = Gate(inv(1 + exp(-Vₘ)))
 
 # output
 Gate{SimpleGate}(SimpleGate, sigmoid(t), Symbolics.Equation[sigmoid(t) ~ 1 / (1 + exp(-Vₘ(t)))], Dict{Symbol, Any}())

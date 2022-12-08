@@ -63,8 +63,8 @@ If we try to simulate the neuron we've modeled so far, the result isn't very int
 ```@example compartment_example
 import Unitful: ms
 using OrdinaryDiffEq, Plots
-sim = Simulation(neuron, time = 300ms)
-solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
+sim = Simulation(neuron, 300ms)
+solution = solve(sim, Rosenbrock23())
 plot(solution; idxs=[Vₘ])
 ```
 The neuron isn't spontaneously active. To make the neuron produce spikes, we can write an
@@ -87,8 +87,8 @@ nothing # hide
 Putting it all together, our neuron simulation now produces a train of action potentials:
 
 ```@example compartment_example
-sim = Simulation(neuron_stim, time = 300ms)
-solution = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3, saveat=0.2)
+sim = Simulation(neuron_stim, 300ms)
+solution = solve(sim, Rosenbrock23())
 plot(solution; idxs=[Vₘ])
 ```
 
