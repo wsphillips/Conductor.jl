@@ -49,7 +49,7 @@ EGlut = Equilibrium(Cation, 0mV, name = :Glut)
 @variables m(t) = 0.0
 @parameters τsyn = 25 # 25 ms
 syn_kinetics = Gate(SimpleGate, m, [D(m) ~ -m/τsyn])
-event_model = ConstantValueEvent(1.0, m) # increment `m` gate by 1 for each incoming AP
+event_model = ConstantValueEvent(m) # increment `m` gate by 1 for each incoming AP
 @named ExpAMPA = SynapticChannel(event_model, Cation, [syn_kinetics]; max_s = 30nS)
 
 top = NetworkTopology([neuron1, neuron2], [ExpAMPA]);
@@ -92,6 +92,4 @@ sol2 = solve(sim2, Rosenbrock23(), abstol = 1e-3, reltol = 1e-3);
 plot(plot(sol2, idxs = [neuron1.Vₘ]),
      plot(sol2, idxs = [neuron2.Vₘ]),
      layout=(2,1))
-
-
 

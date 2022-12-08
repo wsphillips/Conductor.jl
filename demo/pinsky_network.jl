@@ -48,12 +48,12 @@ import Conductor: NMDA, AMPA
                                   [Gate(inv(1 + 0.28 * exp(-0.062(Vₘ - 60.0))); name = :e),
                                    Gate(S, [D(S) ~ -S/τNMDA]),
                                    Gate(inv(1 - p), name = :pnmda)],
-                                  max_s = 0.014mS)
+                                  max_s = 0.025mS)
 
 @named AMPAChan = SynapticChannel(ConstantValueEvent(S; threshold = 20mV), AMPA,
                                   [Gate(S, [D(S) ~ -S/τAMPA]),
                                    Gate(inv(1 - p), name = :pampa)],
-                                  max_s = 0.0045mS)
+                                  max_s = 0.01mS)
 
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)

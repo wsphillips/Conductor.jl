@@ -14,7 +14,7 @@ If `return_system == true`, returns a simplified `ODESystem` instead.
 """
 function Simulation(neuron::AbstractCompartmentSystem, time::Time; return_system = false,
                     jac = false, sparse = false,
-                    parallel = SerialForm())
+                    parallel = Symbolics.SerialForm())
     t_val, simplified = simplify_simulation(neuron, time)
     if return_system
         return simplified
