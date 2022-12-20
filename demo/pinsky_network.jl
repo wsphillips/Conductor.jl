@@ -12,7 +12,7 @@ include(joinpath(@__DIR__, "pinsky_setup.jl"))
 soma_dynamics = HodgkinHuxley([NaV(30mS / cm^2),
                                Kdr(15mS / cm^2),
                                leak(0.1mS / cm^2)],
-                              reversals[1:3]);
+                               reversals[1:3]);
 
 @named soma = Compartment(Vₘ, soma_dynamics;
                           geometry = Unitless(0.5), # FIXME: should take p param
@@ -48,12 +48,12 @@ import Conductor: NMDA, AMPA
                                   [Gate(inv(1 + 0.28 * exp(-0.062(Vₘ - 60.0))); name = :e),
                                    Gate(S, [D(S) ~ -S/τNMDA]),
                                    Gate(inv(1 - p), name = :pnmda)],
-                                  max_s = 0.025mS)
+                                  max_s = 0.014mS)
 
 @named AMPAChan = SynapticChannel(ConstantValueEvent(S; threshold = 20mV), AMPA,
                                   [Gate(S, [D(S) ~ -S/τAMPA]),
                                    Gate(inv(1 - p), name = :pampa)],
-                                  max_s = 0.01mS)
+                                  max_s = 0.0045mS)
 
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
@@ -75,13 +75,14 @@ add_junction!(mcstim_topology, soma_stimulated, dendrite, (gc_soma, gc_dendrite)
 @named mcneuron_stim = MultiCompartment(mcstim_topology)
 
 # Need to introduce 10% gca variance as per Pinsky/Rinzel
-neuronpopulation = [Conductor.replicate(mcneuron) for _ in 1:100];
+n_neurons = 100
+neuronpopulation = [Conductor.replicate(mcneuron) for _ in 1:n_neurons];
 neuronpopulation[4] = mcneuron_stim
 topology = NetworkTopology(neuronpopulation, [NMDAChan, AMPAChan]);
 
 using Graphs
-nmda_g = random_regular_digraph(100, 20, dir = :in)
-ampa_g = random_regular_digraph(100, 20, dir = :in)
+nmda_g = random_regular_digraph(n_neurons, fld(n_neurons, 5), dir = :in)
+ampa_g = random_regular_digraph(n_neurons, fld(n_neurons, 5), dir = :in)
 
 # We could allow users to supply a lambda/function to map in order to get this behavior
 for (i, e) in enumerate(edges(nmda_g))
@@ -94,19 +95,22 @@ for (i, e) in enumerate(edges(ampa_g))
                  AMPAChan, 1.0)
 end
 
+# note: full simulation in literature was 100 neurons. Here you may want to lower if you get
+# out of memory/killed process
 @named net = NeuronalNetworkSystem(topology, revmap);
-simp = Simulation(net, 2000.0ms, return_system = true)
-prob = Simulation(net, 2000.0ms)
-@time sol = solve(prob, RK4());
+t_total = 2000.0
+simp = Simulation(net, t_total*ms, return_system = true)
+prob = Simulation(net, t_total*ms, refractory = false)
+sol = solve(prob, RK4(); adaptive = false, dt = 0.05);
 
 # Pinsky and Rinzel displayed their results as a plot of N neurons over 20mV
 indexof(sym, syms) = findfirst(isequal(sym), syms)
 dvs = states(simp)
-interpolated = sol(1:0.2:2000.0,
+interpolated = sol(1:0.2:t_total,
                    idxs = [indexof(x.soma.Vₘ, dvs) for x in neuronpopulation[5:end]])
 abovethold = reduce(hcat, interpolated.u) .> 10.0
 using Statistics
 final = mean(abovethold, dims = 1)'
 using Plots
-plot(final) # looks correct but only for less than 1 second of simulation time.
+plot(final)
 
