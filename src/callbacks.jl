@@ -18,14 +18,19 @@ end
 
 struct DiscreteSpikeDetection
     voltage_index::Int
+    refractory::Bool
 end
 
 # checks whether a pre-determined neuron spiked
 function (dsd::DiscreteSpikeDetection)(u, t, integrator)
     idx = dsd.voltage_index
     V = u[idx]
-    Vprev = integrator.uprev[idx]
-    return discrete_spike_check(V, Vprev)
+    if dsd.refractory
+        Vprev = integrator.uprev[idx]
+        return discrete_spike_check(V, Vprev)
+    else
+        return V >= 10.0
+    end
 end
 
 struct ContinuousSpikeDetection

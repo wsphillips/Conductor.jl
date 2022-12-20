@@ -36,25 +36,26 @@ function get_weights(integrator, model)
     return graph(topo)[model]
 end
 function Simulation(network::NeuronalNetworkSystem, time::Time; return_system = false,
-        jac = false, sparse = false, parallel = Symbolics.SerialForm(), continuous_events = false)
+        jac = false, sparse = false, parallel = Symbolics.SerialForm(), continuous_events = false,
+        refractory = true)
     t_val, simplified = simplify_simulation(network, time)
     return_system && return simplified
     if !any(iseventbased.(synaptic_systems(network)))
         return ODEProblem(simplified, [], (0.0, t_val), []; jac, sparse, parallel)
     else
-        cb = generate_callback(network, simplified; continuous_events)
+        cb = generate_callback(network, simplified; continuous_events, refractory)
         prob = ODEProblem(simplified, [], (0.0, t_val), []; callback = cb, jac, sparse, parallel)
         remake(prob; p = NetworkParameters(prob.p, get_topology(network) ))
     end
 end
 
 # if continuous, condition has vector cb signature: cond(out, u, t, integrator)
-function generate_callback_condition(network, simplified; continuous_events)
+function generate_callback_condition(network, simplified; continuous_events, refractory)
     voltage_indices = map_voltage_indices(network, simplified; roots_only = true)
     if continuous_events
         return ContinuousSpikeDetection(voltage_indices)
     else # discrete condition for each compartment
-        return [DiscreteSpikeDetection(voltage_index) for voltage_index in voltage_indices]
+        return [DiscreteSpikeDetection(voltage_index, refractory) for voltage_index in voltage_indices]
     end
 end
 
@@ -67,8 +68,8 @@ function generate_callback_affects(network, simplified)
     return NetworkAffects(spike_affects, tailcall)
 end
 
-function generate_callback(network, simplified; continuous_events)
-    cb_condition = generate_callback_condition(network, simplified; continuous_events)
+function generate_callback(network, simplified; continuous_events, refractory)
+    cb_condition = generate_callback_condition(network, simplified; continuous_events, refractory)
     cb_affect = generate_callback_affects(network, simplified)
     if continuous_events
         return VectorContinuousCallback(cb_condition, cb_affect,
