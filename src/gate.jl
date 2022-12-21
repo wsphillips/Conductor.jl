@@ -93,7 +93,7 @@ $(TYPEDSIGNATURES)
 Accepts expressions for forward (α) and reverse (β) reaction rates as descriptors for its
 kinetics.
 
-See also: [`get_eqs`](@ref).
+See also: `get_eqs`.
 """
 function Gate(form::Type{AlphaBeta}, α, β; name = Base.gensym("GateVar"), kwargs...)
     x∞ = α / (α + β)
@@ -108,7 +108,7 @@ $(TYPEDSIGNATURES)
 Accepts expressions for its steady-state activation, x∞(Vₘ), and the time constant, τₓ(Vₘ),
 as descriptors for its kinetics.
 
-See also: [`get_eqs`](@ref).
+See also: `get_eqs`.
 """
 function Gate(form::Type{SteadyStateTau}, x∞, τₓ; name = Base.gensym("GateVar"), kwargs...)
     x = only(@variables $name(t)=x∞ [unit = NoUnits])

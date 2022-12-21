@@ -100,7 +100,7 @@ end
 @named net = NeuronalNetworkSystem(topology, revmap);
 t_total = 2000.0
 simp = Simulation(net, t_total*ms, return_system = true)
-prob = Simulation(net, t_total*ms, refractory = false)
+prob = Simulation(net, t_total*ms)
 sol = solve(prob, RK4(); adaptive = false, dt = 0.05);
 
 # Pinsky and Rinzel displayed their results as a plot of N neurons over 20mV
