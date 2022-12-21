@@ -70,5 +70,4 @@ also be user-customized. The following must be implemented for each gate:
 ```@docs
 Conductor.GateVarForm
 Gate
-Conductor.get_eqs
 ```
