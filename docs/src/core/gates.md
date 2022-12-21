@@ -16,14 +16,6 @@ Gate{SimpleGate}(SimpleGate, sigmoid(t), Symbolics.Equation[sigmoid(t) ~ 1 / (1 
 
 The dynamics of a `Gate{SimpleGate}` are just an algebraic equation:
 
-```jldoctest gate_example
-Conductor.get_eqs(sigmoid, nothing) # internal API call
-
-# output
-1-element Vector{Equation}:
- sigmoid(t) ~ 1 / (1 + exp(-Vₘ(t)))
-```
-
 Alternatively, we can take advantage of customized constructors, which let us describe gate
 dynamics in a more canonical, domain-friendly form. For instance, in the classic
 Hodgkin-Huxley formalism, gates are analogous to the "gating particles" used to describe the
