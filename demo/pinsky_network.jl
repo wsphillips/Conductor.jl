@@ -48,12 +48,12 @@ import Conductor: NMDA, AMPA
                                   [Gate(inv(1 + 0.28 * exp(-0.062(Vₘ - 60.0))); name = :e),
                                    Gate(S, [D(S) ~ -S/τNMDA]),
                                    Gate(inv(1 - p), name = :pnmda)],
-                                  max_s = 0.014mS)
+                                  max_s = 0.027mS)
 
 @named AMPAChan = SynapticChannel(ConstantValueEvent(S; threshold = 20mV), AMPA,
                                   [Gate(S, [D(S) ~ -S/τAMPA]),
                                    Gate(inv(1 - p), name = :pampa)],
-                                  max_s = 0.0045mS)
+                                  max_s = 0.008mS)
 
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
@@ -95,8 +95,6 @@ for (i, e) in enumerate(edges(ampa_g))
                  AMPAChan, 1.0)
 end
 
-# note: full simulation in literature was 100 neurons. Here you may want to lower if you get
-# out of memory/killed process
 @named net = NeuronalNetworkSystem(topology, revmap);
 t_total = 2000.0
 simp = Simulation(net, t_total*ms, return_system = true)
