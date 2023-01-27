@@ -57,7 +57,12 @@ h_kinetics = [
          1.0 / (1.0 + exp((Vₘ + 75.0) / 5.5)),
          2 / (exp((Vₘ + 169.7) / (-11.6)) + exp((Vₘ - 26.7) / (14.3))), name = :m)]
 
-Ca_Nernst(Ca) = 1000 * ((-8.314 * 283.15) / (2 * 96485.365)) * log(max(Ca, 0.001) / 3000.0)
+#Ca_Nernst(Ca) = 1000 * ((-8.314 * 283.15) / (2 * 96485.365)) * log(max(Ca, 0.001) / 3000.0)
+
+_softmax(x,y) = log(exp(x) + exp(y))
+
+Ca_Nernst(Ca) = 1000 * ((-8.314 * 283.15) / (2 * 96485.365)) * log(_softmax(Ca, 0.001) / 3000.0)
+
 @register_symbolic Ca_Nernst(Ca)
 ModelingToolkit.get_unit(op::typeof(Ca_Nernst), args) = mV
 
