@@ -30,12 +30,12 @@ jobs:
                          "simplesynapse",]
     steps:
       - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
+        uses: styfle/cancel-workflow-action@latest
         with:
           access_token: ${{ github.token }}
 
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@latest
 
       - name: Setup Julia
         uses: julia-actions/setup-julia@latest
@@ -43,7 +43,7 @@ jobs:
           version: '1.8'
 
       - name: Cache Julia artifacts and packages
-        uses: julia-actions/cache@v1.1.2
+        uses: julia-actions/cache@latest
 
       - name: Build package
         uses: julia-actions/julia-buildpkg@latest
