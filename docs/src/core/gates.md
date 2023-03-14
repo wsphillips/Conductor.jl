@@ -11,7 +11,7 @@ Vₘ = ParentScope(MembranePotential())
 @named sigmoid = Gate(inv(1 + exp(-Vₘ)))
 
 # output
-Gate{SimpleGate}(SimpleGate, sigmoid(t), Equation[sigmoid(t) ~ 1 / (1 + exp(-Vₘ(t)))], Dict{Symbol, Any}())
+Gate{SimpleGate}(SimpleGate, sigmoid(t), Symbolics.Equation[sigmoid(t) ~ 1 / (1 + exp(-Vₘ(t)))], Dict{Symbol, Any}())
 ```
 
 The dynamics of a `Gate{SimpleGate}` are just an algebraic equation:
@@ -33,7 +33,7 @@ are often described in terms of forward (``\alpha``) and reverse (``\beta``) rea
 )
 
 # output
-Gate{AlphaBeta}(AlphaBeta, h(t), Equation[Differential(t)(h(t)) ~ (-h(t)) / (1.0 + exp(0.1(-35.0 - Vₘ(t)))) + 0.07(1 - h(t))*exp(0.05(-65.0 - Vₘ(t)))], Dict{Symbol, Any}(:ss => (0.07exp(0.05(-65.0 - Vₘ(t)))) / (1.0 / (1.0 + exp(0.1(-35.0 - Vₘ(t)))) + 0.07exp(0.05(-65.0 - Vₘ(t))))))
+Gate{AlphaBeta}(AlphaBeta, h(t), Symbolics.Equation[Differential(t)(h(t)) ~ (-h(t)) / (1.0 + exp(0.1(-35.0 - Vₘ(t)))) + 0.07(1 - h(t))*exp(0.05(-65.0 - Vₘ(t)))], Dict{Symbol, Any}(:ss => (0.07exp(0.05(-65.0 - Vₘ(t)))) / (1.0 / (1.0 + exp(0.1(-35.0 - Vₘ(t)))) + 0.07exp(0.05(-65.0 - Vₘ(t))))))
 ```
 
 `Gate{AlphaBeta}` will automatically setup the differential form, equivalent to:
