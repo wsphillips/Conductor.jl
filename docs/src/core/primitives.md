@@ -12,6 +12,7 @@ ExtrinsicPotential
 IonConcentration
 IonCurrent
 EquilibriumPotential
+Conductor.Temperature
 ```
 
 ## Constants
