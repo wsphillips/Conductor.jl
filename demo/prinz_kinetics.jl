@@ -1,10 +1,15 @@
 using Conductor, Unitful, ModelingToolkit
-import Unitful: mV, mS, cm, µm, ms, mM, µM, µA
-import Conductor: Na, K, Ca, Cation, Leak
+import Unitful: mV, mS, cm, µm, ms, mM, µM, µA, nM, K
+import Conductor: mR, ℱ
 
 Vₘ = ParentScope(MembranePotential(-50mV))
+
 Caᵢ = Concentration(Calcium, 0.05µM, dynamic = true)
+Caₒ = Concentration(Calcium, 3.0mM, location = Conductor.Outside)
+minCa = Concentration(Calcium, 1.0nM, name=:minCa)
 ICa = IonCurrent(Calcium, aggregate = true)
+
+T = Temperature(283.15K)
 
 nav_kinetics = [Gate(SteadyStateTau,
                      1.0 / (1.0 + exp((Vₘ + 25.5) / -5.29)),
@@ -57,21 +62,14 @@ h_kinetics = [
          1.0 / (1.0 + exp((Vₘ + 75.0) / 5.5)),
          2 / (exp((Vₘ + 169.7) / (-11.6)) + exp((Vₘ - 26.7) / (14.3))), name = :m)]
 
-Ca_Nernst(Ca) = 1000 * ((-8.314 * 283.15) / (2 * 96485.365)) * log(max(Ca, 0.001) / 3000.0)
-@register_symbolic Ca_Nernst(Ca)
-ModelingToolkit.get_unit(op::typeof(Ca_Nernst), args) = mV
-
 gradients = Equilibria(Pair[Sodium => 50.0mV,
                             Potassium => -80.0mV,
                             Cation => (-20mV, :H),
                             Leak => -50mV,
-                            # x1000 for mV; thresholding Cai in case negative conc
-                            # TODO: write nernst function + use Unitful constants (RT/zℱ)
-                            Calcium => Ca_Nernst(Caᵢ)]);
+                            Calcium => (-mR*T/2ℱ) * log(max(Caᵢ, minCa) / Caₒ)]);
 
 # Reported area value in Prinz 2003; the area of a cylinder without the ends (2πrh).
 # Dimensions r = 25µm, h = 400µm given by Liu et al 1998.
-
 #r = 25µm; h = 400µm; area = round(ustrip(Float64, cm^2, 2π*r*h), sigdigits=3)
 
 geo = Cylinder(radius = 25µm, height = 400µm)

@@ -26,8 +26,8 @@ dynamics = HodgkinHuxley(channels, gradients);
 @named neuron = CompartmentSystem(Vₘ, dynamics;
                                   geometry = geo,
                                   extensions = [calcium_conversion]);
-t_total = 5000.0
-sim = Simulation(neuron, t_total * ms)
+t_total = 4000.0ms
+sim = Simulation(neuron, t_total)
 solution = solve(sim, Rosenbrock23());
 
 # Plot at 5kHz sampling
