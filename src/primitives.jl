@@ -296,6 +296,15 @@ function EquilibriumPotential(ion::IonSpecies, eqv::Union{Nothing, Real, Voltage
     return setmetadata(ret, EquilibriumPotential, EquilibriumPotential(ion))
 end
 
+"""
+    Temperature(temp; <keyword arguments>)
+
+Temperature (in Kelvin)
+
+# Arguments
+- `dynamic::Bool = false`: a dynamic `Temperature` is assumed to vary with time.
+- `name::Symbol = :T`: the symbol to use for the symbolic variable.
+"""
 function Temperature(temp::Union{Nothing, Real, Unitful.Temperature};
                      dynamic::Bool = false, name::Symbol = :T)
     temp_val = temp isa Unitful.Temperature ? ustrip(Unitful.K, temp) : temp
