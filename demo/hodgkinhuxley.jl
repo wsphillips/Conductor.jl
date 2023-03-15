@@ -1,7 +1,6 @@
 # Classic Hodgkin Huxley neuron with a "current pulse" stimulus
 using Conductor, Unitful, ModelingToolkit, OrdinaryDiffEq, Plots
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms
-import Conductor: Na, K # shorter aliases for Sodium/Potassium
 
 Vₘ = ParentScope(MembranePotential(-65mV))
 
@@ -24,7 +23,7 @@ kdr_kinetics = [
 @named leak = IonChannel(Leak, max_g = 0.3mS / cm^2)
 
 channels = [NaV, Kdr, leak];
-reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV])
+reversals = Equilibria([Sodium => 50.0mV, Potassium => -77.0mV, Leak => -54.4mV])
 
 @named pulse_stim = PulseTrain(amplitude = 400.0pA, duration = 100ms, delay = 100ms)
 

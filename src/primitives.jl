@@ -19,7 +19,25 @@ julia> Conductor.ℱ
 96485.33212331001 C mol^-1
 ```
 """
-const ℱ = Unitful.q * Unitful.Na # Faraday's constant
+const ℱ = let name = :ℱ
+    only(@constants $name=ustrip(Unitful.q * Unitful.Na) [unit = Unitful.C*Unitful.mol^-1])
+end
+
+"""
+Universal Gas Constant (base units)
+"""
+const R = let name = :R
+    only(@constants $name=ustrip(Unitful.R) [unit = Unitful.unit(Unitful.R)])
+end
+
+"""
+Universal Gas Constant (milli-)
+
+Scaled by 1000x. Results in output 
+"""
+const mR = let name = :mR
+    only(@constants $name=(ustrip(Unitful.R)*1000) [unit = u"mJ*K^-1*mol^-1"])
+end
 
 """
 The independent variable for time, ``t``.
@@ -276,6 +294,19 @@ function EquilibriumPotential(ion::IonSpecies, eqv::Union{Nothing, Real, Voltage
               only(@parameters($sym=eqv_val, [unit = mV]))
     end
     return setmetadata(ret, EquilibriumPotential, EquilibriumPotential(ion))
+end
+
+function Temperature(temp::Union{Nothing, Real, Unitful.Temperature};
+                     dynamic::Bool = false, name::Symbol = :T)
+    temp_val = temp isa Unitful.Temperature ? ustrip(Unitful.K, temp) : temp
+    if isnothing(temp_val)
+        ret = dynamic ? only(@variables $name(t) [unit = Unitful.K]) :
+              only(@parameters $name [unit = Unitful.K])
+    else
+        ret = dynamic ? only(@variables($name(t)=temp_val, [unit = Unitful.K])) :
+              only(@parameters($name=temp_val, [unit = Unitful.K]))
+    end
+    return ret
 end
 
 # Internal API: EquilibriumPotential trait queries
