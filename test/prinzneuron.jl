@@ -22,13 +22,13 @@ include(normpath(@__DIR__, "..", "demo", "prinz_kinetics.jl"))
                                       extensions = [calcium_conversion]);
     @test length.([equations(neuron),
                       states(neuron),
-                      parameters(neuron)]) == [31, 31, 17]
+                      parameters(neuron)]) == [31, 31, 20]
 
     simul_sys = ODESystem(neuron)
 
     @test length.([equations(simul_sys),
                       states(simul_sys),
-                      parameters(simul_sys)]) == [13, 13, 17]
+                      parameters(simul_sys)]) == [13, 13, 20]
 
     # Prinz STG neuron hand-written reference implementation
 

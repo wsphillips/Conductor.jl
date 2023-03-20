@@ -12,6 +12,7 @@ ExtrinsicPotential
 IonConcentration
 IonCurrent
 EquilibriumPotential
+Conductor.Temperature
 ```
 
 ## Constants
@@ -21,6 +22,8 @@ Conductor.t
 Conductor.D
 Conductor.ℱ
 Conductor.IonSpecies
+Conductor.R
+Conductor.mR
 ```
 ### Quantities
 

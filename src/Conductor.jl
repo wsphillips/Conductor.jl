@@ -95,7 +95,7 @@ export Simulation
 export @named
 
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion, NonIonic
-
+export Temperature
 export t
 
 export CompartmentSystem, Compartment, ConductanceSystem, Conductance,
