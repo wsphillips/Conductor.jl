@@ -53,6 +53,14 @@ function build_toplevel(system)
     build_toplevel!(dvs, ps, eqs, defs, system)
 end
 
+function time_span(tspan::Tuple{Time,Time})
+    ustrip(Float64, ms, tspan[1]), ustrip(Float64, ms, tspan[2])
+end
+
+time_span(tspan::Tuple{Float64,Float64}) = tspan
+time_span(tspan::Time) = zero(Float64), ustrip(Float64, ms, tspan)
+time_span(tspan::Real) = zero(Float64), Float64(tspan)
+
 heaviside(x) = ifelse(x > zero(x), one(x), zero(x))
 @register_symbolic heaviside(x)
 ModelingToolkit.get_unit(op::typeof(heaviside), args) = ms^-1
@@ -73,4 +81,23 @@ function set_symarray_metadata(x, ctx, val)
         setmetadata(x, ctx, val)
     end
 end
+
+function settunable(sys, ps)
+    new_ps = setmetadata.(ps, ModelingToolkit.VariableTunable, true) 
+    @set! sys.ps = union(new_ps, parameters(sys))
+    return sys
+end
+
+function setbounds(sys, p_dists)
+    new_ps = parameters(sys)
+    for pair in p_dists
+        i = findfirst(isequal(first(pair)), new_ps)
+        i == nothing && throw("Parameter $(first(pair)) not found.")
+        new_ps[i] = setmetadata.(new_ps, ModelingToolkit.VariableBounds, second(pair))
+    end
+    @set! sys.ps = union(new_ps, parameters(sys))
+    return sys
+end
+
+function setdistributions(sys, ps) end
 

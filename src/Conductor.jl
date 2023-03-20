@@ -117,6 +117,11 @@ abstract type AbstractConductanceSystem <: AbstractTimeDependentSystem end
 abstract type AbstractCompartmentSystem <: AbstractTimeDependentSystem end
 abstract type AbstractNeuronalNetworkSystem <: AbstractTimeDependentSystem end
 
+const AbstractConductorSystem = Union{AbstractCurrentSystem,
+                                      AbstractConductanceSystem,
+                                      AbstractCompartmentSystem,
+                                      AbstractNeuronalNetworkSystem}
+
 # Model properties
 abstract type ConductanceModel end
 

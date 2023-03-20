@@ -24,8 +24,7 @@ include(normpath(@__DIR__, "..", "demo", "prinz_kinetics.jl"))
                       states(neuron),
                       parameters(neuron)]) == [31, 31, 17]
 
-    time = 2000
-    simul_sys = Simulation(neuron, time * ms; return_system = true)
+    simul_sys = ODESystem(neuron)
 
     @test length.([equations(simul_sys),
                       states(simul_sys),
@@ -184,12 +183,13 @@ include(normpath(@__DIR__, "..", "demo", "prinz_kinetics.jl"))
         end
     end
 
+    time = 2000.0
     byhand_prob = ODEProblem{true}(prinz_neuron!, u0, (0.0, time), p)
     mtk_prob = ODEProblem(simul_sys, [], (0.0, time), [])
     byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol = 1e-8, abstol = 1e-8)
     current_mtk_sol = solve(mtk_prob, Rosenbrock23(), reltol = 1e-8, abstol = 1e-8)
 
-    tsteps = 0.0:0.025:2000.0
+    tsteps = 0.0:0.025:time
     byhand_out = Array(byhand_sol(tsteps, idxs = 2))
     current_mtk_out = current_mtk_sol(tsteps)[Vₘ]
 

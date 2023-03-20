@@ -54,8 +54,7 @@ using Unitful: mV, mS, cm, µm, µA, ms, pA
                       states(neuron),
                       parameters(neuron)]) == [11, 11, 8]
 
-    time = 300.0
-    sim_sys = Simulation(neuron, time * ms; return_system = true)
+    sim_sys = ODESystem(neuron)
 
     @test length.([equations(sim_sys),
                       states(sim_sys),
@@ -136,6 +135,7 @@ using Unitful: mV, mS, cm, µm, µA, ms, pA
         return nothing
     end
 
+    time = 300.0
     byhand_prob = ODEProblem{true}(hodgkin_huxley!, u0, (0.0, 300.0), p)
     mtk_prob = ODEProblem(sim_sys, [], (0.0, time), [])
 

@@ -64,8 +64,7 @@ import Conductor: Na, K
                       states(network),
                       parameters(network)]) == [24, 24, 20]
 
-    ttot = 250.0
-    simul_sys = Simulation(network, ttot * ms; return_system = true)
+    simul_sys = ODESystem(network)
 
     @test length.([equations(simul_sys),
                       states(simul_sys),
@@ -235,8 +234,9 @@ import Conductor: Na, K
     end
 
     # Solve and check for invariance
+    ttot = 250.0
     byhand_prob = ODEProblem{true}(simple_synapse!, u0, (0.0, ttot), p)
-    sim = Simulation(network, ttot * ms)
+    sim = Simulation(network, (0.0ms, ttot * ms))
     byhand_sol = solve(byhand_prob, Rosenbrock23(), reltol = 1e-9, abstol = 1e-9,
                        saveat = 0.025)
     current_mtk_sol = solve(sim, Rosenbrock23(), reltol = 1e-9, abstol = 1e-9,
