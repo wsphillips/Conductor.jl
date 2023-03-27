@@ -137,6 +137,7 @@ struct IntegratedSynapse <: SynapticModel end
 
 export ConstantValueEvent, IntegratedSynapse
 
+include("populations.jl")
 include("util.jl")
 include("primitives.jl")
 include("stimulus.jl")
@@ -148,6 +149,5 @@ include("compartment.jl")
 include("multicompartment.jl")
 include("network.jl")
 include("simulation.jl")
-include("populations.jl")
 include("callbacks.jl")
 end # module

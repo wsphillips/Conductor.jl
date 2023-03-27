@@ -1,5 +1,5 @@
 # Example of synapses
-using Conductor, OrdinaryDiffEq, Unitful, ModelingToolkit, Plots
+using Conductor, Unitful, ModelingToolkit#, OrdinaryDiffEq, Plots
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
 
@@ -28,18 +28,15 @@ kdr_kinetics = [Gate(AlphaBeta,
 @named Kdr = IonChannel(Potassium, kdr_kinetics, max_g = 36mS / cm^2);
 @named leak = IonChannel(Leak, max_g = 0.3mS / cm^2);
 
-channels = [NaV, Kdr, leak];
 reversals = Equilibria([Na => 50.0mV, K => -77.0mV, Leak => -54.4mV]);
-dynamics = HodgkinHuxley(channels, reversals);
+dynamics = HodgkinHuxley([NaV, Kdr, leak], reversals);
+geometry = Cylinder(radius = 25µm, height = 400µm)
 
 # Stimulate first neuron with a holding current to drive APs
 @named holding_current = Bias(5000pA);
-@named neuron1 = Compartment(Vₘ, dynamics;
-                             geometry = Cylinder(radius = 25µm, height = 400µm),
-                             stimuli = [holding_current]);
+@named neurons = Population(Compartment(Vₘ, dynamics; geometry), 2);
 
-@named neuron2 = Compartment(Vₘ, dynamics;
-                             geometry = Cylinder(radius = 25µm, height = 400µm));
+Conductor.add_stimuli!(neurons, [holding_current], 2)
 
 ############################################################################################
 # Event-based Synaptic model
@@ -52,15 +49,15 @@ syn_kinetics = Gate(SimpleGate, m, [D(m) ~ -m/τsyn])
 event_model = ConstantValueEvent(m) # increment `m` gate by 1 for each incoming AP
 @named ExpAMPA = SynapticChannel(event_model, Cation, [syn_kinetics]; max_s = 30nS)
 
-top = NetworkTopology([neuron1, neuron2], [ExpAMPA]);
+top = NetworkTopology(neurons, [ExpAMPA]);
 
-top[neuron1, neuron2] = ExpAMPA(10nS)
+top[neurons[1], neurons[2]] = ExpAMPA(10nS)
 rev_map = Dict([ExpAMPA => EGlut])
 
 @named net = NeuronalNetworkSystem(top, rev_map)
 
 total_time = 250.0
-sim = Simulation(net, total_time * ms)
+sim = Simulation(net, (0.0ms, total_time * ms))
 sol = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3);
 
 plot(plot(sol, idxs = [neuron1.Vₘ]),
@@ -78,18 +75,18 @@ syn_kinetics2 = Gate(SteadyStateTau, syn∞, tausyn, name = :z)
 
 @named IntAMPA = SynapticChannel(IntegratedSynapse(), Cation, [syn_kinetics2]; max_s = 30nS)
 
-top2 = NetworkTopology([neuron1, neuron2], [IntAMPA]);
+top2 = NetworkTopology(neurons, [IntAMPA]);
 
-top2[neuron1, neuron2] = IntAMPA(30nS)
+top2[neurons[1], neurons[2]] = IntAMPA(30nS)
 rev_map2 = Dict([IntAMPA => EGlut])
 
 @named net2 = NeuronalNetworkSystem(top2, rev_map2)
 
 total_time = 250.0
-sim2 = Simulation(net2, total_time * ms)
+sim2 = Simulation(net2, (0.0ms, total_time * ms))
 sol2 = solve(sim2, Rosenbrock23(), abstol = 1e-3, reltol = 1e-3);
 
-plot(plot(sol2, idxs = [neuron1.Vₘ]),
-     plot(sol2, idxs = [neuron2.Vₘ]),
+plot(plot(sol2, idxs = [neurons[1].Vₘ]),
+     plot(sol2, idxs = [neurons[2].Vₘ]),
      layout=(2,1))
 

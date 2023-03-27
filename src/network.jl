@@ -2,15 +2,18 @@
 struct NetworkTopology
     multigraph::Dict{Any, SparseMatrixCSC{Float64, Int64}}
     neurons::Vector
+    function NetworkTopology(multigraph::Dict, neurons::Vector)
+        new(multigraph, neurons)
+    end
 end
 
 synaptic_systems(topology::NetworkTopology) = keys(graph(topology))
 
-function NetworkTopology(neurons::Vector, synaptic_systems::Vector)
+function NetworkTopology(neurons, synaptic_systems::Vector)
     m = length(neurons)
     n = sum(length(neuron) for neuron in neurons)
     multigraph = Dict(x => sparse(Int64[], Int64[], Float64[], n, m) for x in synaptic_systems)
-    return NetworkTopology(multigraph, neurons)
+    return NetworkTopology(multigraph, collect(neurons))
 end
 
 function NetworkTopology(g::SimpleDiGraph, neurons, synaptic_system,
