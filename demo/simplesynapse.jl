@@ -77,7 +77,7 @@ syn_kinetics2 = Gate(SteadyStateTau, syn∞, tausyn, name = :z)
 
 top2 = NetworkTopology(neurons, [IntAMPA]);
 
-top2[neurons[1], neurons[2]] = IntAMPA(300nS)
+top2[neurons[1], neurons[2]] = IntAMPA(40nS)
 rev_map2 = Dict([IntAMPA => EGlut])
 
 @named net2 = NeuronalNetworkSystem(top2, rev_map2)
