@@ -60,8 +60,8 @@ total_time = 250.0
 sim = Simulation(net, (0.0ms, total_time * ms))
 sol = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3);
 
-plot(plot(sol, idxs = [neuron1.Vₘ]),
-     plot(sol, idxs = [neuron2.Vₘ]),
+plot(plot(sol, idxs = [neurons[1].Vₘ]),
+     plot(sol, idxs = [neurons[2].Vₘ]),
      layout=(2,1))
 
 ############################################################################################
@@ -77,7 +77,7 @@ syn_kinetics2 = Gate(SteadyStateTau, syn∞, tausyn, name = :z)
 
 top2 = NetworkTopology(neurons, [IntAMPA]);
 
-top2[neurons[1], neurons[2]] = IntAMPA(30nS)
+top2[neurons[1], neurons[2]] = IntAMPA(300nS)
 rev_map2 = Dict([IntAMPA => EGlut])
 
 @named net2 = NeuronalNetworkSystem(top2, rev_map2)

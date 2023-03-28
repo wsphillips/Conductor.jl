@@ -149,12 +149,13 @@ synaptic_systems(sys::NeuronalNetworkSystem) = synaptic_systems(get_topology(sys
 compartments(sys::NeuronalNetworkSystem) = compartments(get_topology(sys))
 
 function connect_synapses!(gen, syn_model, comps, topology, reversal_map)
-        # this method assumes weights scale the size of the event/alpha)
+    # this method assumes weights scale the size of the event/alpha)
     new_compartments = deepcopy(comps)
     reversal = reversal_map[syn_model]
     for (i,comp) in enumerate(new_compartments)
         post_synapses = get_synapses(comp)
         push!(post_synapses, Synapse(syn_model, reversal))
+        println("The $i iteration will make a neuron with $(length(post_synapses)) synapses")
         new_compartments[i] = remake(comp; synapses = post_synapses)
     end
     return new_compartments
@@ -229,7 +230,6 @@ function NeuronalNetworkSystem(topology::NetworkTopology, reversal_map,
     for sys in synaptic_systems(topology)
         comps = connect_synapses!(gen, sys, comps, topology, reversal_map)
     end
-
     for neuron in neurons(topology)
         if typeof(neuron) <: MultiCompartmentSystem
             mctop = get_topology(neuron)

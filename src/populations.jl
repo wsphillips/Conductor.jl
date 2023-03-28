@@ -23,7 +23,7 @@ end
 
 # Until MTK supports equivalent systems (loops), we scalarize the population on construction.
 function Population(neuron, n; name)
-    neurons = map(i -> rename(neuron, Symbol(name, :_, i)), 1:n) #same convention as @named
+    neurons = map(i -> rename(deepcopy(neuron), Symbol(name, :_, i)), 1:n) #same convention as @named
     Population(neurons, name, [Dict{Num, Any}() for _ in 1:n], [Equation[] for _ in 1:n])
 end
 
