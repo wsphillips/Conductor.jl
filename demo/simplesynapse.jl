@@ -1,5 +1,5 @@
 # Example of synapses
-using Conductor, Unitful, ModelingToolkit#, OrdinaryDiffEq, Plots
+using Conductor, Unitful, ModelingToolkit, OrdinaryDiffEq, Plots
 import Unitful: mV, mS, cm, µm, pA, nA, mA, µA, ms, nS, pS
 import Conductor: Na, K
 
@@ -36,7 +36,7 @@ geometry = Cylinder(radius = 25µm, height = 400µm)
 @named holding_current = Bias(5000pA);
 @named neurons = Population(Compartment(Vₘ, dynamics; geometry), 2);
 
-Conductor.add_stimuli!(neurons, [holding_current], 2)
+Conductor.add_stimuli!(neurons, [holding_current], 1)
 
 ############################################################################################
 # Event-based Synaptic model
@@ -57,7 +57,7 @@ rev_map = Dict([ExpAMPA => EGlut])
 @named net = NeuronalNetworkSystem(top, rev_map)
 
 total_time = 250.0
-sim = Simulation(net, (0.0ms, total_time * ms))
+sim = Simulation(net, total_time * ms)
 sol = solve(sim, Rosenbrock23(), abstol=1e-3, reltol=1e-3);
 
 plot(plot(sol, idxs = [neurons[1].Vₘ]),
