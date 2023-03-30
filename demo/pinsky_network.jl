@@ -1,5 +1,5 @@
 
-using LinearAlgebra, OrdinaryDiffEq, ModelingToolkit
+using LinearAlgebra, OrdinaryDiffEq, ModelingToolkit, Graphs
 LinearAlgebra.BLAS.set_num_threads(6)
 
 include(joinpath(@__DIR__, "traub_kinetics.jl"))
@@ -48,67 +48,66 @@ import Conductor: NMDA, AMPA
                                   [Gate(inv(1 + 0.28 * exp(-0.062(Vₘ - 60.0))); name = :e),
                                    Gate(S, [D(S) ~ -S/τNMDA]),
                                    Gate(inv(1 - p), name = :pnmda)],
-                                  max_s = 0.027mS)
+                                  max_s = 0.02mS)
 
 @named AMPAChan = SynapticChannel(ConstantValueEvent(S; threshold = 20mV), AMPA,
                                   [Gate(S, [D(S) ~ -S/τAMPA]),
                                    Gate(inv(1 - p), name = :pampa)],
-                                  max_s = 0.008mS)
+                                  max_s = 0.04mS)
 
 ENMDA = EquilibriumPotential(NMDA, 60mV, name = :NMDA)
 EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 revmap = Dict([NMDAChan => ENMDA, AMPAChan => EAMPA])
 
-# A single neuron was "briefly" stimulated to trigger the network
+# Create a neuron group
+n_neurons = 1000
+@named neurons = Population(mcneuron, n_neurons);
+
+# A brief stimulation to trigger the network
 @named I_pulse = PulseTrain(amplitude = 5.0µA / 0.5,
                             duration = 50ms,
                             delay = 150.0ms,
                             offset = -0.5µA / 0.5)
 
-soma_stimulated = Compartment(Vₘ, deepcopy(soma_dynamics);
-                              geometry = Unitless(0.5), # FIXME: should take p param
-                              capacitance = capacitance,
-                              stimuli = [I_pulse],
-                              name = :soma)
-mcstim_topology = MultiCompartmentTopology([soma_stimulated, dendrite]);
-add_junction!(mcstim_topology, soma_stimulated, dendrite, (gc_soma, gc_dendrite))
-@named mcneuron_stim = MultiCompartment(mcstim_topology)
+# apply the stimulus to the root compartment of the 4th neuron
+add_stimuli!(neurons, [I_pulse], (4,1))
+topology = NetworkTopology(neurons, [NMDAChan, AMPAChan]);
 
-# Need to introduce 10% gca variance as per Pinsky/Rinzel
-n_neurons = 100
-neuronpopulation = [Conductor.replicate(mcneuron) for _ in 1:n_neurons];
-neuronpopulation[4] = mcneuron_stim
-topology = NetworkTopology(neuronpopulation, [NMDAChan, AMPAChan]);
+# TODO: Make the API for topology construction cleaner
+# TODO: Introduce 10% gca variance as per Pinsky/Rinzel
 
-using Graphs
+# Generate connectivity graphs
 nmda_g = random_regular_digraph(n_neurons, fld(n_neurons, 5), dir = :in)
 ampa_g = random_regular_digraph(n_neurons, fld(n_neurons, 5), dir = :in)
 
-# We could allow users to supply a lambda/function to map in order to get this behavior
+# Use graphs to create synapses from soma (output) to dendrites (inputs) for neurons
 for (i, e) in enumerate(edges(nmda_g))
-    add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite,
+    add_synapse!(topology, neurons[src(e)].soma, neurons[dst(e)].dendrite,
                  NMDAChan, 1.0)
 end
 
 for (i, e) in enumerate(edges(ampa_g))
-    add_synapse!(topology, neuronpopulation[src(e)].soma, neuronpopulation[dst(e)].dendrite,
+    add_synapse!(topology, neurons[src(e)].soma, neurons[dst(e)].dendrite,
                  AMPAChan, 1.0)
 end
 
 @named net = NeuronalNetworkSystem(topology, revmap);
 t_total = 2000.0
-simp = Simulation(net, t_total*ms, return_system = true)
 prob = Simulation(net, t_total*ms)
-sol = solve(prob, RK4(); adaptive = false, dt = 0.05);
+@time sol = solve(prob, RK4(); adaptive = false, dt = 0.05);
 
+############################################################################################
 # Pinsky and Rinzel displayed their results as a plot of N neurons over 20mV
+using Statistics, Plots
+
+# helper function
 indexof(sym, syms) = findfirst(isequal(sym), syms)
+
+simp = ODESystem(net)
 dvs = states(simp)
 interpolated = sol(1:0.2:t_total,
-                   idxs = [indexof(x.soma.Vₘ, dvs) for x in neuronpopulation[5:end]])
+                   idxs = [indexof(x.soma.Vₘ, dvs) for x in neurons[5:end]])
 abovethold = reduce(hcat, interpolated.u) .> 10.0
-using Statistics
 final = mean(abovethold, dims = 1)'
-using Plots
 plot(final)
 

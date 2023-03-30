@@ -155,7 +155,6 @@ function connect_synapses!(gen, syn_model, comps, topology, reversal_map)
     for (i,comp) in enumerate(new_compartments)
         post_synapses = get_synapses(comp)
         push!(post_synapses, Synapse(syn_model, reversal))
-        println("The $i iteration will make a neuron with $(length(post_synapses)) synapses")
         new_compartments[i] = remake(comp; synapses = post_synapses)
     end
     return new_compartments

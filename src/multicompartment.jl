@@ -186,3 +186,17 @@ function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
                        systems = systems, checks = CheckComponents)
     return odesys
 end
+
+function add_stimuli!(pop::Population{MultiCompartmentSystem},
+                      stimuli::Vector{<:StimulusModel}, idxs)
+    nrn = pop.neurons[idxs[1]]
+    subcomps = get_compartments(nrn)
+    subcomps[idxs[2]] = remake(subcomps[idxs[2]]; stimuli = stimuli)
+    top = get_topology(nrn)
+    @set! top.compartments = subcomps
+    nrn = remake(nrn, topology = top)
+    pop.neurons[idxs[1]] = nrn
+    return nothing
+end
+
+
