@@ -36,7 +36,7 @@ geometry = Cylinder(radius = 25µm, height = 400µm)
 @named holding_current = Bias(5000pA);
 @named neurons = Population(Compartment(Vₘ, dynamics; geometry), 2);
 
-Conductor.add_stimuli!(neurons, [holding_current], 1)
+add_stimuli!(neurons, [holding_current], 1)
 
 ############################################################################################
 # Event-based Synaptic model

@@ -107,7 +107,7 @@ export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate
 export Sphere, Cylinder, Point, Unitless, area, radius, height
 
 export HodgkinHuxley
-export Bias, PulseTrain
+export Bias, PulseTrain, add_stimuli!
 
 # Metadata IDs
 struct ConductorMaxConductance end
