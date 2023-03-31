@@ -2,8 +2,9 @@
 struct NetworkTopology
     multigraph::Dict{Any, SparseMatrixCSC{Float64, Int64}}
     neurons::Vector
-    function NetworkTopology(multigraph::Dict, neurons::Vector)
-        new(multigraph, neurons)
+    lens::Vector{Int64}
+    function NetworkTopology(multigraph::Dict, neurons::Vector, lens::Vector{Int64})
+        new(multigraph, neurons, lens)
     end
 end
 
@@ -11,15 +12,17 @@ synaptic_systems(topology::NetworkTopology) = keys(graph(topology))
 
 function NetworkTopology(neurons, synaptic_systems::Vector)
     m = length(neurons)
-    n = sum(length(neuron) for neuron in neurons)
+    lens = [length(neuron) for neuron in neurons]
+    n = sum(lens)
     multigraph = Dict(x => sparse(Int64[], Int64[], Float64[], n, m) for x in synaptic_systems)
-    return NetworkTopology(multigraph, collect(neurons))
+    return NetworkTopology(multigraph, collect(neurons), lens)
 end
 
 function NetworkTopology(g::SimpleDiGraph, neurons, synaptic_system,
                          default_weight = get_gbar(synaptic_system))
     multigraph = Dict(synaptic_system => adjacency_matrix(g) * default_weight)
-    return NetworkTopology(multigraph, neurons)
+    lens = [length(neuron) for neuron in neurons]
+    return NetworkTopology(multigraph, neurons, lens)
 end
 
 neurons(topology::NetworkTopology) = getfield(topology, :neurons)
@@ -35,29 +38,25 @@ graph(topology::NetworkTopology) = getfield(topology, :multigraph)
 find_source(pre, topology) = findfirst(isequal(first(pre)), root_compartments(topology))
 find_target(post, topology) = findfirst(isequal(post), compartments(topology))
 
-function add_synapse!(topology, pre, post, synaptic_system, weight)
+function add_synapse!(topology, pre::AbstractCompartmentSystem,
+                      post::AbstractCompartmentSystem, synaptic_system, weight)
     src = find_source(pre, topology)
     dst = find_target(post, topology)
     g = graph(topology)[synaptic_system]
     g[dst, src] = weight # underlying matrix is transposed
 end
 
-# FIXME: need updates
-#=
-function remove_synapse!(topology, pre, post, synaptic_system)
-    src = find_source(pre, topology)
-    dst = find_target(post, topology)
+function add_synapse!(topology, pre::Integer, post::Integer, synaptic_system, weight)
     g = graph(topology)[synaptic_system]
-    g[dst, src] = zero(Num)
-    dropzeros!(g)
+    g[post, pre] = weight # underlying matrix is transposed
 end
 
-function add_layer!(topology, synaptic_system::ConductanceSystem,
-                    g = SimpleDiGraph(length(vertices(topology))),
-                    default_weight = get_gbar(synaptic_system))
-    push!(graph(topology), synaptic_system => adjacency_matrix(g) * default_weight)
+function add_synapse!(topology, pre::Integer, post::Tuple{Integer,Integer},
+                      synaptic_system, weight)
+    g = graph(topology)[synaptic_system]
+    post_idx = sum(topology.lens[1:post[1]-1]) + post[2]
+    g[post_idx, pre] = weight # underlying matrix is transposed
 end
-=#
 
 Base.eltype(nt::NetworkTopology) = AbstractCompartmentSystem
 Base.length(nt::NetworkTopology) = length(neurons(nt))

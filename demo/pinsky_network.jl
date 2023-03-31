@@ -60,7 +60,7 @@ EAMPA = EquilibriumPotential(AMPA, 60mV, name = :AMPA)
 revmap = Dict([NMDAChan => ENMDA, AMPAChan => EAMPA])
 
 # Create a neuron group
-n_neurons = 1000
+n_neurons = 100
 @named neurons = Population(mcneuron, n_neurons);
 
 # A brief stimulation to trigger the network
@@ -73,21 +73,18 @@ n_neurons = 1000
 add_stimuli!(neurons, [I_pulse], (4,1))
 topology = NetworkTopology(neurons, [NMDAChan, AMPAChan]);
 
-# TODO: Make the API for topology construction cleaner
-# TODO: Introduce 10% gca variance as per Pinsky/Rinzel
-
 # Generate connectivity graphs
 nmda_g = random_regular_digraph(n_neurons, fld(n_neurons, 5), dir = :in)
 ampa_g = random_regular_digraph(n_neurons, fld(n_neurons, 5), dir = :in)
 
 # Use graphs to create synapses from soma (output) to dendrites (inputs) for neurons
 for (i, e) in enumerate(edges(nmda_g))
-    add_synapse!(topology, neurons[src(e)].soma, neurons[dst(e)].dendrite,
+    add_synapse!(topology, src(e), (dst(e),2),
                  NMDAChan, 1.0)
 end
 
 for (i, e) in enumerate(edges(ampa_g))
-    add_synapse!(topology, neurons[src(e)].soma, neurons[dst(e)].dendrite,
+    add_synapse!(topology, src(e), (dst(e),2),
                  AMPAChan, 1.0)
 end
 
