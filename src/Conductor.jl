@@ -107,7 +107,7 @@ export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate
 export Sphere, Cylinder, Point, Unitless, area, radius, height
 
 export HodgkinHuxley
-export Bias, PulseTrain
+export Bias, PulseTrain, add_stimuli!
 
 # Metadata IDs
 struct ConductorMaxConductance end
@@ -137,6 +137,7 @@ struct IntegratedSynapse <: SynapticModel end
 
 export ConstantValueEvent, IntegratedSynapse
 
+include("populations.jl")
 include("util.jl")
 include("primitives.jl")
 include("stimulus.jl")
@@ -148,6 +149,5 @@ include("compartment.jl")
 include("multicompartment.jl")
 include("network.jl")
 include("simulation.jl")
-include("populations.jl")
 include("callbacks.jl")
 end # module

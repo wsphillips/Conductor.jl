@@ -56,6 +56,11 @@ function IonCurrent(stim::PulseTrain{T}) where {T <: Current}
     IonCurrent(NonIonic, stim.offset*µA; dynamic = true, name = :Iₑ)
 end
 
+function add_stimuli!(pop::Population, stimuli::Vector{<:StimulusModel}, i)
+    pop.neurons[i] = remake(pop.neurons[i]; stimuli)
+    return nothing
+end
+
 # Arbitrary input
 #struct CommandCurrent end
 #struct CommandPotential end
