@@ -16,10 +16,24 @@ duration, `time`.
 If `return_system == true`, returns a simplified `ODESystem` instead.
 """
 function Simulation(neuron::AbstractCompartmentSystem, tspan;
-                    simplify = true, parallel = Symbolics.SerialForm(), kwargs...)
+                    simplify = true, parallel = Symbolics.SerialForm(), 
+                    use_distributions = true, kwargs...)
     simplified = ODESystem(neuron; simplify)
     tstart, tstop = time_span(tspan)
-    return ODEProblem(simplified, [], (tstart, tstop), []; parallel, kwargs...)
+    u0_map = []
+    p_map = []
+   
+    if use_distributions
+        dvs, ps = states(simplified), parameters(simplified)
+        for dv in dvs
+            hasdist(dv) && push!(u0_map, dv => rand(getdist(dv)))
+        end
+        
+        for p in ps
+            hasdist(p) && push!(p_map, p => rand(getdist(p)))
+        end
+    end
+    return ODEProblem(simplified, u0_map, (tstart, tstop), p_map; parallel, kwargs...)
 end
 
 struct NetworkParameters{T}
