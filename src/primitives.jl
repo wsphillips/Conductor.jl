@@ -106,15 +106,18 @@ If `V0 == nothing`, the default value of the resulting variable will be left una
 - `name::Symbol = :Vₘ`: the symbol to use for the symbolic variable
 """
 struct MembranePotential
-    function MembranePotential(V0::Union{Nothing, Real, Voltage} = -60mV; dynamic = true,
-                               source::PrimitiveSource = Intrinsic, n::Integer = 1,
-                               name::Symbol = :Vₘ)
+    function MembranePotential(V0::Union{Nothing, Real, Voltage, Distribution} = -60mV;
+                               dynamic = true, source::PrimitiveSource = Intrinsic,
+                               n::Integer = 1, name::Symbol = :Vₘ)
         V0_val = V0 isa Voltage ? ustrip(Float64, mV, V0) : V0
         if n == one(n)
             if isnothing(V0)
                 ret = only(dynamic ? @variables($name(t), [unit = mV]) :
                            @parameters($name, [unit = mV]))
-            else
+            elseif V0 isa Distribution
+                ret = only(dynamic ? @variables($name(t), [unit = mV, dist = V0]) :
+                           @parameters($name, [unit = mV, dist = V0]))
+            else # Real or Voltage
                 ret = only(dynamic ? @variables($name(t)=V0_val, [unit = mV]) :
                            @parameters($name=V0_val, [unit = mV]))
             end
@@ -124,6 +127,10 @@ struct MembranePotential
             if isnothing(V0)
                 ret = only(dynamic ? @variables($name(t)[1:n], [unit = mV]) :
                            @parameters($name[1:n], [unit = mV]))
+            elseif V0 isa Distribution
+                ret = only(dynamic ?
+                           @variables($name(t)[1:n], [unit = mV, dist = V0]) :
+                           @parameters($name[1:n], [unit = mV, dist = V0]))
             else
                 ret = only(dynamic ?
                            @variables($name(t)[1:n]=fill(V0_val, n), [unit = mV]) :
@@ -195,7 +202,7 @@ An intra/extracellular concentration of ions.
   variable. By default, a lookup table is used to find the ion's symbol on the periodic
   table of elements.
 """
-function IonConcentration(ion::IonSpecies, conc::Union{Nothing, Real, Molarity} = nothing;
+function IonConcentration(ion::IonSpecies, conc::Union{Nothing,Real,Molarity,Distribution} = nothing;
                           location::PrimitiveLocation = Inside, dynamic::Bool = false,
                           name::Symbol = PERIODIC_SYMBOL[ion])
     sym = Symbol(name, (location == Inside ? "ᵢ" : "ₒ"))
