@@ -277,7 +277,7 @@ Base.getindex(comp::CompartmentSystem, I) = [comp[i] for i in I]
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
     dvs = get_states(compartment)
-    ps = get_ps(compartment)
+    ps = union(get_ps(compartment),get_capacitance(compartment))
     eqs = get_eqs(compartment)
     defs = get_defaults(compartment)
     syss = convert.(ODESystem, get_systems(compartment))

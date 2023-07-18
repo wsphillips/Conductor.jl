@@ -26,7 +26,8 @@ import Symbolics:
     VariableDefaultValue,
     wrap, unwrap, Arr,
     scalarize,
-    getname
+    getname,
+    substitute
 
 import ModelingToolkit:
     toparam,

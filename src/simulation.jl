@@ -15,9 +15,14 @@ duration, `time`.
 
 If `return_system == true`, returns a simplified `ODESystem` instead.
 """
-function Simulation(neuron::AbstractCompartmentSystem, tspan;
+function Simulation(neuron::AbstractCompartmentSystem, tspan; fixed_params = [],
                     simplify = true, parallel = Symbolics.SerialForm(), kwargs...)
-    simplified = ODESystem(neuron; simplify)
+    if isempty(fixed_params)
+        simplified = ODESystem(neuron; simplify)
+    else
+        odesys = convert(ODESystem, neuron)
+        simplified = set_fixed_params(odesys, fixed_params; simplify) 
+    end
     tstart, tstop = time_span(tspan)
     return ODEProblem(simplified, [], (tstart, tstop), []; parallel, kwargs...)
 end

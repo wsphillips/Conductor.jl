@@ -82,10 +82,19 @@ function set_symarray_metadata(x, ctx, val)
     end
 end
 
-function settunable(sys, ps)
-    new_ps = setmetadata.(ps, ModelingToolkit.VariableTunable, true) 
-    @set! sys.ps = union(new_ps, parameters(sys))
-    return sys
+function set_fixed_params(sys::ODESystem, ps_to_const; simplify = false)
+    # flatten the system; specify parameters from top-level system (i.e. after namespacing)
+    flat_sys = flatten(sys)
+    new_ps = setdiff(get_ps(flat_sys), ps_to_const)
+    eqs = get_eqs(flat_sys)
+    defs = get_defaults(flat_sys)
+    csubs = Dict(c => getdefault(c) for c in ps_to_const)
+    new_eqs = substitute(eqs, csubs)
+    new_defs = Dict(setdiff(defs, csubs))
+    @set! flat_sys.ps = new_ps
+    @set! flat_sys.eqs = new_eqs
+    @set! flat_sys.defaults = new_defs
+    return simplify ? structural_simplify(flat_sys) : flat_sys
 end
 
 function setbounds(sys, p_dists)
