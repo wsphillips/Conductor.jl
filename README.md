@@ -1,10 +1,13 @@
 # Conductor.jl
 
-**Conductor.jl is a WIP. If the idea of a Julia-based neuronal network simulator engine sounds exciting to you, please feel free to reach out** 
-
-![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/wsphillips/Conductor.jl/CI?label=tests&logo=julia)
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://wsphillips.github.io/Conductor.jl/stable)
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://wsphillips.github.io/Conductor.jl/dev)
+<p align="center">
+<img src="https://img.shields.io/github/actions/workflow/status/wsphillips/Conductor.jl/CI.yml?branch=main&label=Tests&logo=julia&style=for-the-badge" alt="GitHub Workflow Status" />
+<a href="https://wsphillips.github.io/Conductor.jl/stable">
+<img src="https://img.shields.io/badge/docs-stable-blue.svg?style=for-the-badge" />
+</a>
+<a href="https://wsphillips.github.io/Conductor.jl/dev">
+<img src="https://img.shields.io/badge/docs-dev-blue.svg?style=for-the-badge"/>
+</p>
 
 Conductor.jl aims to be a platform for quickly and flexibly building high-performance,
 multi-scale neuronal network models in Julia. Under the hood it's being built on top of
