@@ -19,7 +19,7 @@ Gate{AlphaBeta}(AlphaBeta, h(t), Symbolics.Equation[Differential(t)(h(t)) ~ (-h(
 
 function Conductor.get_eqs(g::Gate{MyNewGate}, comp::CompartmentSystem)
     # a function that returns a vector of equations defining gate dynamics
-end</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/62d172947fc37ad70ac501963513c249465f898d/src/gate.jl#L27">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Conductor.Gate" href="#Conductor.Gate"><code>Conductor.Gate</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia hljs">struct Gate{T&lt;:Conductor.GateVarForm} &lt;: Conductor.AbstractGatingVariable</code></pre><p>Low-level constructor for <code>Gate</code>.</p><p>A gate has a single symbolic <code>output</code> and stores properties (passed as a variable length list of keyword arguments). Gate properties are accessible via <code>get</code> and <code>getproperty</code>.</p><p><strong>Example</strong></p><pre><code class="language-julia-repl hljs">julia&gt; @variables t X(t)
+end</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/4cae3f2725b80c1e6827e4c5b01d6ddad45c8bfb/src/gate.jl#L27">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Conductor.Gate" href="#Conductor.Gate"><code>Conductor.Gate</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia hljs">struct Gate{T&lt;:Conductor.GateVarForm} &lt;: Conductor.AbstractGatingVariable</code></pre><p>Low-level constructor for <code>Gate</code>.</p><p>A gate has a single symbolic <code>output</code> and stores properties (passed as a variable length list of keyword arguments). Gate properties are accessible via <code>get</code> and <code>getproperty</code>.</p><p><strong>Example</strong></p><pre><code class="language-julia-repl hljs">julia&gt; @variables t X(t)
 2-element Vector{Num}:
     t
  X(t)
@@ -28,31 +28,31 @@ julia&gt; g = Gate{MyGateType}(MyGateType, X, Equation[], prop1 = &quot;foo&quot
 Gate{MyGateType}(MyGateType, X(t), Symbolics.Equation[], Dict{Symbol, Any}(:prop2 =&gt; 62, :prop1 =&gt; &quot;foo&quot;))
 
 julia&gt; (g.prop1, g.prop2)
-(&quot;foo&quot;, 62)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/62d172947fc37ad70ac501963513c249465f898d/src/gate.jl#L58">source</a></section><section><div><pre><code class="language-julia hljs">Gate(
+(&quot;foo&quot;, 62)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/4cae3f2725b80c1e6827e4c5b01d6ddad45c8bfb/src/gate.jl#L58">source</a></section><section><div><pre><code class="language-julia hljs">Gate(
     form::Type{AlphaBeta},
     α,
     β;
     name,
     kwargs...
 ) -&gt; Gate{AlphaBeta}
-</code></pre><p>Accepts expressions for forward (α) and reverse (β) reaction rates as descriptors for its kinetics.</p><p>See also: <code>get_eqs</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/62d172947fc37ad70ac501963513c249465f898d/src/gate.jl#L90">source</a></section><section><div><pre><code class="language-julia hljs">Gate(
+</code></pre><p>Accepts expressions for forward (α) and reverse (β) reaction rates as descriptors for its kinetics.</p><p>See also: <code>get_eqs</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/4cae3f2725b80c1e6827e4c5b01d6ddad45c8bfb/src/gate.jl#L90">source</a></section><section><div><pre><code class="language-julia hljs">Gate(
     form::Type{SteadyStateTau},
     x∞,
     τₓ;
     name,
     kwargs...
 ) -&gt; Gate{SteadyStateTau}
-</code></pre><p>Accepts expressions for its steady-state activation, x∞(Vₘ), and the time constant, τₓ(Vₘ), as descriptors for its kinetics.</p><p>See also: <code>get_eqs</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/62d172947fc37ad70ac501963513c249465f898d/src/gate.jl#L105">source</a></section><section><div><pre><code class="language-julia hljs">Gate(
+</code></pre><p>Accepts expressions for its steady-state activation, x∞(Vₘ), and the time constant, τₓ(Vₘ), as descriptors for its kinetics.</p><p>See also: <code>get_eqs</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/4cae3f2725b80c1e6827e4c5b01d6ddad45c8bfb/src/gate.jl#L105">source</a></section><section><div><pre><code class="language-julia hljs">Gate(
     form::Type{SimpleGate},
     rhs::Symbolics.Num;
     default,
     name,
     kwargs...
 ) -&gt; Gate{SimpleGate}
-</code></pre><p>Accepts any symbolic expression as an explicit definition of the gate dynamics.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/62d172947fc37ad70ac501963513c249465f898d/src/gate.jl#L125">source</a></section><section><div><pre><code class="language-julia hljs">Gate(
+</code></pre><p>Accepts any symbolic expression as an explicit definition of the gate dynamics.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/4cae3f2725b80c1e6827e4c5b01d6ddad45c8bfb/src/gate.jl#L125">source</a></section><section><div><pre><code class="language-julia hljs">Gate(
     form::Type{Conductor.ParameterGate},
     val;
     name,
     kwargs...
 ) -&gt; Gate{Conductor.ParameterGate}
-</code></pre><p>A static parameter gate with initial value, <code>val</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/62d172947fc37ad70ac501963513c249465f898d/src/gate.jl#L146">source</a></section></article></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../primitives/">« Primitives</a><a class="docs-footer-nextpage" href="../conductances/">Conductances »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Wednesday 19 July 2023 14:36">Wednesday 19 July 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+</code></pre><p>A static parameter gate with initial value, <code>val</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/wsphillips/Conductor.jl/blob/4cae3f2725b80c1e6827e4c5b01d6ddad45c8bfb/src/gate.jl#L146">source</a></section></article></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../primitives/">« Primitives</a><a class="docs-footer-nextpage" href="../conductances/">Conductances »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Wednesday 19 July 2023 17:10">Wednesday 19 July 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
