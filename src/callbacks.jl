@@ -94,7 +94,7 @@ const SynapticSystem{M} = Union{ConductanceSystem{M},CurrentSystem{M}} where {M<
 
 struct SpikeAffect{M}
     synaptic_system::SynapticSystem{M}
-    state_indices::Vector{Int}
+    state_indices::Dict
 end
 
 get_system(sa::SpikeAffect) = sa.synaptic_system
@@ -117,10 +117,19 @@ end
 function SpikeAffect(synsys::SynapticSystem{T}, network, simplified) where {T<:ConstantValueEvent}
     model = get_model(synsys)
     comps = compartments(get_topology(network))
-    state = renamespace(synsys, model.state)
+    state = renamespace(synsys, model.state) # e.g. AMPA.m
     syn_states = renamespace.(comps, state)
+    
+    comps_with_syn = []
+    for (i, comp) in enumerate(comps)
+        if hasproperty(getproperty(network, nameof(comp)), nameof(synsys))
+            push!(comps_with_syn, i)
+        end
+    end
+
     state_indices = indexmap(syn_states, states(simplified))
-    return SpikeAffect{T}(synsys, state_indices)
+
+    return SpikeAffect{T}(synsys, Dict(zip(comps_with_syn, state_indices)))
 end
 
 function (cv::SpikeAffect{<:ConstantValueEvent})(integrator, i)
@@ -132,9 +141,12 @@ function (cv::SpikeAffect{<:ConstantValueEvent})(integrator, i)
     # row numbers of non-zero values from the ith column of the sparse matrix
     rng = nzrange(g,i)
     iszero(length(rng)) && return nothing
+
     rows = view(rowvals(g), rng) # i.e. indexes of post_synaptic compartment(s)
-    for j in view(cv.state_indices, rows)
-        integrator.u[j] += ifelse(integrator.u[j] < sat, α, zero(α))
+
+    for j in rows
+        idx = cv.state_indices[j]
+        integrator.u[idx] += ifelse(integrator.u[idx] < sat, α, zero(α))
     end
     return nothing
 end
