@@ -9,7 +9,7 @@ $(TYPEDFIELDS)
 """
 struct CompartmentSystem{T <: AbstractDynamics} <: AbstractCompartmentSystem
     "Voltage potential."
-    voltage::Num
+    voltage::Union{Nothing, Num}
     dynamics::T
     "Membrane capacitance."
     capacitance::Union{Nothing,Num}

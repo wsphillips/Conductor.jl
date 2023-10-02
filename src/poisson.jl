@@ -7,22 +7,21 @@ struct PoissonDynamics <: AbstractDynamics
 end
 
 poisson_draw(lambda) = rand(Poisson(lambda))
-Symbolics.@register_symbolic poisson_draw(x)
 
 function CompartmentSystem(dynamics::PoissonDynamics; name)
     lambda = dynamics.lambda
     @variables S = 0
     gen = GeneratedCollections(dvs = Set((S,)),
                                ps = Set((lambda,)),
-                               eqs = [S ~ poisson_draw(lambda)])
+                               eqs = [D(S) ~ 0])
 
     (; eqs, dvs, ps, observed, systems, defs) = gen
-    return CompartmentSystem(S, dynamics, nothing, eqs, t, collect(dvs), collect(ps), observed, name,
+    return CompartmentSystem(nothing, dynamics, nothing, eqs, t, collect(dvs), collect(ps), observed, name,
                              systems, defs, [], Synapse[], Arborization(), StimulusModel[], Point())
 end
 
 # TODO: this is kind of a hack
-function CompartmentSystem(Vₘ, dynamics::PoissonDynamics, synapses, arbor, capacitance,
+function CompartmentSystem(voltage, dynamics::PoissonDynamics, synapses, arbor, capacitance,
                            geometry, stimuli, defaults, extensions, name)
     return CompartmentSystem(dynamics; name)
 end

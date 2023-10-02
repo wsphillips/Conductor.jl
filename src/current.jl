@@ -12,7 +12,7 @@ function Synapse(x::ConductanceSystem, rev::Num)
     return Synapse{typeof(x)}(x, metadata)
 end
 
-isequal(syn1::Synapse, syn2::Synapse) = isequal(syn1.system, syn2.system)
+Base.isequal(syn1::Synapse, syn2::Synapse) = isequal(syn1.system, syn2.system)
 Base.:(==)(syn1::Synapse, syn2::Synapse) = isequal(syn1, syn2)
 
 

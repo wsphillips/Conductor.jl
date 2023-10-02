@@ -33,6 +33,16 @@ function (dsd::DiscreteSpikeDetection)(u, t, integrator)
     end
 end
 
+struct PoissonSpikeDetection
+    spiketrain_index::Int
+end
+
+function (psd::PoissonSpikeDetection)(u, t, integrator)
+    idx = psd.spiketrain_index
+    S = u[idx]
+    return S > 0
+end
+
 struct ContinuousSpikeDetection
     voltage_indices::Vector{Int}
 end
@@ -123,9 +133,20 @@ function (cv::SpikeAffect{<:ConstantValueEvent})(integrator, i)
     rng = nzrange(g,i)
     iszero(length(rng)) && return nothing
     rows = view(rowvals(g), rng) # i.e. indexes of post_synaptic compartment(s)
-    for i in view(cv.state_indices, rows)
-        integrator.u[i] += ifelse(integrator.u[i] < sat, α, zero(α))
+    for j in view(cv.state_indices, rows)
+        integrator.u[j] += ifelse(integrator.u[j] < sat, α, zero(α))
     end
     return nothing
 end
 
+struct PoissonSpikeUpdate
+    spiketrain_indices
+    lambda_indices
+end
+
+function (psu::PoissonSpikeUpdate)(integrator)
+    itr = zip(psu.spiketrain_indices, psu.lambda_indices)
+    for (x, y) in itr
+        integrator.u[x] = poisson_draw(integrator.p[y])
+    end
+end
