@@ -21,6 +21,12 @@ function CompartmentSystem(dynamics::PoissonDynamics; name)
                              systems, defs, [], Synapse[], Arborization(), StimulusModel[], Point())
 end
 
+# TODO: this is kind of a hack
+function CompartmentSystem(Vₘ, dynamics::PoissonDynamics, synapses, arbor, capacitance,
+                           geometry, stimuli, defaults, extensions, name)
+    return CompartmentSystem(dynamics; name)
+end
+
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{PoissonDynamics})
     dvs = get_states(compartment)
     ps = get_ps(compartment)

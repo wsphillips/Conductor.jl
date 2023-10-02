@@ -153,7 +153,11 @@ function connect_synapses!(gen, syn_model, comps, topology, reversal_map)
     reversal = reversal_map[syn_model]
     for (i,comp) in enumerate(new_compartments)
         post_synapses = get_synapses(comp)
-        push!(post_synapses, Synapse(syn_model, reversal))
+        synapse = Synapse(syn_model, reversal)
+        println("hello")
+        if !(synapse in post_synapses) 
+            push!(post_synapses, Synapse(syn_model, reversal))
+        end
         new_compartments[i] = remake(comp; synapses = post_synapses)
     end
     return new_compartments
