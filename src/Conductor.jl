@@ -137,6 +137,7 @@ abstract type SummedEventsSynapse <: EventBasedSynapse end
 struct IntegratedSynapse <: SynapticModel end
 
 export ConstantValueEvent, IntegratedSynapse
+export PoissonDynamics
 
 include("populations.jl")
 include("util.jl")
@@ -151,4 +152,5 @@ include("multicompartment.jl")
 include("network.jl")
 include("simulation.jl")
 include("callbacks.jl")
+include("poisson.jl")
 end # module

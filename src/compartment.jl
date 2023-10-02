@@ -156,64 +156,6 @@ function CompartmentSystem(Vₘ, dynamics::HodgkinHuxley, synapses::Vector{<:Syn
                              geometry)
 end
 
-struct LIF <: AbstractDynamics
-    V::Num
-    τ_mem::Num
-    τ_syn::Num
-    V_th::Num
-    R::Num
-    inputs::Vector{Num}
-    stimuli::Vector{Num}
-end
-
-function LIF(voltage = 0.0; tau_membrane = 10.0, tau_synaptic = 10.0, threshold = 1.0,
-             resistance = 1.0, stimulus = 1.0)
-    @variables V(t) = voltage
-    @parameters V_th = threshold
-    @parameters τ_mem=tau_membrane τ_syn=tau_synaptic R=resistance Iₑ=stimulus
-    inputs = Num[]
-    return LIF(V, τ_mem, τ_syn, V_th, R, inputs, [Iₑ])
-end
-
-function CompartmentSystem(dynamics::LIF, defaults, extensions, name)
-    (; V, τ_mem, τ_syn, V_th, R, stimuli) = dynamics
-    Iₑ = stimuli[1]
-    @variables I(t)=0.0 S(t)=false
-    @parameters V_rest = MTK.getdefault(V)
-    gen = GeneratedCollections(dvs = Set((V, I)),
-                               ps = Set((τ_mem, τ_syn, V_th, R, V_rest, Iₑ)),
-                               eqs = [
-                                   D(V) ~ (-(V - V_rest) / τ_mem) + (R * I + R * Iₑ) / τ_mem,
-                                   D(I) ~ -I / τ_syn])
-
-    (; eqs, dvs, ps, observed, systems, defs) = gen
-    push!(observed, S ~ V >= V_th)
-    merge!(defs, defaults)
-    return CompartmentSystem(dynamics, eqs, t, collect(dvs), collect(ps), observed, name,
-                             systems, defs, extensions)
-end
-
-function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{LIF};
-                      with_cb = false)
-    dvs = get_states(compartment)
-    ps = get_ps(compartment)
-    eqs = get_eqs(compartment)
-    defs = get_defaults(compartment)
-    obs = get_observed(compartment)
-    syss = convert.(ODESystem, get_systems(compartment))
-    V = @nonamespace compartment.V
-    S = @nonamespace compartment.S
-    V_th = @nonamespace compartment.V_th
-    V_rest = @nonamespace compartment.V_rest
-
-    cb = with_cb ? MTK.SymbolicDiscreteCallback(V >= V_th, [V ~ V_rest]) :
-         MTK.SymbolicDiscreteCallback[]
-
-    return ODESystem(eqs, t, dvs, ps; systems = syss, defaults = defs,
-                     name = nameof(compartment), discrete_events = cb,
-                     observed = obs, checks = CheckComponents)
-end
-
 function SciMLBase.remake(sys::CompartmentSystem;
                           Vₘ = get_voltage(sys),
                           dynamics = get_dynamics(sys),

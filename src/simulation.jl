@@ -40,7 +40,7 @@ function get_weights(integrator, model)
     return graph(topo)[model]
 end
 
-function Simulation(network::NeuronalNetworkSystem, tspan; simplify = true,
+function Simulation(network::NeuronalNetworkSystem, tspan, cb = nothing; simplify = true,
                     parallel = Symbolics.SerialForm(), continuous_events = false,
                     refractory = true, kwargs...)
     odesys = ODESystem(network; simplify)
@@ -48,7 +48,9 @@ function Simulation(network::NeuronalNetworkSystem, tspan; simplify = true,
     if !any(iseventbased.(synaptic_systems(network)))
         return ODEProblem(odesys, [], (tstart, tstop), []; parallel, kwargs...)
     else
-        cb = generate_callback(network, odesys; continuous_events, refractory)
+        if isnothing(cb)
+            cb = generate_callback(network, odesys; continuous_events, refractory)
+        end
         prob = ODEProblem(odesys, [], (tstart, tstop), [];
                           callback = cb, parallel, kwargs...)
         remake(prob; p = NetworkParameters(prob.p, get_topology(network)))
