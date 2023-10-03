@@ -153,12 +153,15 @@ end
 
 struct PoissonSpikeUpdate
     spiketrain_indices
-    lambda_indices
+    rate_indices
 end
 
 function (psu::PoissonSpikeUpdate)(integrator)
-    itr = zip(psu.spiketrain_indices, psu.lambda_indices)
+    itr = zip(psu.spiketrain_indices, psu.rate_indices)
+    dt = integrator.t - integrator.tprev
     for (x, y) in itr
-        integrator.u[x] = poisson_draw(integrator.p[y])
+        rate = integrator.p[y]
+        lambda = (dt/1000.0)*rate # lambda = r*t
+        integrator.u[x] = poisson_draw(lambda)
     end
 end

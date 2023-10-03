@@ -154,7 +154,6 @@ function connect_synapses!(gen, syn_model, comps, topology, reversal_map)
     for (i,comp) in enumerate(new_compartments)
         post_synapses = get_synapses(comp)
         synapse = Synapse(syn_model, reversal)
-        println("hello")
         if !(synapse in post_synapses) 
             push!(post_synapses, Synapse(syn_model, reversal))
         end

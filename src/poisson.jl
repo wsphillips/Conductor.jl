@@ -1,18 +1,21 @@
+import Unitful: Hz
+
 struct PoissonDynamics <: AbstractDynamics
-    lambda::Num
-    function PoissonDynamics(lambda = 0.5)
-        @parameters λ = lambda
-        return new(λ)
+    rate::Num
+    function PoissonDynamics(rate = 50Hz) # Hz
+        rate_val = ustrip(Float64, Hz, rate)
+        @parameters r = rate_val
+        return new(r)
     end
 end
 
 poisson_draw(lambda) = rand(Poisson(lambda))
 
 function CompartmentSystem(dynamics::PoissonDynamics; name)
-    lambda = dynamics.lambda
+    r = dynamics.rate
     @variables S = 0
     gen = GeneratedCollections(dvs = Set((S,)),
-                               ps = Set((lambda,)),
+                               ps = Set((r,)),
                                eqs = [D(S) ~ 0])
 
     (; eqs, dvs, ps, observed, systems, defs) = gen
