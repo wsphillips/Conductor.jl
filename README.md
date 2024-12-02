@@ -8,7 +8,9 @@
 <a href="https://wsphillips.github.io/Conductor.jl/dev">
 <img src="https://img.shields.io/badge/docs-dev-blue.svg?style=for-the-badge"/>
 </p>
-![L-BFGS Optimization](./lbfgs_stgneuron.gif)
+
+![LBFGS Optimization](lbfgs_stgneuron.gif)
+
 Conductor.jl aims to be a platform for quickly and flexibly building high-performance,
 multi-scale neuronal network models in Julia. Under the hood it's being built on top of
 ModelingToolkit.jl--so all the tools available in the SciML and DiffEq ecosystem are (or
