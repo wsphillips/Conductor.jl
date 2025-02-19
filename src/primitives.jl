@@ -83,8 +83,7 @@ const Mixed = const Leak = NonIonic
 const PERIODIC_SYMBOL = IdDict(Na => :Na, K => :K, Cl => :Cl, Ca => :Ca, Leak => :l)
 
 # Primitive Properties
-# TODO: It may be possible to use the I/O api in MTK instead of defining our
-# own enums.
+# TODO: It may now be possible to use the I/O api in MTK instead of defining enums
 @enum PrimitiveSource Intrinsic Extrinsic 
 @enum PrimitiveLocation Outside Inside
 
@@ -93,6 +92,17 @@ struct PrimitiveMetadata
     source::PrimitiveSource = Intrinsic
     location::PrimitiveLocation = Inside
 end
+
+
+struct MembranePotential end
+struct ExtrinsicPotential end
+struct IonConcentration
+    ion::IonSpecies
+    loc::PrimitiveLocation
+end
+
+const Concentration = IonConcentration
+
 
 """
     MembranePotential(V0 = -60mV; <keyword arguments>)
@@ -109,7 +119,6 @@ If `V0 == nothing`, the default value of the resulting variable will be left una
 - `n::Integer = 1`: when `n > 1`, the voltage will be a symbolic array of length `n`.
 - `name::Symbol = :Vₘ`: the symbol to use for the symbolic variable
 """
-struct MembranePotential
   function MembranePotential(V0::Union{Nothing, <:Real, Voltage} = -60mV;
                              dynamic = true,
                              source::PrimitiveSource = Intrinsic,
@@ -117,7 +126,7 @@ struct MembranePotential
                              name::Symbol = :Vₘ)
 
         V0_val = V0 isa Voltage ? ustrip(V0) : V0
-        V0_units = 
+        # V0_units = 
 
         if n == one(n)
             if isnothing(V0)
@@ -178,12 +187,6 @@ function ExtrinsicPotential(; n = 1, name::Symbol = :Vₓ)
         name = name)
 end
 
-struct IonConcentration
-    ion::IonSpecies
-    loc::PrimitiveLocation
-end
-
-const Concentration = IonConcentration
 
 """
     IonConcentration(ion::IonSpecies, val = nothing; <keyword arguments>)
