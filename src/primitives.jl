@@ -1,7 +1,10 @@
-# Custom Unitful.jl quantities
-@derived_dimension SpecificConductance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^3
-@derived_dimension SpecificCapacitance 𝐈^2*𝐋^-4*𝐌^-1*𝐓^4
-@derived_dimension ConductancePerFarad 𝐓^-1 # S/F cancels out to 1/s; perhaps find a better abstract type?
+# Custom quantities
+const SpecificConductance = Quantity{<:Real, typeof(dimension(u"S/m^2"))}
+const SpecificCapacitance = Quantity{<:Real, typeof(dimension(u"F/m^2"))}
+const ConductancePerFarad = Quantity{<:Real, typeof(dimension(u"S/F"))}
+const Voltage = Quantity{<:Real, typeof(dimension(u"V"))}
+const Current = Quantity{<:Real, typeof(dimension(u"I"))}
+const Capacitance = Quantity{<:Real, typeof(dimension(u"C"))}
 
 @doc "Conductance per unit area." SpecificConductance
 @doc "Capacitance per unit area." SpecificCapacitance
@@ -9,42 +12,34 @@
 """
 Faraday's Constant
 
-The electric charge of one mole of electrons.
+The electric charge of one mole of electrons. Convenience alias and symbolic form of
+DynamicQuantities.Constants.F to help distinguish it from Farad units
+(DynamicQuantities.Units.F).
 
-Unicode ℱ can be typed by writing \\scrF then pressing tab in the Julia REPL, and in many editors.
-
-# Examples
-```julia-repl
-julia> Conductor.ℱ
-96485.33212331001 C mol^-1
-```
+Unicode ℱ can be typed by writing \\scrF then pressing tab in the Julia REPL,
+and in many editors.
 """
-const ℱ = let name = :ℱ
-    only(@constants $name=ustrip(Unitful.q * Unitful.Na) [unit = Unitful.C*Unitful.mol^-1])
+const ℱ = only(@constants ℱ = ustrip(Constants.F) [unit = u"C/mol"])
+
+"""
+Universal Gas Constant
+"""
+const R = only(@constants R=ustrip(Constants.R) [unit = u""])
 end
 
-"""
-Universal Gas Constant (base units)
-"""
-const R = let name = :R
-    only(@constants $name=ustrip(Unitful.R) [unit = Unitful.unit(Unitful.R)])
-end
-
-"""
-Universal Gas Constant (milli-)
-
-Scaled by 1000x. Results in output 
-"""
-const mR = let name = :mR
-    only(@constants $name=(ustrip(Unitful.R)*1000) [unit = u"mJ*K^-1*mol^-1"])
-end
+#"""
+#Universal Gas Constant (milli-)
+#
+#Scaled by 1000x. Results in output 
+#"""
+#const mR = let name = :mR
+#    only(@constants $name=(ustrip(Unitful.R)*1000) [unit = u"mJ*K^-1*mol^-1"])
+#end
 
 """
 The independent variable for time, ``t``.
 """
-const t = let name = :t
-    only(@variables $name [unit = ms])
-end
+const t = only(@variables t [unit = u"ms"])
 
 """
 Differential with respect to time, ``t``.
@@ -78,6 +73,7 @@ end
 
 @doc ion_doc IonSpecies
 
+# Convenience aliases
 const Ca = Calcium
 const Na = Sodium
 const K = Potassium
@@ -86,9 +82,17 @@ const Mixed = const Leak = NonIonic
 
 const PERIODIC_SYMBOL = IdDict(Na => :Na, K => :K, Cl => :Cl, Ca => :Ca, Leak => :l)
 
-# Properties
-@enum PrimitiveSource Intrinsic Extrinsic
+# Primitive Properties
+# TODO: It may be possible to use the I/O api in MTK instead of defining our
+# own enums.
+@enum PrimitiveSource Intrinsic Extrinsic 
 @enum PrimitiveLocation Outside Inside
+
+struct PrimitiveMetadata
+    ion_species::IonSpecies = NonIonic
+    source::PrimitiveSource = Intrinsic
+    location::PrimitiveLocation = Inside
+end
 
 """
     MembranePotential(V0 = -60mV; <keyword arguments>)
@@ -106,17 +110,22 @@ If `V0 == nothing`, the default value of the resulting variable will be left una
 - `name::Symbol = :Vₘ`: the symbol to use for the symbolic variable
 """
 struct MembranePotential
-    function MembranePotential(V0::Union{Nothing, Real, Voltage} = -60mV; dynamic = true,
-                               source::PrimitiveSource = Intrinsic, n::Integer = 1,
-                               name::Symbol = :Vₘ)
-        V0_val = V0 isa Voltage ? ustrip(Float64, mV, V0) : V0
+  function MembranePotential(V0::Union{Nothing, <:Real, Voltage} = -60mV;
+                             dynamic = true,
+                             source::PrimitiveSource = Intrinsic,
+                             n::Integer = 1,
+                             name::Symbol = :Vₘ)
+
+        V0_val = V0 isa Voltage ? ustrip(V0) : V0
+        V0_units = 
+
         if n == one(n)
             if isnothing(V0)
-                ret = only(dynamic ? @variables($name(t), [unit = mV]) :
-                           @parameters($name, [unit = mV]))
+                 ret = only(dynamic ? @variables($name(t), [unit = mV]) :
+                            @parameters($name, [unit = mV]))
             else
-                ret = only(dynamic ? @variables($name(t)=V0_val, [unit = mV]) :
-                           @parameters($name=V0_val, [unit = mV]))
+               ret = only(dynamic ? @variables($name(t)=V0_val, [unit = mV]) :
+                          @parameters($name=V0_val, [unit = u"mV"]))
             end
             ret = setmetadata(ret, PrimitiveSource, source)
             ret = setmetadata(ret, MembranePotential, true)
@@ -139,15 +148,9 @@ struct MembranePotential
 end
 
 # Internal API: Trait queries for MembranePotential
-isvoltage(x) = hasmetadata(value(x), MembranePotential)
-function isintrinsic(x)
-    hasmetadata(value(x), PrimitiveSource) ?
-    getmetadata(value(x), PrimitiveSource) == Intrinsic : false
-end
-function isextrinsic(x)
-    hasmetadata(value(x), PrimitiveSource) ?
-    getmetadata(value(x), PrimitiveSource) == Extrinsic : false
-end
+isvoltage(x) = getmisc(x) isa MembranePotential
+isintrinsic(x) = getmisc(x).source == Intrinsic
+isextrinsic(x) = getmisc(x).source == Extrinsic
 
 function find_voltage(vars, source = isintrinsic)
     idx = findfirst(x -> isvoltage(x) && source(x), vars)
@@ -164,7 +167,7 @@ end
 
 A voltage derived from an external source (i.e. not the parent compartment).
 
-Equivalent to: `MembranePotential(nothing; dynamic=true, source=Extrinsic, n=n, name=name)`
+Equivalent to: `MembranePotential(nothing; dynamic=true, source=Extrinsic)`
 
 # Arguments
 - `n::Integer = 1`: when `n > 1`, the voltage will be a symbolic array of length `n`.
@@ -172,7 +175,7 @@ Equivalent to: `MembranePotential(nothing; dynamic=true, source=Extrinsic, n=n, 
 """
 function ExtrinsicPotential(; n = 1, name::Symbol = :Vₓ)
     return MembranePotential(nothing; dynamic = true, source = Extrinsic, n = n,
-                             name = name)
+        name = name)
 end
 
 struct IonConcentration
@@ -196,8 +199,8 @@ An intra/extracellular concentration of ions.
   table of elements.
 """
 function IonConcentration(ion::IonSpecies, conc::Union{Nothing, Real, Molarity} = nothing;
-                          location::PrimitiveLocation = Inside, dynamic::Bool = false,
-                          name::Symbol = PERIODIC_SYMBOL[ion])
+        location::PrimitiveLocation = Inside, dynamic::Bool = false,
+        name::Symbol = PERIODIC_SYMBOL[ion])
     sym = Symbol(name, (location == Inside ? "ᵢ" : "ₒ"))
     conc_val = conc isa Molarity ? ustrip(µM, conc) : conc
     if isnothing(conc_val)
@@ -236,8 +239,8 @@ An ionic membrane current.
   periodic table of elements.
 """
 function IonCurrent(ion::IonSpecies, curr::Union{Nothing, Real, Current} = nothing;
-                    aggregate::Bool = false, dynamic::Bool = true,
-                    name::Symbol = Symbol("I", PERIODIC_SYMBOL[ion]))
+        aggregate::Bool = false, dynamic::Bool = true,
+        name::Symbol = Symbol("I", PERIODIC_SYMBOL[ion]))
     curr_val = curr isa Current ? ustrip(µA, curr) : curr
 
     if isnothing(curr_val)
@@ -282,8 +285,8 @@ An equilibrium (a.k.a. reversal) potential.
   periodic table of elements.
 """
 function EquilibriumPotential(ion::IonSpecies, eqv::Union{Nothing, Real, Voltage};
-                              dynamic::Bool = false,
-                              name::Symbol = PERIODIC_SYMBOL[ion])
+        dynamic::Bool = false,
+        name::Symbol = PERIODIC_SYMBOL[ion])
     sym = Symbol("E", name)
     eqv_val = eqv isa Voltage ? ustrip(mV, eqv) : eqv
     if isnothing(eqv_val)
@@ -306,7 +309,7 @@ Temperature (in Kelvin)
 - `name::Symbol = :T`: the symbol to use for the symbolic variable.
 """
 function Temperature(temp::Union{Nothing, Real, Unitful.Temperature};
-                     dynamic::Bool = false, name::Symbol = :T)
+        dynamic::Bool = false, name::Symbol = :T)
     temp_val = temp isa Unitful.Temperature ? ustrip(Unitful.K, temp) : temp
     if isnothing(temp_val)
         ret = dynamic ? only(@variables $name(t) [unit = Unitful.K]) :
@@ -345,12 +348,12 @@ function Equilibria(equil::Vector)
             tup[2] isa Symbol ||
                 throw("Second tuple argument for $(x.first) must be a symbol.")
             push!(out,
-                  Equilibrium(x.first, tup[1], dynamic = tup[1] isa Voltage ? false : true,
-                              name = tup[2]))
+                Equilibrium(x.first, tup[1], dynamic = tup[1] isa Voltage ? false : true,
+                    name = tup[2]))
         else
             push!(out,
-                  Equilibrium(x.first, x.second,
-                              dynamic = x.second isa Voltage ? false : true))
+                Equilibrium(x.first, x.second,
+                    dynamic = x.second isa Voltage ? false : true))
         end
     end
     return out

@@ -30,7 +30,7 @@ function CompartmentSystem(voltage, dynamics::PoissonDynamics, synapses, arbor, 
 end
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem{PoissonDynamics})
-    dvs = get_states(compartment)
+    dvs = get_unknowns(compartment)
     ps = get_ps(compartment)
     eqs = get_eqs(compartment)
     defs = get_defaults(compartment)

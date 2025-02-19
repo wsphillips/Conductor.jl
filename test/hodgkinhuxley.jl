@@ -2,10 +2,11 @@
 module HodgkinHuxleySingle
 
 using Test
-using Conductor, ModelingToolkit, OrdinaryDiffEq, Unitful
+
+using Conductor, ModelingToolkit, OrdinaryDiffEq
 import ModelingToolkit: isparameter
 import Conductor: Na, K
-using Unitful: mV, mS, cm, µm, µA, ms, pA
+using DynamicQuantities: mV, mS, cm, µm, µA, ms, pA
 
 @testset "Hodgkin Huxley Single Compartment" begin
 

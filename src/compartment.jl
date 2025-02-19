@@ -90,7 +90,7 @@ end
 function extend!(gen::GeneratedCollections, extension::AbstractSystem)
     union!(gen.eqs, equations(extension))
     union!(gen.ps, parameters(extension))
-    union!(gen.dvs, states(extension))
+    union!(gen.dvs, unknowns(extension))
     return nothing
 end
 
@@ -200,7 +200,7 @@ function Base.:(==)(sys1::AbstractCompartmentSystem, sys2::AbstractCompartmentSy
     isequal(iv1, iv2) &&
         isequal(nameof(sys1), nameof(sys2)) &&
         _eq_unordered(get_eqs(sys1), get_eqs(sys2)) &&
-        _eq_unordered(get_states(sys1), get_states(sys2)) &&
+        _eq_unordered(get_unknowns(sys1), get_unknowns(sys2)) &&
         _eq_unordered(get_ps(sys1), get_ps(sys2)) &&
         all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end
@@ -218,7 +218,7 @@ Base.getindex(comp::CompartmentSystem, i::Number) = comp[convert(Int, i)]
 Base.getindex(comp::CompartmentSystem, I) = [comp[i] for i in I]
 
 function Base.convert(::Type{ODESystem}, compartment::CompartmentSystem)
-    dvs = get_states(compartment)
+    dvs = get_unknowns(compartment)
     ps = union(get_ps(compartment),get_capacitance(compartment))
     eqs = get_eqs(compartment)
     defs = get_defaults(compartment)

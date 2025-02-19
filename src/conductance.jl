@@ -10,7 +10,7 @@ struct ConductanceSystem{T<:ConductanceModel} <: AbstractConductanceSystem
     eqs::Vector{Equation}
     "Independent variable. Defaults to time, ``t``."
     iv::Num
-    states::Vector{Num}
+    unknowns::Vector{Num}
     ps::Vector{Num}
     observed::Vector{Equation}
     name::Symbol
@@ -143,7 +143,7 @@ get_inputs(x::ConductanceSystem) = getfield(x, :inputs)
 get_extensions(x::AbstractConductanceSystem) = getfield(x, :extensions)
 
 function Base.convert(::Type{ODESystem}, condsys::ConductanceSystem)
-    dvs = states(condsys)
+    dvs = unknowns(condsys)
     ps = parameters(condsys)
     eqs = equations(condsys)
     defs = get_defaults(condsys)
@@ -162,7 +162,7 @@ function Base.:(==)(sys1::ConductanceSystem, sys2::ConductanceSystem)
     isequal(iv1, iv2) &&
         isequal(nameof(sys1), nameof(sys2)) &&
         _eq_unordered(get_eqs(sys1), get_eqs(sys2)) &&
-        _eq_unordered(get_states(sys1), get_states(sys2)) &&
+        _eq_unordered(get_unknowns(sys1), get_unknowns(sys2)) &&
         _eq_unordered(get_ps(sys1), get_ps(sys2)) &&
         all(s1 == s2 for (s1, s2) in zip(get_systems(sys1), get_systems(sys2)))
 end

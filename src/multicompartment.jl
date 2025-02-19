@@ -177,7 +177,7 @@ Base.firstindex(M::MultiCompartmentSystem) = 1
 Base.lastindex(M::MultiCompartmentSystem) = length(M)
 
 function Base.convert(::Type{ODESystem}, mcsys::MultiCompartmentSystem)
-    dvs = get_states(mcsys)
+    dvs = get_unknowns(mcsys)
     ps = get_ps(mcsys)
     eqs = get_eqs(mcsys)
     defs = get_defaults(mcsys)

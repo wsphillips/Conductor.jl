@@ -275,7 +275,7 @@ Base.firstindex(ns::NeuronalNetworkSystem) = 1
 Base.lastindex(ns::NeuronalNetworkSystem) = length(get_topology(ns))
 
 function Base.convert(::Type{ODESystem}, nnsys::NeuronalNetworkSystem)
-    dvs = get_states(nnsys)
+    dvs = get_unknowns(nnsys)
     ps = get_ps(nnsys)
     eqs = get_eqs(nnsys)
     defs = get_defaults(nnsys)

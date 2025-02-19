@@ -18,7 +18,7 @@ function copy_collections(sys::AbstractSystem)
     GeneratedCollections(eqs = deepcopy(get_eqs(sys)),
                          systems = deepcopy(get_systems(sys)),
                          observed = deepcopy(get_observed(sys)),
-                         dvs = Set(deepcopy(get_states(sys))),
+                         dvs = Set(deepcopy(get_unknowns(sys))),
                          ps = Set(deepcopy(get_ps(sys))),
                          defs = deepcopy(get_defaults(sys)))
 end
@@ -101,7 +101,7 @@ function setbounds(sys, p_dists)
     new_ps = parameters(sys)
     for pair in p_dists
         i = findfirst(isequal(first(pair)), new_ps)
-        i == nothing && throw("Parameter $(first(pair)) not found.")
+        isnothing(i) && throw("Parameter $(first(pair)) not found.")
         new_ps[i] = setmetadata.(new_ps, ModelingToolkit.VariableBounds, second(pair))
     end
     @set! sys.ps = union(new_ps, parameters(sys))

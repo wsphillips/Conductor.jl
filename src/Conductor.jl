@@ -1,12 +1,13 @@
+# SPDX-License-Identifier: MIT
+
 module Conductor
+
 using DocStringExtensions
-using Graphs
-using Distributions
-using SparseArrays
-import SciMLBase
-using ModelingToolkit,
-      Unitful,
-      Unitful.DefaultSymbols,
+			Graphs,
+			Distributions,
+			SparseArrays,
+			ModelingToolkit,
+      DynamicQuantities,
       InteractiveUtils,
       Symbolics,
       SymbolicUtils,
@@ -15,70 +16,73 @@ using ModelingToolkit,
 
 const MTK = ModelingToolkit
 
-import SciMLBase: remake, VectorContinuousCallback, DiscreteCallback, ContinuousCallback,
+import SciMLBase: remake,
+                  VectorContinuousCallback,
+                  DiscreteCallback,
+                  ContinuousCallback,
                   CallbackSet
 
 import Symbolics:
-    get_variables,
-    Symbolic,
-    value,
-    tosymbol,
-    VariableDefaultValue,
-    wrap, unwrap, Arr,
-    scalarize,
-    getname,
-    substitute
+                  get_variables,
+                  Symbolic,
+                  value,
+                  tosymbol,
+                  VariableDefaultValue,
+                  wrap, unwrap, Arr,
+                  scalarize,
+                  getname,
+                  substitute
 
 import ModelingToolkit:
-    toparam,
-    isparameter,
-    Equation,
-    defaults,
-    AbstractSystem,
-    get_eqs,
-    get_iv,
-    get_ivs,
-    get_states,
-    get_observed,
-    get_defaults,
-    get_ps,
-    get_systems,
-    get_continuous_events,
-    get_discrete_events,
-    get_unit,
-    _merge,
-    renamespace,
-    hasdefault,
-    getdefault,
-    setdefault,
-    AbstractTimeDependentSystem,
-    independent_variables,
-    get_variables!,
-    validate,
-    CheckComponents,
-    rename,
-    namespace_variables
+                        toparam,
+                        isparameter,
+                        Equation,
+                        defaults,
+                        AbstractSystem,
+                        get_eqs,
+                        get_iv,
+                        get_ivs,
+                        get_unknowns,
+                        get_observed,
+                        get_defaults,
+                        get_ps,
+                        get_systems,
+                        get_continuous_events,
+                        get_discrete_events,
+                        get_unit,
+                        _merge,
+                        renamespace,
+                        hasdefault,
+                        getdefault,
+                        setdefault,
+                        AbstractTimeDependentSystem,
+                        independent_variables,
+                        get_variables!,
+                        validate,
+                        CheckComponents,
+                        rename,
+                        namespace_variables
 
 import ModelingToolkit.SciMLBase: parameterless_type
 
-import Unitful:
-    Time,
-    TimeUnits,
-    Voltage,
-    VoltageUnits,
-    Current,
-    CurrentUnits,
-    Molarity,
-    ElectricalConductance,
-    ElectricalConductanceUnits
+#import Unitful:
+#                Time,
+#                TimeUnits,
+#                Voltage,
+#                VoltageUnits,
+#                Current,
+#                CurrentUnits,
+#                Molarity,
+#                ElectricalConductance,
+#                ElectricalConductanceUnits
 
-import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
+#import Unitful: mV, mS, cm, µF, mF, µm, pA, nA, mA, µA, ms, mM, µM
 
 import SymbolicUtils:
-    FnType,
-    symtype,
-    operation,
-    arguments
+                      FnType,
+                      symtype,
+                      operation,
+                      arguments
 
 import Base: show, display
 
@@ -96,7 +100,6 @@ export Simulation
 export @named
 
 export Calcium, Sodium, Potassium, Chloride, Cation, Anion, Leak, Ion, NonIonic
-export Temperature
 export t
 
 export CompartmentSystem, Compartment, ConductanceSystem, Conductance,
@@ -105,7 +108,7 @@ export CompartmentSystem, Compartment, ConductanceSystem, Conductance,
 export output, get_output, timeconstant, steadystate, forward_rate, reverse_rate,
        hasexponent, exponent
 
-export Sphere, Cylinder, Point, Unitless, area, radius, height
+export Sphere, Cylinder, Point, area, radius, height
 
 export HodgkinHuxley
 export Bias, PulseTrain, add_stimuli!

@@ -6,7 +6,7 @@ iseventbased(x::CurrentSystem{<:EventBasedSynapse}) = true
 discrete_spike_check(V,Vprev)::Bool = V >= 10. && Vprev < 10.
 
 function map_voltage_indices(network, simplified; roots_only = false)
-    dvs = states(simplified)
+    dvs = unknowns(simplified)
     if roots_only
         comps = root_compartments(get_topology(network))
     else
@@ -127,7 +127,7 @@ function SpikeAffect(synsys::SynapticSystem{T}, network, simplified) where {T<:C
         end
     end
 
-    state_indices = indexmap(syn_states, states(simplified))
+    state_indices = indexmap(syn_states, unknowns(simplified))
 
     return SpikeAffect{T}(synsys, Dict(zip(comps_with_syn, state_indices)))
 end
